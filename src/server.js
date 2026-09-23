@@ -7,6 +7,7 @@ import { errorResult } from './http/errors.js';
 import { getPath, requireMethod, SECURITY_HEADERS } from './http/policy.js';
 import { createNodeExplanation } from './runtime/node-explanation.js';
 import { readNodeJson } from './runtime/node-json.js';
+import { configuredPublicOrigin } from './runtime/node-origin.js';
 import { sendNodeStatic } from './runtime/node-static.js';
 
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
@@ -24,9 +25,10 @@ function sendJson(response, { status, body: value, headers = {} }) {
 
 /** Node composition root. Construct once so admission counters survive across requests. */
 export function createRequestHandler({ aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR, ...options } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, ...options } = {}) {
   const staticRoot = resolve(publicDir);
-  const explain = createNodeExplanation({ ...options, aiConfigured });
+  const trustedOrigin = configuredPublicOrigin(publicOrigin, env);
+  const explain = createNodeExplanation({ ...options, aiConfigured, env });
   return async (request, response) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);
     try {
@@ -34,7 +36,7 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
       const headers = { get: name => request.headers[name.toLowerCase()] ?? null };
       const protocol = request.socket.encrypted ? 'https' : 'http';
       // Forwarded headers are client-controlled unless a trusted proxy policy is configured.
-      const origin = `${protocol}://${request.headers.host}`;
+      const origin = trustedOrigin ?? `${protocol}://${request.headers.host}`;
       const result = await handleApiRequest({ pathname, method: request.method, headers, origin,
         readJson: () => readNodeJson(request, headers), aiConfigured: aiConfigured(), explain });
       request.resume();

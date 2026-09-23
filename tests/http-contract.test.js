@@ -47,7 +47,7 @@ async function startRuntime(t, runtime, explain = async () => explanation) {
   if (runtime === 'Node') {
     const publicDir = await mkdtemp(join(tmpdir(), 'ascension-contract-'));
     await Promise.all([...assets.values()].map(asset => writeFile(join(publicDir, asset.file), asset.body)));
-    const server = createAppServer({ publicDir, aiConfigured: () => false, explain });
+    const server = createAppServer({ env: {}, publicDir, aiConfigured: () => false, explain });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     t.after(async () => {
