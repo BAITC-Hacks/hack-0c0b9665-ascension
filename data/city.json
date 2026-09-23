@@ -1,0 +1,355 @@
+{
+  "budget": 100,
+  "horizon": 8,
+  "indicators": [
+    {
+      "id": "T1",
+      "name": "Разгрузка дорог",
+      "direction": "transport",
+      "weight": 0.1
+    },
+    {
+      "id": "T2",
+      "name": "Доступность общественного транспорта",
+      "direction": "transport",
+      "weight": 0.1
+    },
+    {
+      "id": "E1",
+      "name": "Озеленение",
+      "direction": "ecology",
+      "weight": 0.09
+    },
+    {
+      "id": "E2",
+      "name": "Качество воздуха",
+      "direction": "ecology",
+      "weight": 0.11
+    },
+    {
+      "id": "S1",
+      "name": "Школы и детсады",
+      "direction": "social",
+      "weight": 0.11
+    },
+    {
+      "id": "S2",
+      "name": "Поликлиники и первичная медпомощь",
+      "direction": "social",
+      "weight": 0.11
+    },
+    {
+      "id": "B1",
+      "name": "Безопасность улиц",
+      "direction": "safety",
+      "weight": 0.09
+    },
+    {
+      "id": "B2",
+      "name": "Безопасность дорожного движения",
+      "direction": "safety",
+      "weight": 0.09
+    },
+    {
+      "id": "C1",
+      "name": "Надёжность ЖКХ",
+      "direction": "services",
+      "weight": 0.1
+    },
+    {
+      "id": "C2",
+      "name": "Скорость решения обращений жителей",
+      "direction": "services",
+      "weight": 0.1
+    }
+  ],
+  "districts": [
+    {
+      "id": "esil",
+      "name": "Есиль",
+      "populationShare": 0.27,
+      "indicators": {
+        "T1": 45,
+        "T2": 62,
+        "E1": 68,
+        "E2": 72,
+        "S1": 48,
+        "S2": 55,
+        "B1": 78,
+        "B2": 60,
+        "C1": 75,
+        "C2": 70
+      }
+    },
+    {
+      "id": "almaty",
+      "name": "Алматы",
+      "populationShare": 0.24,
+      "indicators": {
+        "T1": 40,
+        "T2": 75,
+        "E1": 50,
+        "E2": 55,
+        "S1": 60,
+        "S2": 65,
+        "B1": 62,
+        "B2": 52,
+        "C1": 50,
+        "C2": 60
+      }
+    },
+    {
+      "id": "saryarka",
+      "name": "Сарыарка",
+      "populationShare": 0.2,
+      "indicators": {
+        "T1": 50,
+        "T2": 70,
+        "E1": 42,
+        "E2": 40,
+        "S1": 62,
+        "S2": 68,
+        "B1": 58,
+        "B2": 55,
+        "C1": 45,
+        "C2": 55
+      }
+    },
+    {
+      "id": "baikonur",
+      "name": "Байконур",
+      "populationShare": 0.13,
+      "indicators": {
+        "T1": 52,
+        "T2": 68,
+        "E1": 55,
+        "E2": 50,
+        "S1": 58,
+        "S2": 60,
+        "B1": 52,
+        "B2": 58,
+        "C1": 55,
+        "C2": 58
+      }
+    },
+    {
+      "id": "nura",
+      "name": "Нура",
+      "populationShare": 0.16,
+      "indicators": {
+        "T1": 55,
+        "T2": 40,
+        "E1": 45,
+        "E2": 65,
+        "S1": 38,
+        "S2": 35,
+        "B1": 55,
+        "B2": 50,
+        "C1": 60,
+        "C2": 50
+      }
+    }
+  ],
+  "measures": [
+    {
+      "id": "M1",
+      "name": "Выделенные полосы для автобусов",
+      "direction": "transport",
+      "scope": "district",
+      "cost": 18,
+      "lag": 2,
+      "effects": {
+        "T1": 6,
+        "T2": 9
+      }
+    },
+    {
+      "id": "M2",
+      "name": "Умные светофоры (адаптивное управление)",
+      "direction": "transport",
+      "scope": "city",
+      "cost": 22,
+      "lag": 2,
+      "effects": {
+        "T1": 4,
+        "B2": 3
+      }
+    },
+    {
+      "id": "M3",
+      "name": "Линия ЛРТ / расширение",
+      "direction": "transport",
+      "scope": "district",
+      "cost": 30,
+      "lag": 4,
+      "effects": {
+        "T1": 16,
+        "T2": 20,
+        "E2": 4
+      }
+    },
+    {
+      "id": "M4",
+      "name": "Парк / сквер",
+      "direction": "ecology",
+      "scope": "district",
+      "cost": 15,
+      "lag": 2,
+      "effects": {
+        "E1": 12,
+        "E2": 3,
+        "B1": 2
+      }
+    },
+    {
+      "id": "M5",
+      "name": "Перевод частного сектора на чистое топливо",
+      "direction": "ecology",
+      "scope": "district",
+      "cost": 25,
+      "lag": 3,
+      "effects": {
+        "E2": 14,
+        "C1": 4
+      }
+    },
+    {
+      "id": "M6",
+      "name": "Городская программа озеленения и ветрозащитных полос",
+      "direction": "ecology",
+      "scope": "city",
+      "cost": 20,
+      "lag": 4,
+      "effects": {
+        "E1": 5,
+        "E2": 3
+      }
+    },
+    {
+      "id": "M7",
+      "name": "Школа + детсад (модульное строительство)",
+      "direction": "social",
+      "scope": "district",
+      "cost": 24,
+      "lag": 3,
+      "effects": {
+        "S1": 16
+      }
+    },
+    {
+      "id": "M8",
+      "name": "Центр семейного здоровья / поликлиника",
+      "direction": "social",
+      "scope": "district",
+      "cost": 20,
+      "lag": 3,
+      "effects": {
+        "S2": 14
+      }
+    },
+    {
+      "id": "M9",
+      "name": "Дворовые спорт-хабы",
+      "direction": "social",
+      "scope": "district",
+      "cost": 10,
+      "lag": 1,
+      "effects": {
+        "S1": 3,
+        "S2": 3,
+        "B1": 3
+      }
+    },
+    {
+      "id": "M10",
+      "name": "Освещение и камеры (расширение Safe City)",
+      "direction": "safety",
+      "scope": "district",
+      "cost": 12,
+      "lag": 1,
+      "effects": {
+        "B1": 12,
+        "B2": 2
+      }
+    },
+    {
+      "id": "M11",
+      "name": "Безопасные переходы и школьные зоны",
+      "direction": "safety",
+      "scope": "district",
+      "cost": 10,
+      "lag": 1,
+      "effects": {
+        "B2": 12,
+        "T1": -2
+      }
+    },
+    {
+      "id": "M12",
+      "name": "Единая цифровая платформа обращений",
+      "direction": "services",
+      "scope": "city",
+      "cost": 14,
+      "lag": 1,
+      "effects": {
+        "C2": 5
+      }
+    },
+    {
+      "id": "M13",
+      "name": "Модернизация тепло- и водосетей",
+      "direction": "services",
+      "scope": "district",
+      "cost": 28,
+      "lag": 4,
+      "effects": {
+        "C1": 18,
+        "E2": 2
+      }
+    },
+    {
+      "id": "M14",
+      "name": "Аварийные бригады ЖКХ + раннее оповещение",
+      "direction": "services",
+      "scope": "city",
+      "cost": 16,
+      "lag": 1,
+      "effects": {
+        "C1": 5,
+        "C2": 2
+      }
+    }
+  ],
+  "synergies": [
+    {
+      "pair": [
+        "M1",
+        "M2"
+      ],
+      "districtFrom": "M1",
+      "effects": {
+        "T1": 2
+      }
+    },
+    {
+      "pair": [
+        "M10",
+        "M12"
+      ],
+      "districtFrom": "M10",
+      "effects": {
+        "B1": 2
+      }
+    },
+    {
+      "pair": [
+        "M5",
+        "M6"
+      ],
+      "districtFrom": "M5",
+      "effects": {
+        "E2": 2
+      }
+    }
+  ]
+}
