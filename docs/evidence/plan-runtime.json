@@ -1,0 +1,37 @@
+{
+  "startedAt": "2026-09-23T11:55:00.891Z",
+  "bundle": ".wrangler/plan-dry-run/cloudflare.js",
+  "checks": [
+    {
+      "name": "keyless plan returns honest unavailable with no result or outbound request",
+      "passed": true
+    },
+    {
+      "name": "invalid prompt, injected key and malformed JSON return structured 400",
+      "passed": true
+    },
+    {
+      "name": "trajectory keeps official cost/score anchors; invalid scenario returns 422 without provider calls",
+      "passed": true,
+      "cost": 95,
+      "score": 56.54307
+    },
+    {
+      "name": "local provider response passes real rate limiter and SQLite admission and computes official result",
+      "passed": true
+    },
+    {
+      "name": "mixed plan then explain shares configured one-request cap without another provider call",
+      "passed": true
+    }
+  ],
+  "mockedProviderRequests": 1,
+  "blockedUnexpectedRequests": 0,
+  "realExternalRequests": 0,
+  "instrumentation": "None: exact unchanged compiled bundle runs directly as the entry script.",
+  "bundleSha256": "fa8aa0d491b0be374270b686774516bda7980148de5e0e5e2697d758edc96cbf",
+  "passed": true,
+  "finishedAt": "2026-09-23T11:55:02.318Z",
+  "limitation": "HTTP behavior and one provider call verified against real rate limiter and SQLite AIBudget; durable lease rows were not inspected directly.",
+  "sourceCommit": "e795b211501d41ca703fef1b7ea564ccc51a5e15"
+}
