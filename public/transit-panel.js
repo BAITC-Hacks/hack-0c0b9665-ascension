@@ -9,6 +9,7 @@ const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&':
 const natural = (a, b) => a.number.localeCompare(b.number, 'ru', { numeric: true });
 const label = (route) => `${route.from || 'Начальная остановка не указана'} → ${route.to || 'Конечная остановка не указана'}`;
 const date = (value) => value ? new Date(value).toLocaleDateString('ru-RU') : 'не указана';
+const errorMessage = (error) => error instanceof TypeError ? 'сервис временно не отвечает или ограничил доступ' : error?.message || 'ошибка сети';
 
 export function routeCatalog(city, data) {
   const entries = city?.id === 'astana' ? ASTANA_ROUTES.map((r) => ({ ...r, source: 'screenshot', relations: [] })) : [];
@@ -123,7 +124,7 @@ export function mountTransitPanel({ host, city, client = createTransitClient(), 
       state.geometry = EMPTY();
       status(`Получено ${data.stops.length} остановок и ${data.routes.length} направлений OSM в области города. Это не данные движения автобусов.`);
     } catch (error) {
-      if (!state.destroyed && generation === state.generation) status(`OSM сейчас недоступен: ${error.message || 'ошибка сети'}. ${state.data ? 'Сохранённые данные остаются доступными.' : 'Попробуйте позже.'}`);
+      if (!state.destroyed && generation === state.generation) status(`OSM сейчас недоступен: ${errorMessage(error)}. ${state.data ? 'Сохранённые данные остаются доступными.' : 'Попробуйте позже.'}`);
     } finally {
       if (!state.destroyed && generation === state.generation) { state.busy = false; render(); }
     }
@@ -147,7 +148,7 @@ export function mountTransitPanel({ host, city, client = createTransitClient(), 
       }
       status(geometry.features.length ? 'Показаны сегменты выбранного направления из OSM. GPS и расписание не подключены.' : 'В OSM нет геометрии для выбранного направления.');
     } catch (error) {
-      if (!state.destroyed && generation === state.generation) status(`Не удалось загрузить линию: ${error.message || 'ошибка сети'}.`);
+      if (!state.destroyed && generation === state.generation) status(`Не удалось загрузить линию: ${errorMessage(error)}.`);
     } finally {
       if (!state.destroyed && generation === state.generation) { state.busy = false; render(); }
     }
