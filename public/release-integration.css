@@ -5,6 +5,8 @@
 .sidebar { overflow-y: auto; }
 .sidebar > .brand, .sidebar-bottom { flex-shrink: 0; }
 .sidebar nav { flex-shrink: 0; }
+.sidebar .nav-item .nav-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; width: 22px; height: 22px; line-height: 0; }
+.sidebar .nav-icon svg { display: block; width: 100%; height: 100%; }
 #decision-brief, #action-register-panel, #evidence-register-panel, #scenario-library { scroll-margin-top: 24px; min-width: 0; }
 #action-register-panel .action-register, #evidence-register-panel .evidence-register, #decision-brief .decision-brief-root { border-color: var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); font-family: inherit; }
 #local-scenarios .library-item { display: block; }
@@ -28,7 +30,7 @@
   .sidebar nav { position: static; display: flex; overflow-x: auto; align-items: stretch; gap: 6px; margin: 10px 0 0; padding: 4px 0; box-shadow: none; scrollbar-width: thin; }
   .sidebar nav .nav-item, .sidebar nav .nav-item[data-mobile-label] { display: flex; flex: 0 0 auto; flex-direction: row; min-width: auto; gap: 7px; padding: 9px 12px; margin: 0; min-height: 42px; font-size: 11px; }
   .sidebar nav .nav-item[data-mobile-label]::after { content: none; }
-  .sidebar nav .nav-item span { font-size: 16px; }
+  .sidebar .nav-item .nav-icon { flex-basis: 20px; width: 20px; height: 20px; }
   .topbar { padding-inline: 16px; gap: 8px; }
   .breadcrumb { min-width: 0; font-size: 10px; }
   .breadcrumb > span, .breadcrumb > strong { display: none; }
