@@ -134,7 +134,7 @@ test('temporary validation failure keeps the handoff for an explicit reload retr
 });
 
 test('the app cancels navigation visibly when storage fails or validation is pending', async () => {
-  const source = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  const source = (await readFile(new URL('../public/app.js', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
   const start = source.indexOf("document.addEventListener('click', (event) => {\n  const destination");
   const end = source.indexOf('\nfunction renderResult', start);
   assert.ok(start >= 0 && end > start);

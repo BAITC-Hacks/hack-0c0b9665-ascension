@@ -137,7 +137,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     button.append(element('strong', '', panel.title), element('span', '', panel.description));
     toolsPane.append(button);
   }
-  for (const [href, title, description] of [['/classic.html', 'Компактный симулятор', 'План и результаты на одной странице'], ['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Кабинет акимата', 'Работа с обращениями и поручениями']]) {
+  for (const [href, title, description] of [['/classic.html', 'Компактный симулятор', 'План и результаты на одной странице'], ['/mayor-overview.html', 'Рабочее пространство акима', 'Девять разделов: от обзора города до поручений'], ['/demo.html', 'Учебный маршрут', 'Пройдите пример решения за 90 секунд'], ['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Обращения в акимате', 'Работа с обращениями и ответственными']]) {
     const link = element('a', 'cc-tool-card'); link.href = href;
     link.append(element('strong', '', title), element('span', '', description)); toolsPane.append(link);
   }
