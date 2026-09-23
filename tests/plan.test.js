@@ -90,6 +90,31 @@ test('missing key and invalid inputs never call the provider', async () => {
   assert.equal(calls, 0);
 });
 
+test('plan evaluation, budget checks and impact visualization are transmitted as supported server capabilities', async () => {
+  const prompt = 'Оцени и составь план ровно из пяти мер: в Нуре построить школу с детсадом, открыть поликлинику и добавить освещение с камерами; во всём городе внедрить единую цифровую платформу обращений; в Сарыарке перевести частный сектор на чистое топливо. Используй только эти пять мер. Проверь бюджет и покажи влияние на город.';
+  const output = await proposePlan({ prompt }, options(async (_url, init) => {
+    const request = JSON.parse(init.body);
+    const instruction = request.input.find(message => message.role === 'developer').content;
+    for (const capability of ['оценить план', 'проверить бюджет', 'провести симуляцию', 'рассчитать влияние', 'визуализацию']) {
+      assert.ok(instruction.includes(capability), `Missing supported capability: ${capability}`);
+    }
+    assert.match(instruction, /никогда не записывай их в unsupported/);
+    assert.match(instruction, /не утверждаешь, что он уже проведён/);
+    const unsupported = request.text.format.schema.properties.unsupported;
+    assert.match(unsupported.description, /поддерживаемые функции приложения/);
+    assert.match(unsupported.description, /их нельзя включать в unsupported/);
+    assert.equal(request.input.at(-1).content, prompt);
+    // Fixture for the supported five-measure request: the server performs the
+    // budget check and numerical simulation after this qualitative translation.
+    return jsonResponse(envelope(plan()));
+  }));
+  assert.equal(output.valid, true);
+  assert.deepEqual(output.unsupported, []);
+  assert.deepEqual(output.decisions, scenario().decisions);
+  assert.deepEqual(output.result, simulate(scenario()));
+  assert.equal(output.result.totalCost, 95);
+});
+
 test('short requests remain short and do not get hidden filler measures', async () => {
   const proposal = plan();
   proposal.decisions = [proposal.decisions[0]];
