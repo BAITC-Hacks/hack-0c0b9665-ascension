@@ -1,5 +1,5 @@
 const KEY = 'ascension:scenario-view-transfer:v1';
-const PATHS = new Set(['/', '/index.html', '/command-center.html', '/classic.html']);
+const PATHS = new Set(['/command-center.html', '/classic.html']);
 const MAX_LENGTH = 2048;
 const MAX_AGE = 30 * 60 * 1000;
 

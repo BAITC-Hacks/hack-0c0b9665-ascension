@@ -21,12 +21,11 @@ function setup() {
 const link = (href, extra = {}) => ({ href, target: '', hasAttribute: () => false, ...extra });
 
 test('only same-tab same-origin simulator view changes qualify', () => {
-  for (const path of ['/index.html', '/command-center.html', '/classic.html']) {
-    assert.equal(scenarioViewDestination(link(origin + path), origin + '/'), path);
-    assert.equal(scenarioViewDestination(link(origin + '/'), origin + path), '/');
+  for (const [from, to] of [['/command-center.html', '/classic.html'], ['/classic.html', '/command-center.html']]) {
+    assert.equal(scenarioViewDestination(link(origin + to), origin + from), to);
   }
-  for (const href of [origin + '/#workspace', origin + '/citizens.html', origin + '/mayor.html', 'https://other.test/classic.html']) {
-    assert.equal(scenarioViewDestination(link(href), origin + '/'), null);
+  for (const href of [origin + '/', origin + '/index.html', origin + '/command-center.html#workspace', origin + '/citizens.html', origin + '/mayor.html', 'https://other.test/classic.html']) {
+    assert.equal(scenarioViewDestination(link(href), origin + '/command-center.html'), null);
   }
   for (const event of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }, { defaultPrevented: true }]) {
     assert.equal(scenarioViewDestination(link(origin + '/classic.html'), origin + '/', event), null);
@@ -142,7 +141,7 @@ test('the app cancels navigation visibly when storage fails or validation is pen
     let handler, prevented = false, opened = false, message;
     runInNewContext(source.slice(start, end), {
       document: { addEventListener: (_, listener) => { handler = listener; } },
-      scenarioViewDestination, location: { href: origin + '/' },
+      scenarioViewDestination, location: { href: origin + '/command-center.html' },
       state: { dataset: {}, decisions: demo, busy, hasScenarioData: true }, currentCity: { id: 'astana' },
       viewTransfer: { save() { throw new Error('Storage denied'); } },
       commandCenter: { openPanel(name) { opened = name === 'workspace'; } },
