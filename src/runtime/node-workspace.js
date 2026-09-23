@@ -76,7 +76,11 @@ export function createNodeWorkspace({ env = process.env, dbPath, publicDir = PUB
         let storageFailed = false;
         const port = Object.fromEntries(REPOSITORY_METHODS.map(method => [method, (...args) => {
           try { return getRepository()[method](...args); }
-          catch (error) { storageFailed = true; throw error; }
+          catch (error) {
+            // Expected domain errors, such as revision conflicts, keep their service response.
+            if (!(error instanceof WorkspaceError)) storageFailed = true;
+            throw error;
+          }
         }]));
         const handler = createWorkspaceHandler({ repository: port, getConfig: () => env });
         await handleNodeWebRequest(request, response, {

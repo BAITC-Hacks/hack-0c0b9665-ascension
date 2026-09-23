@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#153d35">
+  <meta name="theme-color" content="#F4F2EB">
   <meta name="description" content="Аким на 5 часов — симулятор городских решений на синтетических данных. Пять решений, единый бюджет и измеримый результат.">
-  <title>Аким на 5 часов · Ascension</title>
+  <title>Сценарии · ASCENSION</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/comparison.css">
   <link rel="stylesheet" href="/scenario-library.css">
@@ -17,29 +17,25 @@
   <link rel="stylesheet" href="/decision-brief.css">
   <link rel="stylesheet" href="/evidence-register.css">
   <link rel="stylesheet" href="/dashboard.css">
-  <link rel="stylesheet" href="/visual-design.css">
+
   <link rel="stylesheet" href="/motion.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/comparison.js"></script>
   <script type="module" src="/motion.js"></script>
+  <link rel="icon" href="/assets/design/ascension-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/brand.css">
+  <link rel="stylesheet" href="/simulator-design.css">
+  <link rel="stylesheet" href="/widgets-design.css">
 </head>
-<body class="compact-layout">
+<body class="compact-layout ascension-design">
   <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
-  <header class="compact-header">
-    <a class="compact-brand" href="#top" aria-label="Аким на 5 часов — начало">ASCENSION<span>Аким на 5 часов</span></a>
-    <nav aria-label="Основная навигация">
-      <a class="compact-link" href="/">3D-карта</a>
-      <a class="compact-link active" href="#workspace" aria-current="page">Симулятор</a>
-      <a class="compact-link" href="/citizens.html">Жителям</a>
-      <a class="compact-link" href="/mayor.html">Панель акима</a>
-    </nav>
-  </header>
+<header class="brand-header"><a class="brand-logo" href="/" aria-label="ASCENSION — главная"><img src="/assets/design/ascension-mark.svg" width="30" height="34" alt=""><strong>ASCENSION</strong></a><nav class="brand-nav" aria-label="Основная навигация"><a href="/">Обзор</a><a href="/classic.html#workspace" aria-current="page">Сценарии</a><a href="/citizens.html">Обращения</a><a href="/classic.html#action-register-details">Поручения</a><a href="/classic.html#city">Данные</a></nav><a class="brand-resident" href="/command-center.html">Карта и ИИ ↗</a></header>
 
   <main id="top">
     <div class="page-content">
       <section class="hero" aria-labelledby="page-title">
-        <div><div class="eyebrow">СИМУЛЯТОР ГОРОДСКИХ РЕШЕНИЙ</div><h1 id="page-title">Что вы измените в городе?</h1><p>Выберите 5 решений в пределах 100 условных единиц.<br>Посмотрите, как изменится жизнь в районах Астаны.</p></div>
-        <div class="hero-actions model-only"><button class="button button-outline" id="demo-button" disabled>Попробовать на примере</button><button class="text-button" id="reset-button" disabled hidden>Начать заново</button></div>
+        <div><div class="eyebrow">ВАШ СЦЕНАРИЙ / АСТАНА</div><h1 id="page-title">Пять решений.<br>Один город.</h1><p>Выберите 5 решений в пределах 100 условных единиц.<br>Посмотрите, как изменится жизнь в районах Астаны.</p></div>
+        <div class="hero-actions model-only"><button class="button button-outline" id="demo-button" disabled>Загрузить пример</button><button class="text-button" id="reset-button" disabled hidden>Начать заново</button></div>
       </section>
 
       <div id="loading" class="loading-state" role="status">Загружаем исходные данные города…</div>
@@ -56,14 +52,14 @@
 
         <section id="workspace" class="workspace model-only" aria-label="Конструктор сценария">
           <div class="catalog-area">
-            <div class="section-heading"><div><h2>Выберите решения</h2></div><span class="quiet-tag" id="planning-district">Астана · 5 районов</span></div>
+            <div class="section-heading"><div><div class="eyebrow">01 / КАТАЛОГ МЕР</div><h2>Что изменим?</h2></div><span class="quiet-tag" id="planning-district">Астана · 5 районов</span></div>
             <p class="section-description">Начните с направления. Можно выбрать не более 2 решений в каждом.</p>
             <div id="filters" class="filters" role="group" aria-label="Фильтр по направлению"></div>
             <div id="error-box" class="error-box" role="alert" tabindex="-1" hidden></div>
             <div id="catalog" class="catalog-grid"></div>
           </div>
           <aside class="plan-panel" aria-labelledby="plan-heading">
-            <div class="plan-heading"><div><h2 id="plan-heading">Ваш план</h2></div><span id="plan-count" class="count-badge">0/5</span></div>
+            <div class="plan-heading"><div><div class="eyebrow">02 / ВАШ СЦЕНАРИЙ</div><h2 id="plan-heading">План решений</h2></div><span id="plan-count" class="count-badge">0/5</span></div>
             <div id="selected-list" class="selected-list"></div>
             <div class="plan-summary"><div><span>Стоимость решений</span><strong><span id="plan-total">0</span> <small>у. е.</small></strong></div><div><span>Остаток бюджета</span><strong class="green"><span id="plan-left">100</span> <small>у. е.</small></strong></div></div>
             <button id="simulate-button" class="button button-primary" disabled>Посмотреть результат</button>

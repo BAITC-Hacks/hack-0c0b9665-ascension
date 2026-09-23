@@ -164,6 +164,73 @@ test('Node workspace preserves Secure cookie, Origin, SQLite document, audit and
   await revoked.arrayBuffer();
 });
 
+test('Node workspace conflicts preserve the document, audit and authenticated session', async t => {
+  const directory = temporaryDirectory(t);
+  const { env, accessKey } = await configuration();
+  const server = await startServer(t, createNodeWorkspace({ env, dbPath: join(directory, 'workspace.sqlite') }));
+  const decisions = [1, 2, 3, 4, 5].map(id => ({ measureId: `M${id}`, districtId: 'nura' }));
+  const labels = decisions.map(decision => ({ ...decision, measureName: decision.measureId, districtName: 'Nura' }));
+  const createdAt = '2026-09-23T11:00:00.000Z';
+  const document = { schemaVersion: 2, registers: [{
+    id: 'register-1', sourceKey: JSON.stringify(['astana', decisions.map(({ measureId, districtId }) => [measureId, districtId])]),
+    createdAt,
+    source: { city: { id: 'astana', name: 'Astana' }, scenario: { decisions }, labels, calculatedAt: createdAt,
+      result: { valid: true, score: 56.54, totalCost: 95, remainingBudget: 5, criticalCount: 1 } },
+    actions: labels.map((label, index) => ({ id: `action-${index}`, ...label, owner: 'Fixture owner',
+      dueDate: '', criterion: '', status: 'draft', evidence: '', implementation: {
+        siteAddress: '', siteBasis: '', siteSourceUrl: '',
+        kpi: { name: '', unit: '', baseline: null, target: null, source: '' },
+        budget: { capexKzt: null, opexKzt: null, opexPeriod: '', estimateSource: '', estimateDate: '' },
+        prerequisites: '', nextStep: '',
+      } })),
+  }] };
+  const login = await server.request('session', { method: 'POST', body: { accessKey }, headers: { Origin: ORIGIN } });
+  assert.equal(login.status, 200);
+  const identity = (await login.json()).identity;
+  const cookie = login.headers.get('Set-Cookie').split(';')[0];
+  const headers = { Cookie: cookie, Origin: ORIGIN };
+  const published = await server.request('register', { method: 'PUT', headers, body: { expectedRevision: 0, document } });
+  assert.equal(published.status, 200);
+  assert.deepEqual(await published.json(), { revision: 1, document });
+  const auditBefore = await server.request('audit', { headers });
+  assert.equal(auditBefore.status, 200);
+  const journal = await auditBefore.json();
+  assert.equal(journal.entries.length, 1);
+  assert.deepEqual(journal.entries[0].summary, { registers: 1, actions: 5 });
+
+  const conflict = await server.request('register', { method: 'PUT', headers,
+    body: { expectedRevision: 0, document: EMPTY_DOCUMENT } });
+  assert.equal(conflict.status, 409);
+  assertPrivateHeaders(conflict);
+  const { error } = await conflict.json();
+  assert.equal(error.code, 'REVISION_CONFLICT');
+  assert.equal(error.currentRevision, 1);
+  assert.equal(conflict.headers.get('Set-Cookie'), null);
+  const current = await server.request('register', { headers });
+  assert.equal(current.status, 200);
+  assert.deepEqual(await current.json(), { revision: 1, document });
+  const auditAfter = await server.request('audit', { headers });
+  assert.equal(auditAfter.status, 200);
+  assert.deepEqual(await auditAfter.json(), journal);
+  const session = await server.request('session', { headers });
+  assert.equal(session.status, 200);
+  assert.deepEqual((await session.json()).identity, identity);
+
+  const retried = await server.request('register', { method: 'PUT', headers,
+    body: { expectedRevision: 1, document: EMPTY_DOCUMENT } });
+  assert.equal(retried.status, 200);
+  assert.deepEqual(await retried.json(), { revision: 2, document: EMPTY_DOCUMENT });
+  const finalRead = await server.request('register', { headers });
+  assert.equal(finalRead.status, 200);
+  assert.deepEqual(await finalRead.json(), { revision: 2, document: EMPTY_DOCUMENT });
+  const finalAudit = await server.request('audit', { headers });
+  assert.equal(finalAudit.status, 200);
+  const { entries } = await finalAudit.json();
+  assert.deepEqual(entries.map(entry => entry.revision), [2, 1]);
+  assert.deepEqual(entries[1], journal.entries[0]);
+  assert.deepEqual(entries[0].actor, identity);
+});
+
 test('Node workspace login limit uses the connection address rather than spoofed proxy headers', async t => {
   const directory = temporaryDirectory(t);
   const { env } = await configuration();
