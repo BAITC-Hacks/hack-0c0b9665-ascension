@@ -1,6 +1,6 @@
 // Browser-only consumer of the integration contract; all scores come from the core.
 const metrics = [
-  ['score', 'Итоговый Score'],
+  ['score', 'Качество жизни'],
   ['totalCost', 'Потрачено'],
   ['remainingBudget', 'Остаток бюджета'],
   ['criticalCount', 'Критических показателей'],
@@ -77,6 +77,8 @@ function mount() {
   let saved = [];
 
   function render() {
+    const disclosure = document.getElementById('comparison-details');
+    if (disclosure) disclosure.hidden = saved.length < 2;
     slots.replaceChildren();
     for (let index = 0; index < 2; index += 1) {
       const label = index === 0 ? 'A' : 'B';
