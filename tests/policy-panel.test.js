@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mountPolicyOptionsPanel } from '../public/policy-options-panel.js';
 import { getDataset, simulate } from '../src/core/simulator.js';
+import { buildPolicyOptions } from '../src/core/policy-options.js';
 
 // Minimal DOM surface, kept local to this test file; no browser globals or packages.
 class Element extends EventTarget {
@@ -51,6 +52,8 @@ const fixture = {
   }], errors: [], emptyReason: null,
 };
 const response = (data = fixture) => ({ ok: true, status: 200, json: async () => structuredClone(data) });
+const change = (node, value) => { node.value = value; node.dispatchEvent(new Event('change')); };
+const check = (node, checked = true) => { node.checked = checked; node.dispatchEvent(new Event('change')); };
 
 function setup(options = {}) {
   const window = new EventTarget();
@@ -69,6 +72,126 @@ function setup(options = {}) {
     cards: () => byClass(container, 'policy-options-card'),
   };
 }
+
+test('constraints stay compact and send exact decisions and named priority scope through the envelope', async () => {
+  let sent;
+  const ui = setup({ fetcher: async (_url, options) => {
+    sent = JSON.parse(options.body);
+    return response(buildPolicyOptions(sent.scenario ?? sent, { constraints: sent.constraints }));
+  } });
+  ui.emit('scenario:calculated', baseline);
+  assert.equal(byClass(ui.container, 'policy-options-constraints')[0].tagName, 'details');
+  const locks = byClass(ui.container, 'policy-options-lock');
+  assert.equal(locks.length, 5);
+  check(locks[4]);
+  change(byClass(ui.container, 'policy-options-priority')[0], 'E2');
+  change(byClass(ui.container, 'policy-options-priority-district')[0], 'saryarka');
+  ui.button().click();
+  await wait();
+  assert.deepEqual(sent, { scenario, constraints: { lockedDecisions: [scenario.decisions[4]],
+    protectedIndicator: { indicatorId: 'E2', districtId: 'saryarka' } } });
+  assert.ok(ui.cards().length > 0);
+  assert.match(ui.container.textContent, /Качество воздуха/);
+  assert.match(ui.container.textContent, /Сарыарка/);
+  assert.match(ui.container.textContent, /текущего рассчитанного плана/);
+  assert.match(ui.container.textContent, /в рамках выбранных ограничений/);
+  ui.mount.destroy();
+});
+
+test('changing constraints aborts pending work and rejects stale cards even when transport ignores abort', async () => {
+  const pending = deferred();
+  let signal;
+  const ui = setup({ fetcher: async (_url, options) => { signal = options.signal; return pending.promise; } });
+  ui.emit('scenario:calculated', baseline);
+  ui.button().click();
+  check(byClass(ui.container, 'policy-options-lock')[0]);
+  assert.equal(signal.aborted, true);
+  assert.equal(ui.button().disabled, false);
+  pending.resolve(response());
+  await wait();
+  assert.equal(ui.cards().length, 0);
+  assert.match(ui.status(), /Ограничения изменены/);
+  ui.mount.destroy();
+});
+
+test('ignored constraints and a lying response are rejected rather than presented as protected', async () => {
+  for (const data of [fixture, { ...fixture, constraintScope: 'constrained',
+    constraints: { lockedDecisions: [scenario.decisions[4]], protectedIndicator: null } }]) {
+    const ui = setup({ fetcher: async () => response(data) });
+    ui.emit('scenario:calculated', baseline);
+    check(byClass(ui.container, 'policy-options-lock')[4]);
+    ui.button().click();
+    await wait();
+    assert.equal(ui.cards().length, 0);
+    assert.match(ui.status(), /не подтвердил ограничения/);
+    ui.mount.destroy();
+  }
+  const ui = setup({ fetcher: async () => response({ ...fixture, constraintScope: 'constrained',
+    constraints: { lockedDecisions: [], protectedIndicator: { indicatorId: 'E2' } } }) });
+  ui.emit('scenario:calculated', baseline);
+  change(byClass(ui.container, 'policy-options-priority')[0], 'E2');
+  ui.button().click();
+  await wait();
+  assert.equal(ui.cards().length, 0);
+  assert.match(ui.status(), /не подтвердил ограничения/);
+  ui.mount.destroy();
+});
+
+test('all-locked reason, city gating and recalculation reset do not leave hidden active constraints', async () => {
+  const bodies = [];
+  const ui = setup({ fetcher: async (_url, options) => {
+    const sent = JSON.parse(options.body); bodies.push(sent);
+    return response(buildPolicyOptions(sent.scenario ?? sent, { constraints: sent.constraints }));
+  } });
+  ui.emit('scenario:calculated', baseline);
+  for (const lock of byClass(ui.container, 'policy-options-lock')) check(lock);
+  ui.button().click();
+  await wait();
+  assert.equal(ui.cards().length, 0);
+  assert.match(ui.status(), /Все пять решений закреплены/);
+  ui.emit('city:changed', { hasScenarioData: false });
+  assert.equal(byClass(ui.container, 'policy-options-lock').length, 0);
+  assert.equal(ui.button().disabled, true);
+  ui.emit('city:changed', { hasScenarioData: true });
+  ui.emit('scenario:calculated', baseline);
+  ui.button().click();
+  await wait();
+  assert.deepEqual(bodies[1], scenario);
+  assert.ok(ui.cards().length > 0);
+  ui.mount.destroy();
+});
+
+test('each option names district indicator regressions against the current plan in expandable details', async () => {
+  const ui = setup();
+  ui.emit('scenario:calculated', baseline);
+  ui.button().click();
+  await wait();
+  const worsened = byClass(ui.container, 'policy-options-worsened')[0];
+  assert.equal(worsened.tagName, 'details');
+  assert.match(worsened.textContent, /Что ухудшается относительно вашего плана/);
+  assert.match(worsened.textContent, /Сарыарка: Качество воздуха/);
+  assert.match(worsened.textContent, /→/);
+  const oldLoad = byClass(ui.container, 'policy-options-load')[0];
+  let loaded = false;
+  ui.window.addEventListener('scenario:load', () => { loaded = true; });
+  change(byClass(ui.container, 'policy-options-priority')[0], 'E2');
+  oldLoad.click();
+  assert.equal(loaded, false);
+  assert.equal(ui.cards().length, 0);
+  ui.mount.destroy();
+});
+
+test('missing district indicators never claim that no indicators worsen', async () => {
+  const incomplete = structuredClone(fixture);
+  delete incomplete.options[0].result.districts[0].after;
+  const ui = setup({ fetcher: async () => response(incomplete) });
+  ui.emit('scenario:calculated', baseline);
+  ui.button().click();
+  await wait();
+  assert.match(ui.container.textContent, /Данных для полного сравнения районных показателей недостаточно/);
+  assert.doesNotMatch(ui.container.textContent, /Ухудшений показателей относительно вашего плана нет/);
+  ui.mount.destroy();
+});
 
 test('import is safe without DOM and a valid calculation enables only an explicit request', async () => {
   assert.equal(typeof globalThis.document, 'undefined');

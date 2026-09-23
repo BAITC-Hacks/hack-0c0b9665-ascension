@@ -578,19 +578,57 @@ function selectOptions(frontier, limit) {
   }));
 }
 var direction = (difference) => difference > 0 ? "improved" : difference < 0 ? "worse" : "unchanged";
-function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT } = {}) {
+var record = (value) => value !== null && typeof value === "object" && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+var onlyKeys = (value, keys) => record(value) && Object.keys(value).every((key) => keys.includes(key));
+function normalizeConstraints(value, scenario, dataset) {
+  if (value === void 0) value = {};
+  if (!onlyKeys(value, ["lockedDecisions", "protectedIndicator"])) return null;
+  const locks = value.lockedDecisions === void 0 ? [] : value.lockedDecisions;
+  if (!Array.isArray(locks) || locks.length > scenario.decisions.length) return null;
+  const keys = /* @__PURE__ */ new Set();
+  for (const lock of locks) {
+    if (!onlyKeys(lock, ["measureId", "districtId"]) || typeof lock.measureId !== "string" || Object.hasOwn(lock, "districtId") && typeof lock.districtId !== "string") return null;
+    const original = scenario.decisions.find((decision) => decision.measureId === lock.measureId);
+    if (!original || original.districtId !== lock.districtId || keys.has(decisionKey(lock))) return null;
+    keys.add(decisionKey(lock));
+  }
+  const protection = value.protectedIndicator === void 0 ? null : value.protectedIndicator;
+  if (protection !== null && (!onlyKeys(protection, ["indicatorId", "districtId"]) || !dataset.indicators.some(({ id }) => id === protection.indicatorId) || Object.hasOwn(protection, "districtId") && !dataset.districts.some(({ id }) => id === protection.districtId))) return null;
+  return {
+    lockedDecisions: canonicalScenario(locks).decisions,
+    protectedIndicator: protection === null ? null : { ...protection }
+  };
+}
+function worsenedIndicators(result, baseline2, dataset) {
+  return result.districts.flatMap((district) => {
+    const previous = baseline2.districts.find(({ id }) => id === district.id);
+    return dataset.indicators.filter(({ id }) => district.after[id] < previous.after[id]).map(({ id, name }) => ({
+      districtId: district.id,
+      districtName: district.name,
+      indicatorId: id,
+      indicatorName: name,
+      baseline: previous.after[id],
+      value: district.after[id],
+      delta: district.after[id] - previous.after[id]
+    }));
+  });
+}
+function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT, constraints } = {}) {
   limit = Number.isFinite(limit) ? Math.max(0, Math.min(MAX_LIMIT, Math.floor(limit))) : DEFAULT_LIMIT;
   const baselineResult = simulate(scenario);
   const response = {
     valid: baselineResult.valid,
     scope: "single-decision-neighborhood",
     exhaustiveWithinScope: baselineResult.valid,
+    constraintScope: "unrestricted",
+    constraints: null,
     baseline: {
       scenario: baselineResult.valid ? canonicalScenario(scenario.decisions) : structuredClone(scenario ?? null),
       result: baselineResult
     },
     explored: 0,
     validCandidates: 0,
+    rejectedByConstraints: 0,
     paretoCandidates: 0,
     limit,
     truncated: false,
@@ -606,11 +644,35 @@ function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT } = {}) {
     return response;
   }
   const dataset = getDataset();
+  const normalized = normalizeConstraints(constraints, scenario, dataset);
+  if (!normalized) {
+    response.valid = false;
+    response.exhaustiveWithinScope = false;
+    response.errors = [{
+      code: "INVALID_CONSTRAINTS",
+      message: "Ограничения не приняты: закрепляйте только точные решения текущего плана и известные показатели и районы."
+    }];
+    response.emptyReason = response.errors[0];
+    return response;
+  }
+  response.constraints = normalized;
+  const lockedKeys = new Set(normalized.lockedDecisions.map(decisionKey));
+  const protection = normalized.protectedIndicator;
+  const constrained = lockedKeys.size > 0 || protection !== null;
+  response.constraintScope = constrained ? "constrained" : "unrestricted";
+  if (lockedKeys.size === scenario.decisions.length) {
+    response.emptyReason = {
+      code: "ALL_DECISIONS_LOCKED",
+      message: "Все пять решений закреплены. Снимите хотя бы одно закрепление, чтобы искать замену."
+    };
+    return response;
+  }
   const choices = dataset.measures.flatMap((measure) => measure.scope === "city" ? [{ measureId: measure.id }] : dataset.districts.map((district) => ({ measureId: measure.id, districtId: district.id })));
   const baselineScenario = response.baseline.scenario;
   const seen = /* @__PURE__ */ new Set([scenarioKey(baselineScenario)]);
   const candidates = [];
   for (const removed of baselineScenario.decisions) {
+    if (lockedKeys.has(decisionKey(removed))) continue;
     const retained = baselineScenario.decisions.filter((decision) => decision !== removed);
     const retainedIds = new Set(retained.map((decision) => decision.measureId));
     for (const added of choices) {
@@ -622,6 +684,11 @@ function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT } = {}) {
       response.explored++;
       const result = simulate(candidateScenario);
       if (!result.valid) continue;
+      const worsened = worsenedIndicators(result, baselineResult, dataset);
+      if (protection && worsened.some((item) => item.indicatorId === protection.indicatorId && (protection.districtId === void 0 || item.districtId === protection.districtId))) {
+        response.rejectedByConstraints++;
+        continue;
+      }
       response.validCandidates++;
       const delta = {
         score: result.score - baselineResult.score,
@@ -633,6 +700,7 @@ function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT } = {}) {
         id: `single:${key}`,
         scenario: candidateScenario,
         result,
+        worsenedIndicators: worsened,
         delta,
         changed: { removed: { ...removed }, added: { ...added } },
         objectives: {
@@ -650,7 +718,7 @@ function buildPolicyOptions(scenario, { limit = DEFAULT_LIMIT } = {}) {
   if (!frontier.length) {
     response.emptyReason = {
       code: response.validCandidates ? "NO_IMPROVING_ALTERNATIVES" : "NO_VALID_ALTERNATIVES",
-      message: response.validCandidates ? "Среди всех допустимых замен одного решения нет недоминируемой альтернативы, улучшающей хотя бы одну из трёх целей. Для иных вариантов потребуется изменить несколько решений." : "Ни одна замена одного решения не прошла официальную проверку ограничений."
+      message: response.validCandidates ? "Среди допустимых замен одного решения с заданными ограничениями нет недоминируемой альтернативы, улучшающей хотя бы одну из трёх целей. Для иных вариантов потребуется изменить несколько решений." : "Ни одна замена одного решения не прошла правила модели и заданные ограничения. Измените ограничения, чтобы расширить поиск."
     };
   } else if (limit === 0) {
     response.emptyReason = { code: "LIMIT_ZERO", message: "Альтернативы рассчитаны; вывод отключён параметром limit=0." };
@@ -663,7 +731,10 @@ self.addEventListener("message", ({ data }) => {
   const requestId = data?.requestId;
   if (typeof requestId !== "string" || !requestId || requestId.length > 128) return;
   try {
-    const result = buildPolicyOptions(data.scenario, { limit: data.limit ?? 6 });
+    const result = buildPolicyOptions(data.scenario, {
+      limit: data.limit ?? 6,
+      constraints: data.constraints
+    });
     self.postMessage({ requestId, data: result });
   } catch {
     self.postMessage({ requestId, error: {
