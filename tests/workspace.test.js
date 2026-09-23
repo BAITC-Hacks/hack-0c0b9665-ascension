@@ -128,6 +128,21 @@ test('login limiter persists across handlers; 60 seconds resets the window', asy
   const r = await again(s.req('session', 'POST', { accessKey: s.tokens.editor })); assert.equal(r.status, 429); assert.equal(r.headers.get('retry-after'), '60');
   s.setClock(s.clock() + 60_000); assert.equal((await again(s.req('session', 'POST', { accessKey: s.tokens.editor }))).status, 200);
 });
+test('trusted per-client limits isolate one noisy client; spoofed request headers cannot select a bucket', async (t) => {
+  const s = await setup(t);
+  for (let i = 0; i < 12; i++) assert.equal((await s.handler(s.req('session', 'POST', { accessKey: access() }), { clientAddress: '198.51.100.1' })).status, 401);
+  const noisy = await s.handler(s.req('session', 'POST', { accessKey: s.tokens.editor }, undefined, { 'x-forwarded-for': '198.51.100.2', 'x-workspace-client-address': '198.51.100.2' }), { clientAddress: '198.51.100.1' });
+  assert.equal(noisy.status, 429);
+  assert.equal((await s.handler(s.req('session', 'POST', { accessKey: s.tokens.editor }), { clientAddress: '198.51.100.2' })).status, 200);
+  assert.equal(s.repository.audit().length, 0);
+});
+test('quota failures retain 413 even when stream cancel rejects; JSON media type is exact', async (t) => {
+  const s = await setup(t), cookie = await s.login();
+  const malformed = s.req('register', 'PUT', {}, cookie, { 'content-type': 'application/json-malicious' });
+  assert.equal((await s.handler(malformed)).status, 415); assert.equal(malformed.bodyUsed, false);
+  const request = new Request('https://city.example/api/workspace/register', { method: 'PUT', duplex: 'half', headers: { origin: 'https://city.example', cookie, 'content-type': 'application/json; charset=utf-8' }, body: new ReadableStream({ pull(c) { c.enqueue(new Uint8Array(131073)); }, cancel() { throw new Error('cancel fixture'); } }) });
+  assert.equal((await s.handler(request)).status, 413);
+});
 test('declared and streamed body limits reject before mutation; no leaked parser error', async (t) => {
   const s = await setup(t), cookie = await s.login();
   const declared = s.req('register', 'PUT', {}, cookie, { 'content-length': '131073' });

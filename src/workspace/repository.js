@@ -5,6 +5,7 @@ export function createRepository(sql) {
   sql.run('CREATE TABLE IF NOT EXISTS workspace_document (singleton INTEGER PRIMARY KEY CHECK(singleton=1), revision INTEGER NOT NULL, document TEXT NOT NULL)');
   sql.run('CREATE TABLE IF NOT EXISTS workspace_audit (revision INTEGER PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL, summary TEXT NOT NULL)');
   sql.run('CREATE TABLE IF NOT EXISTS workspace_login_limit (singleton INTEGER PRIMARY KEY CHECK(singleton=1), window_start INTEGER NOT NULL, attempts INTEGER NOT NULL)');
+  sql.run('CREATE TABLE IF NOT EXISTS workspace_client_limits (bucket TEXT PRIMARY KEY, window_start INTEGER NOT NULL, attempts INTEGER NOT NULL)');
   sql.run('CREATE TABLE IF NOT EXISTS workspace_revoked_sessions (id TEXT PRIMARY KEY, expires INTEGER NOT NULL)');
   sql.run("INSERT OR IGNORE INTO workspace_document VALUES (1, 0, '{\"schemaVersion\":2,\"registers\":[]}')");
   const read = () => {
@@ -27,12 +28,18 @@ export function createRepository(sql) {
       });
     },
     audit() { return sql.rows('SELECT revision, at, actor, summary FROM workspace_audit ORDER BY revision DESC LIMIT 50').map((r) => ({ revision: r.revision, at: r.at, actor: JSON.parse(r.actor), summary: JSON.parse(r.summary) })); },
-    consumeLogin(now) {
+    consumeLogin(now, bucket = 'unknown') {
       return sql.transaction(() => {
-        const row = sql.rows('SELECT window_start, attempts FROM workspace_login_limit WHERE singleton=1')[0];
-        const sameWindow = row && now >= row.window_start && now - row.window_start < 60_000;
-        if (sameWindow && row.attempts >= 12) return Math.max(1, Math.ceil((60_000 - now + row.window_start) / 1000));
-        sql.run('INSERT OR REPLACE INTO workspace_login_limit VALUES (1, ?, ?)', sameWindow ? row.window_start : now, sameWindow ? row.attempts + 1 : 1);
+        sql.run('DELETE FROM workspace_client_limits WHERE window_start <= ? OR window_start > ?', now - 60_000, now);
+        const row = sql.rows('SELECT window_start, attempts FROM workspace_client_limits WHERE bucket=?', bucket)[0];
+        if (row && row.attempts >= 12) return Math.max(1, Math.ceil((60_000 - now + row.window_start) / 1000));
+        // Fixed upper bounds protect the limiter itself from high-cardinality clients.
+        if (!row && sql.rows('SELECT COUNT(*) AS count FROM workspace_client_limits')[0].count >= 1024) return 60;
+        const global = sql.rows('SELECT window_start, attempts FROM workspace_login_limit WHERE singleton=1')[0];
+        const sameWindow = global && now >= global.window_start && now - global.window_start < 60_000;
+        if (sameWindow && global.attempts >= 1200) return Math.max(1, Math.ceil((60_000 - now + global.window_start) / 1000));
+        sql.run('INSERT OR REPLACE INTO workspace_login_limit VALUES (1, ?, ?)', sameWindow ? global.window_start : now, sameWindow ? global.attempts + 1 : 1);
+        sql.run('INSERT OR REPLACE INTO workspace_client_limits VALUES (?, ?, ?)', bucket, row ? row.window_start : now, row ? row.attempts + 1 : 1);
         sql.run('DELETE FROM workspace_revoked_sessions WHERE expires <= ?', now);
         return 0;
       });

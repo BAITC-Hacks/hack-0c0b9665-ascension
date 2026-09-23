@@ -9,5 +9,5 @@ export class TeamWorkspaceDurableObject extends DurableObject {
     this.repository = createDurableRepository(ctx.storage);
     this.handle = createWorkspaceHandler({ repository: this.repository, getConfig: () => this.env });
   }
-  fetch(request) { return this.handle(request); }
+  fetch(request) { return this.handle(request, { clientAddress: request.headers.get('X-Workspace-Client-Address') }); }
 }

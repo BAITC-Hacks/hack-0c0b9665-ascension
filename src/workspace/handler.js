@@ -1,5 +1,5 @@
 import { MAX_BODY_BYTES, WorkspaceError, validateWrite } from './schema.js';
-import { readConfiguration, enforceOrigin, authenticateAccessKey, authenticateSession, issueSession, sessionCookie, publicIdentity } from './auth.js';
+import { readConfiguration, enforceOrigin, authenticateAccessKey, authenticateSession, issueSession, sessionCookie, publicIdentity, sha256 } from './auth.js';
 
 export async function readBoundedJson(request) {
   if ((request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() !== 'application/json') throw new WorkspaceError(415, 'JSON_REQUIRED', 'Нужен JSON.');
@@ -24,7 +24,7 @@ export async function readBoundedJson(request) {
 const json = (value, status = 200, headers = {}) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers } });
 export function createWorkspaceHandler({ repository, getConfig, now = Date.now }) {
   if (!repository || typeof getConfig !== 'function') throw new TypeError('Repository and configuration provider required.');
-  return async function handleWorkspace(request) {
+  return async function handleWorkspace(request, { clientAddress } = {}) {
     try {
       const url = new URL(request.url), path = url.pathname, method = request.method;
       const config = await readConfiguration(await getConfig());
@@ -35,7 +35,8 @@ export function createWorkspaceHandler({ repository, getConfig, now = Date.now }
       if (!routes[path].includes(method)) return json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Метод не поддерживается.' } }, 405, { Allow: routes[path].join(', ') });
       const clock = now();
       if (path === '/api/workspace/session' && method === 'POST') {
-        const retry = repository.consumeLogin(clock);
+        const address = typeof clientAddress === 'string' && clientAddress.length > 0 && clientAddress.length <= 128 ? clientAddress : 'unknown';
+        const retry = repository.consumeLogin(clock, await sha256(address));
         if (retry) return json({ error: { code: 'LOGIN_RATE_LIMIT', message: 'Слишком много попыток входа. Повторите позже.' } }, 429, { 'Retry-After': String(retry) });
         const input = await readBoundedJson(request);
         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1 || !Object.hasOwn(input, 'accessKey')) throw new WorkspaceError(400, 'INVALID_LOGIN', 'Неверный формат входа.');
