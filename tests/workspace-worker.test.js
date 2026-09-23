@@ -12,7 +12,7 @@ test('real local workerd: authenticated DO, atomic 409/audit, persisted restart,
   const prefix = process.env.WORKSPACE_RUNTIME_DIR;
   const { Miniflare, convertV4MiniflareOptions } = await import(pathToFileURL(join(prefix, 'node_modules/miniflare/dist/src/index.js')));
   const { build } = await import(pathToFileURL(join(prefix, 'node_modules/esbuild/lib/main.js')));
-  const result = await build({ stdin: { contents: `import { TeamWorkspaceDurableObject } from './src/workspace/cloudflare.js'; export { TeamWorkspaceDurableObject }; export default { fetch(request, env) { return env.TEAM_WORKSPACE.getByName('test-team').fetch(request); } };`, resolveDir: resolve('.') }, bundle: true, format: 'esm', platform: 'browser', external: ['cloudflare:workers'], write: false });
+  const result = await build({ stdin: { contents: `import { TeamWorkspaceDurableObject } from './src/workspace/cloudflare.js'; export { TeamWorkspaceDurableObject }; export default { fetch(request, env) { const headers = new Headers(request.headers); headers.set('X-Workspace-Client-Address', request.headers.get('CF-Connecting-IP') || 'unknown'); return env.TEAM_WORKSPACE.getByName('test-team').fetch(new Request(request, { headers })); } };`, resolveDir: resolve('.') }, bundle: true, format: 'esm', platform: 'browser', external: ['cloudflare:workers'], write: false });
   const dir = mkdtempSync(join(tmpdir(), 'workspace-workerd-'));
   const token = crypto.randomUUID() + crypto.randomUUID();
   const policy = [{ id: 'fixture-editor', name: 'Test editor', role: 'editor', tokenHash: await sha256(token) }];
@@ -37,5 +37,12 @@ test('real local workerd: authenticated DO, atomic 409/audit, persisted restart,
     const viewerLogin = await send('session', 'POST', { accessKey: token }); assert.equal(viewerLogin.status, 200);
     const viewer = viewerLogin.headers.get('set-cookie').split(';')[0]; assert.equal((await send('register', 'PUT', { expectedRevision: 1, document }, viewer)).status, 403);
     assert.equal((await send('session', 'DELETE', undefined, viewer)).status, 200); assert.equal((await send('register', 'GET', undefined, viewer)).status, 401);
+    // One editor + one viewer login already used 2 attempts. Untrusted internal-header values
+    // cannot split the remaining attempts into separate buckets in this bridge fixture.
+    for (let i = 0; i < 10; i++) {
+      const bad = await mf.dispatchFetch('https://city.example/api/workspace/session', { method: 'POST', headers: { origin: 'https://city.example', 'content-type': 'application/json', 'X-Workspace-Client-Address': `spoof-${i}` }, body: JSON.stringify({ accessKey: crypto.randomUUID() + crypto.randomUUID() }) });
+      assert.equal(bad.status, 401);
+    }
+    assert.equal((await send('session', 'POST', { accessKey: token })).status, 429);
   } finally { await mf?.dispose(); rmSync(dir, { recursive: true, force: true }); }
 });

@@ -35,7 +35,8 @@ async function setup(t, { origin = 'https://city.example', repository: supplied 
 
 test('disabled config never exposes data; unknown roles and insecure origins fail closed', async (t) => {
   const s = await setup(t);
-  for (const config of [{}, { ...s.config(), WORKSPACE_SESSION_SECRET: '' }, { ...s.config(), WORKSPACE_ORIGIN: 'http://public.example' }, { ...s.config(), WORKSPACE_ACCESS_POLICY: '[{"role":"admin"}]' }]) {
+  const valid = s.config(), entry = s.policy()[0];
+  for (const config of [{}, { ...valid, WORKSPACE_SESSION_SECRET: '' }, { ...valid, WORKSPACE_ORIGIN: 'http://public.example' }, { ...valid, WORKSPACE_ACCESS_POLICY: '[{"role":"admin"}]' }, { ...valid, WORKSPACE_ACCESS_POLICY: JSON.stringify([{ ...entry, id: 123 }]) }, { ...valid, WORKSPACE_ACCESS_POLICY: JSON.stringify([{ ...entry, tokenHash: [entry.tokenHash] }]) }]) {
     s.setConfig(config); assert.equal((await s.handler(s.req('register'))).status, 503);
   }
 });
@@ -135,6 +136,15 @@ test('trusted per-client limits isolate one noisy client; spoofed request header
   assert.equal(noisy.status, 429);
   assert.equal((await s.handler(s.req('session', 'POST', { accessKey: s.tokens.editor }), { clientAddress: '198.51.100.2' })).status, 200);
   assert.equal(s.repository.audit().length, 0);
+});
+test('rate limit storage cardinality, TTL and global fuse remain bounded', async (t) => {
+  const s = await setup(t), now = s.clock();
+  for (let i = 0; i < 1024; i++) assert.equal(s.repository.consumeLogin(now, `fixture-${i}`), 0);
+  assert.equal(s.repository.consumeLogin(now, 'over-cap'), 60);
+  assert.equal(s.repository.consumeLogin(now + 60_000, 'after-expiry'), 0);
+  const fresh = now + 120_000;
+  for (let client = 0; client < 100; client++) for (let attempt = 0; attempt < 12; attempt++) assert.equal(s.repository.consumeLogin(fresh, `global-${client}`), 0);
+  assert.equal(s.repository.consumeLogin(fresh, 'global-fused'), 60);
 });
 test('quota failures retain 413 even when stream cancel rejects; JSON media type is exact', async (t) => {
   const s = await setup(t), cookie = await s.login();
