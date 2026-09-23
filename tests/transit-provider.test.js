@@ -5,7 +5,7 @@ import { buildCityQuery, normalizeRouteNumber, parseTransitResponse, parseRouteR
 const city = { id: 'astana', kind: 'city', center: [71.4304, 51.147] };
 const timestamp = '2026-09-23T11:20:00Z';
 const envelope = (elements = []) => ({ elements, osm3s: { timestamp_osm_base: timestamp } });
-const reply = (json = envelope()) => ({ ok: true, json: async () => json });
+const reply = (json = envelope()) => new Response(JSON.stringify(json), { headers: { 'Content-Type': 'application/json' } });
 const stop = (id = 1, extra = {}) => ({ type: 'node', id, lon: 71.43, lat: 51.15, tags: { highway: 'bus_stop', name: 'Остановка' }, ...extra });
 const route = (id = 20, extra = {}) => ({ type: 'relation', id, tags: { route: 'bus', ref: '55Б', from: 'A', to: 'B', name: 'Автобус 55Б' }, ...extra });
 const geometry = envelope([route(20, { members: [
@@ -177,7 +177,7 @@ test('separate operations do not cancel each other; route lookup rejects unsafe 
 
 test('HTTP, JSON and Overpass errors never become cached success', async () => {
   let clock = Date.parse(timestamp), calls = 0;
-  const responses = [{ ok: false, status: 429 }, { ok: true, json: async () => { throw new SyntaxError(); } },
+  const responses = [new Response('', { status: 429 }), new Response('{invalid'),
     reply({ ...envelope(), remark: 'runtime error' }), reply(envelope([stop()]))];
   const client = createTransitClient({ now: () => clock, fetcher: async () => responses[calls++] });
   for (const code of ['HTTP_ERROR', 'INVALID_RESPONSE', 'UPSTREAM_ERROR']) {
@@ -202,4 +202,72 @@ test('a slow old response cannot replace a newer force refresh in cache', async 
   assert.equal((await older).stops[0].id, 1);
   assert.equal((await client.loadCity(city)).stops[0].id, 2);
   assert.equal(calls, 2);
+});
+
+test('oversized declared response cancels before consuming its stream', async () => {
+  let pulled = 0, cancelled = false, signal;
+  const body = new ReadableStream({ pull() { pulled++; }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  const client = createTransitClient({ fetcher: async (url, options) => {
+    signal = options.signal;
+    return new Response(body, { headers: { 'Content-Length': String(4 * 1024 * 1024 + 1) } });
+  } });
+  await assert.rejects(client.loadCity(city), { code: 'RESPONSE_TOO_LARGE' });
+  assert.equal(pulled, 0);
+  assert.equal(cancelled, true);
+  assert.equal(signal.aborted, true);
+});
+
+test('actual chunk bytes are bounded with absent or misleading Content-Length; network tail is cancelled', async () => {
+  for (const headers of [{}, { 'Content-Length': '2' }]) {
+    let pulled = 0, cancelled = false, signal;
+    const body = new ReadableStream({
+      pull(controller) { pulled++; controller.enqueue(new Uint8Array(1024 * 1024).fill(32)); },
+      cancel() { cancelled = true; },
+    }, { highWaterMark: 0 });
+    const client = createTransitClient({ fetcher: async (url, options) => { signal = options.signal; return new Response(body, { headers }); } });
+    await assert.rejects(client.loadCity(city), { code: 'RESPONSE_TOO_LARGE' });
+    assert.equal(pulled, 5, 'no sixth/network-tail chunk consumed');
+    assert.equal(cancelled, true);
+    assert.equal(signal.aborted, true);
+  }
+});
+
+test('bounded UTF-8 stream decoding accepts split characters and rejects invalid bytes', async () => {
+  const encoded = new TextEncoder().encode(JSON.stringify(envelope([stop()])));
+  let offset = 0;
+  const streamed = new ReadableStream({ pull(controller) {
+    if (offset < encoded.length) controller.enqueue(encoded.slice(offset, ++offset));
+    else controller.close();
+  } });
+  const client = createTransitClient({ fetcher: async () => new Response(streamed) });
+  assert.equal((await client.loadCity(city)).stops[0].name, 'Остановка');
+  const invalid = createTransitClient({ fetcher: async () => new Response(new Uint8Array([0xc3, 0x28])) });
+  await assert.rejects(invalid.loadCity(city), { code: 'INVALID_RESPONSE' });
+});
+
+test('oversized elements, relation members and cumulative geometry fail instead of becoming partial success', () => {
+  const tooManyElements = envelope(Array.from({ length: 10001 }, (_, index) => stop(index + 1)));
+  assert.throws(() => parseTransitResponse(tooManyElements, { city }), { code: 'RESPONSE_TOO_LARGE' });
+  const tooManyMembers = envelope([route(20, { members: Array.from({ length: 3001 }, (_, index) => ({ type: 'node', ref: index + 1 })) })]);
+  assert.throws(() => parseRouteResponse(tooManyMembers, { relationId: 20 }), { code: 'RESPONSE_TOO_LARGE' });
+  const coordinates = Array.from({ length: 10001 }, () => ({ lon: 71.4, lat: 51.1 }));
+  const large = envelope([route(20, { members: [
+    { type: 'way', ref: 1, geometry: coordinates }, { type: 'way', ref: 2, geometry: coordinates },
+  ] })]);
+  assert.throws(() => parseRouteResponse(large, { relationId: 20 }), { code: 'RESPONSE_TOO_LARGE' });
+  const reportedRegression = envelope([route(20, { members: [{ type: 'way', ref: 1, geometry: new Array(150000).fill({ lon: 71.4, lat: 51.1 }) }] })]);
+  assert.throws(() => parseRouteResponse(reportedRegression, { relationId: 20 }), { code: 'RESPONSE_TOO_LARGE' });
+});
+
+test('caller cancellation while reading a body cancels even an abort-insensitive custom stream', async () => {
+  let reading, cancelled = false;
+  const ready = new Promise(resolve => { reading = resolve; });
+  const body = new ReadableStream({ pull() { reading(); return new Promise(() => {}); }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+  const controller = new AbortController();
+  const client = createTransitClient({ fetcher: async () => new Response(body) });
+  const pending = client.loadCity(city, { signal: controller.signal });
+  await ready;
+  controller.abort();
+  await assert.rejects(pending, { code: 'ABORTED' });
+  assert.equal(cancelled, true);
 });

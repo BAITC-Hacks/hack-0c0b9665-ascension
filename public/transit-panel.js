@@ -32,6 +32,18 @@ export function matchingStops(stops, number) {
   return stops.filter((stop) => stop.routeRefs?.some((ref) => normalizeRouteNumber(ref) === normalized));
 }
 
+export function transitBounds(collection) {
+  let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+  for (const feature of collection.features) {
+    const points = feature.geometry.type === 'LineString' ? feature.geometry.coordinates : [feature.geometry.coordinates];
+    for (const [longitude, latitude] of points) {
+      west = Math.min(west, longitude); south = Math.min(south, latitude);
+      east = Math.max(east, longitude); north = Math.max(north, latitude);
+    }
+  }
+  return Number.isFinite(west) ? [[west, south], [east, north]] : null;
+}
+
 /** Local catalogue works without WebGL. External data loads only on explicit refresh. */
 export function mountTransitPanel({ host, city, client = createTransitClient(), fetcher = globalThis.fetch, reducedMotion = false }) {
   if (!document.querySelector('link[data-transit]')) {
@@ -141,10 +153,9 @@ export function mountTransitPanel({ host, city, client = createTransitClient(), 
       if (state.destroyed || generation !== state.generation) return;
       state.geometry = geometry;
       paint();
-      const points = geometry.features.flatMap((f) => f.geometry.type === 'LineString' ? f.geometry.coordinates : [f.geometry.coordinates]);
-      if (points.length && state.map) {
-        const lngs = points.map((p) => p[0]), lats = points.map((p) => p[1]);
-        state.map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 65, maxZoom: 15, duration: reducedMotion ? 0 : 700 });
+      const bounds = transitBounds(geometry);
+      if (bounds && state.map) {
+        state.map.fitBounds(bounds, { padding: 65, maxZoom: 15, duration: reducedMotion ? 0 : 700 });
       }
       status(geometry.features.length ? 'Показаны сегменты выбранного направления из OSM. GPS и расписание не подключены.' : 'В OSM нет геометрии для выбранного направления.');
     } catch (error) {

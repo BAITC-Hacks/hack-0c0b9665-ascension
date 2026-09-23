@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { ASTANA_ROUTES } from '../public/transit-catalog.js';
-import { routeCatalog, matchingStops } from '../public/transit-panel.js';
+import { routeCatalog, matchingStops, transitBounds } from '../public/transit-panel.js';
 
 test('screenshot catalogue includes all 127 unique routes and preserves incomplete endpoints', () => {
   assert.equal(ASTANA_ROUTES.length, 127);
@@ -31,6 +31,13 @@ test('route-stop association requires an explicit OSM tag and never a nearby coo
   const stops = [{ id: 1, routeRefs: ['15A'] }, { id: 2, routeRefs: ['15'] }, { id: 3, routeRefs: [] }];
   assert.deepEqual(matchingStops(stops, '15А').map((s) => s.id), [1]);
   assert.deepEqual(matchingStops(stops, '52'), []);
+});
+
+test('map bounds use bounded iteration without argument expansion for large geometries', () => {
+  const coordinates = Array.from({ length: 150000 }, (_, i) => [71 + i / 1000000, 51 + i / 1000000]);
+  const bounds = transitBounds({ features: [{ geometry: { type: 'LineString', coordinates } }] });
+  assert.deepEqual(bounds, [[71, 51], coordinates.at(-1)]);
+  assert.equal(transitBounds({ features: [] }), null);
 });
 
 test('bundled stop snapshot carries real OSM identifiers, source and date without GPS vehicles', async () => {

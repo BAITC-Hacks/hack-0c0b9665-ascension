@@ -4,10 +4,53 @@ const CACHE_TTL = 10 * 60 * 1000;
 const REQUEST_INTERVAL = 15 * 1000;
 const STOP_LIMIT = 1500;
 const ROUTE_LIMIT = 500;
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+const MAX_ELEMENTS = 10000;
+const MAX_ROUTE_MEMBERS = 3000;
+const MAX_ROUTE_COORDINATES = 20000;
 const OSM_URL = 'https://www.openstreetmap.org';
 
 function fail(code, message, details = {}) {
   return Object.assign(new Error(message), { code, ...details });
+}
+
+function tooLarge() {
+  return fail('RESPONSE_TOO_LARGE', 'Ответ OSM слишком большой');
+}
+
+/** Bound bytes before decoding/parsing, including chunked or incorrectly declared bodies. */
+async function readBoundedJson(reply, controller) {
+  const reader = reply.body?.getReader?.();
+  if (!reader) throw fail('INVALID_RESPONSE', 'Сервис маршрутов не предоставил поток данных.');
+  const cancelReader = () => { void reader.cancel(controller.signal.reason).catch(() => {}); };
+  controller.signal.addEventListener('abort', cancelReader, { once: true });
+  try {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    const declaredLength = Number(reply.headers?.get('content-length'));
+    if (declaredLength > MAX_RESPONSE_BYTES) throw tooLarge();
+    const buffer = new Uint8Array(MAX_RESPONSE_BYTES);
+    let bytes = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (controller.signal.aborted) throw controller.signal.reason;
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw fail('INVALID_RESPONSE', 'Некорректный поток данных OSM.');
+      if (bytes + value.byteLength > MAX_RESPONSE_BYTES) throw tooLarge();
+      buffer.set(value, bytes);
+      bytes += value.byteLength;
+    }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, bytes)));
+  } catch (error) {
+    const failure = ['RESPONSE_TOO_LARGE', 'INVALID_RESPONSE', 'ABORTED', 'TIMEOUT'].includes(error?.code)
+      ? error : fail('INVALID_RESPONSE', 'Сервис маршрутов вернул некорректный UTF-8 или JSON.');
+    controller.abort(failure);
+    // Also cancel custom fetch streams that do not react to AbortController.
+    cancelReader();
+    throw failure;
+  } finally {
+    controller.signal.removeEventListener('abort', cancelReader);
+    reader.releaseLock();
+  }
 }
 
 export function normalizeRouteNumber(value) {
@@ -43,6 +86,7 @@ function elementsOf(json) {
   if (!json || typeof json !== 'object' || !Array.isArray(json.elements)) {
     throw fail('INVALID_RESPONSE', 'Некорректный ответ сервиса маршрутов.');
   }
+  if (json.elements.length > MAX_ELEMENTS) throw tooLarge();
   if (json.remark) throw fail('UPSTREAM_ERROR', 'Overpass вернул ошибку или неполный ответ. Попробуйте позже.');
   if (json.elements.some((element) => !element || typeof element !== 'object' || Array.isArray(element)
     || !['node', 'way', 'relation'].includes(element.type) || !validId(element.id)
@@ -109,6 +153,12 @@ export function parseRouteResponse(json, { relationId, fetchedAt = new Date().to
   const elements = elementsOf(json);
   const relation = elements.find((element) => element.type === 'relation' && element.id === relationId && element.tags?.route === 'bus');
   if (!relation || !Array.isArray(relation.members)) throw fail('INVALID_RESPONSE', 'Геометрия автобусного маршрута не найдена.');
+  if (relation.members.length > MAX_ROUTE_MEMBERS) throw tooLarge();
+  let coordinateCount = 0;
+  for (const member of relation.members) {
+    coordinateCount += member?.type === 'node' ? 1 : Array.isArray(member?.geometry) ? member.geometry.length : 0;
+    if (coordinateCount > MAX_ROUTE_COORDINATES) throw tooLarge();
+  }
   const features = [];
   let partial = false;
   for (const [memberIndex, member] of relation.members.entries()) {
@@ -169,9 +219,13 @@ export function createTransitClient({ fetcher = globalThis.fetch, timeoutMs = 20
       const response = await Promise.race([cancelled, (async () => {
         const reply = await fetcher(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ data: query }).toString(), signal: controller.signal, credentials: 'omit', cache: 'no-store' });
-        if (!reply?.ok) throw fail('HTTP_ERROR', `Сервис маршрутов недоступен (HTTP ${Number(reply?.status) || 0}).`);
-        try { return await reply.json(); }
-        catch { throw fail('INVALID_RESPONSE', 'Сервис маршрутов вернул некорректный JSON.'); }
+        if (!reply?.ok) {
+          const error = fail('HTTP_ERROR', `Сервис маршрутов недоступен (HTTP ${Number(reply?.status) || 0}).`);
+          controller.abort(error);
+          if (reply?.body) void reply.body.cancel().catch(() => {});
+          throw error;
+        }
+        return readBoundedJson(reply, controller);
       })()]);
       checkAbort(signal);
       return response;
