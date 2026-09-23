@@ -15,10 +15,50 @@ const API_METHODS = new Map([
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'], ['.css', 'text/css; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'], ['.json', 'application/json; charset=utf-8'],
+  ['.geojson', 'application/geo+json; charset=utf-8'],
   ['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.jpg', 'image/jpeg'],
   ['.jpeg', 'image/jpeg'], ['.webp', 'image/webp'], ['.ico', 'image/x-icon'],
   ['.woff', 'font/woff'], ['.woff2', 'font/woff2'],
 ]);
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://tiles.openfreemap.org",
+  "font-src 'self' https://tiles.openfreemap.org",
+  "connect-src 'self' https://tiles.openfreemap.org https://photon.komoot.io",
+  "worker-src 'self' blob:", "object-src 'none'", "base-uri 'self'",
+  "frame-ancestors 'none'", "form-action 'self'",
+].join('; ');
+
+function boundedInteger(value, fallback, maximum) {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= maximum ? parsed : fallback;
+}
+
+// These conservative, process-local limits protect a public demo without trusting client IP headers.
+// They count all dispatches (including provider failures and cache hits), and reset on process restart.
+function createAIGuard(limits, now) {
+  const maxRequests = boundedInteger(limits.maxRequests ?? process.env.AI_MAX_REQUESTS, 100, 10_000);
+  const perMinute = boundedInteger(limits.requestsPerMinute ?? process.env.AI_REQUESTS_PER_MINUTE, 10, 120);
+  const maxConcurrent = boundedInteger(limits.maxConcurrent ?? process.env.AI_MAX_CONCURRENT, 2, 10);
+  let total = 0;
+  let active = 0;
+  let recent = [];
+  return () => {
+    const time = now();
+    recent = recent.filter(started => time - started < 60_000);
+    if (total >= maxRequests) return { reason: 'server_request_limit' };
+    if (active >= maxConcurrent) return { reason: 'server_busy', retryAfter: 5 };
+    if (recent.length >= perMinute) {
+      return { reason: 'server_rate_limited',
+        retryAfter: recent.length ? Math.max(1, Math.ceil((60_000 - time + recent[0]) / 1000)) : 60 };
+    }
+    total++;
+    active++;
+    recent.push(time);
+    return { release: () => { active--; } };
+  };
+}
 
 class RequestError extends Error {
   constructor(status, code, message) {
@@ -130,14 +170,18 @@ async function sendStatic(request, response, pathname, publicDir) {
   }
 }
 
-/** Returns an unbound Node HTTP server. Tests may inject explain, aiConfigured and publicDir. */
-export function createAppServer({ explain = explainScenario, aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR, complaints = {} } = {}) {
+/** Create once per process to retain AI limits between requests, including in serverless adapters. */
+export function createRequestHandler({ explain = explainScenario, aiConfigured = isAIConfigured,
+  publicDir = DEFAULT_PUBLIC_DIR, complaints = {}, aiLimits = {}, now = Date.now } = {}) {
   const staticRoot = resolve(publicDir);
   const handleComplaints = createComplaintRoutes(complaints);
-  return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (request, response) => {
+  const enterAI = createAIGuard(aiLimits, now);
+  return async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
     try {
       const pathname = getPath(request);
       if (await handleComplaints(request, response, pathname, { readJson, sendJson })) return;
@@ -156,7 +200,17 @@ export function createAppServer({ explain = explainScenario, aiConfigured = isAI
         const result = simulate(scenario);
         if (!result.valid) return sendJson(response, 422, result);
         if (pathname === '/api/simulate') return sendJson(response, 200, result);
-        return sendJson(response, 200, await explain(scenario, result));
+        const permit = aiConfigured() ? enterAI() : {};
+        if (permit.reason) {
+          if (permit.retryAfter) response.setHeader('Retry-After', permit.retryAfter);
+          const fallback = await explainScenario(scenario, result, { apiKey: '' });
+          return sendJson(response, 200, { ...fallback, reason: permit.reason });
+        }
+        try {
+          return sendJson(response, 200, await explain(scenario, result));
+        } finally {
+          permit.release?.();
+        }
       }
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         throw new RequestError(404, 'NOT_FOUND', 'Маршрут API не найден.');
@@ -177,7 +231,12 @@ export function createAppServer({ explain = explainScenario, aiConfigured = isAI
           message: known ? error.message : 'Не удалось обработать запрос.' }],
       });
     }
-  });
+  };
+}
+
+/** Returns an unbound Node HTTP server. Options are forwarded to createRequestHandler. */
+export function createAppServer(options = {}) {
+  return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, createRequestHandler(options));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

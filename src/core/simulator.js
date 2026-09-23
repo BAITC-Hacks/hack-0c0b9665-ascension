@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-
-const dataset = JSON.parse(readFileSync(new URL('../../data/city.json', import.meta.url), 'utf8'));
+import dataset from '../../data/city.json' with { type: 'json' };
 const measureById = new Map(dataset.measures.map((measure) => [measure.id, measure]));
 const districtIds = new Set(dataset.districts.map((district) => district.id));
 const incompatibilities = [

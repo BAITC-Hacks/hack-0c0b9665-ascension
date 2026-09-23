@@ -18,7 +18,7 @@ const schema = {
 };
 
 export function isAIConfigured() {
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
+  return Boolean(globalThis.process?.env?.OPENAI_API_KEY?.trim());
 }
 
 function bestReplacement(scenario, result) {
@@ -43,7 +43,7 @@ function bestReplacement(scenario, result) {
   return best;
 }
 
-export function buildExplanationFacts(scenario, result) {
+export function buildExplanationFacts(scenario, result, options = {}) {
   if (!result?.valid) throw new Error('A valid calculated scenario is required.');
   const critical = result.districts.flatMap((district) => data.indicators
     .filter((indicator) => district.after[indicator.id] < 40)
@@ -59,7 +59,8 @@ export function buildExplanationFacts(scenario, result) {
     decisions: scenario.decisions.map((decision) => ({ ...decision, ...measures.get(decision.measureId),
       target: decision.districtId ? districts.get(decision.districtId).name : 'Все районы' })),
     districts: result.districts, contributions: result.contributions, synergies: result.synergies,
-    bestSingleReplacement: bestReplacement(scenario, result),
+    replacementSearchPerformed: options.skipReplacementSearch !== true,
+    bestSingleReplacement: options.skipReplacementSearch === true ? null : bestReplacement(scenario, result),
     formula: '0.7 * populationWeightedAverage + 0.3 * worstDistrictScore - criticalCount; critical means strictly below 40',
   };
 }
@@ -84,7 +85,9 @@ function deterministic(facts, reason) {
   if (negative.length) risks.push(`Отрицательные побочные эффекты: ${negative.join('; ')}.`);
   risks.push('Эффекты условные и учитывают задержку реализации на горизонте 8 кварталов; это не прогноз для реального города.');
   const best = facts.bestSingleReplacement;
-  const recommendations = best
+  const recommendations = !facts.replacementSearchPerformed
+    ? ['Поиск замены не выполнялся. Сравните альтернативные наборы решений в панели сравнения.']
+    : best
     ? [`Проверенная замена: ${decisionLabel(best.removed)} → ${decisionLabel(best.added)}. Score ${fmt(best.score)}, стоимость ${best.totalCost}. Это лучший найденный вариант одной замены, не глобальный оптимум.`]
     : ['Среди допустимых замен одного решения улучшение не найдено. Для дальнейшего поиска сравните несколько решений одновременно.'];
   if (facts.remainingBudget) recommendations.push(`Остаток ${facts.remainingBudget} единиц сам по себе не даёт баллов; шестое решение добавлять нельзя.`);
@@ -112,11 +115,12 @@ function parseAnalysis(response) {
 }
 
 export async function explainScenario(scenario, result, options = {}) {
-  const facts = buildExplanationFacts(scenario, result);
-  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  const facts = buildExplanationFacts(scenario, result, options);
+  const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
   if (!apiKey?.trim()) return deterministic(facts, 'not_configured');
-  const model = options.model ?? process.env.OPENAI_MODEL ?? 'gpt-6-astra';
-  const cacheKey = JSON.stringify([model, [...scenario.decisions].sort((a,b) => a.measureId.localeCompare(b.measureId))]);
+  const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? 'gpt-6-astra';
+  const cacheKey = JSON.stringify([model, facts.replacementSearchPerformed,
+    [...scenario.decisions].sort((a,b) => a.measureId.localeCompare(b.measureId))]);
   // Injectable transports never share live-response cache with production.
   const useCache = !options.fetchImpl && !options.apiKey;
   const cached = useCache && cache.get(cacheKey);
@@ -128,7 +132,7 @@ export async function explainScenario(scenario, result, options = {}) {
       body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
         ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
         input: [
-          { role: 'developer', content: 'Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. Объясни сильные стороны, риски, компромиссы и последствия. Не рассчитывай новые числа, не меняй бюджет, Score или формулу. Используй только готовые числа из JSON, округляя при показе до двух знаков. Не утверждай, что условные эффекты гарантированы в реальном городе. Объясни приоритет самого слабого района и штрафы строго ниже 40. Рекомендацию bestSingleReplacement, если она есть, назови проверенной заменой одного решения, никогда глобальным оптимумом. Не предлагай шестое решение или несовместимые меры. По 2–4 коротких пункта в каждом списке.' },
+          { role: 'developer', content: 'Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. Объясни сильные стороны, риски, компромиссы и последствия. Не рассчитывай новые числа, не меняй бюджет, Score или формулу. Используй только готовые числа из JSON, округляя при показе до двух знаков. Не утверждай, что условные эффекты гарантированы в реальном городе. Объясни приоритет самого слабого района и штрафы строго ниже 40. Рекомендацию bestSingleReplacement, если она есть, назови проверенной заменой одного решения, никогда глобальным оптимумом. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По 2–4 коротких пункта в каждом списке.' },
           { role: 'user', content: JSON.stringify(facts) },
         ],
         text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema } },

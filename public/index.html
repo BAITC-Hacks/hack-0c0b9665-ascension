@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#fafbf8">
   <meta name="description" content="Выберите пять инициатив для города и посмотрите, как изменится качество жизни в районах.">
   <title>Аким на 5 часов · Ascension</title>
+  <link rel="stylesheet" href="/map.css">
+  <link rel="stylesheet" href="/scenario-library.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/comparison.css">
   <script type="module" src="/app.js"></script>
@@ -28,7 +30,7 @@
         <h1 id="page-title">Что вы измените<br>в городе?</h1>
         <p class="hero-description">Выберите 5 инициатив в пределах бюджета 100.<br>Посмотрите, как они повлияют на жизнь районов.</p>
       </div>
-      <div class="hero-actions">
+      <div class="hero-actions model-only">
         <button class="button button-outline" id="demo-button" disabled>Попробовать на примере</button>
         <p>Заполним план — вы сможете его изменить.</p>
       </div>
@@ -36,10 +38,20 @@
     <div id="loading" class="loading-state" role="status">Загружаем инициативы…</div>
     <div id="fatal-error" class="error-box" role="alert" hidden></div>
     <div id="app" hidden>
-      <section id="workspace" class="workspace" aria-label="Выбор инициатив">
+      <details id="map-section" class="disclosure map-section">
+        <summary>Карта города <span class="summary-hint">Выбрать район на карте</span></summary>
+        <div class="disclosure-body">
+          <h2 id="map-heading" class="map-heading">Астана · карта и приоритеты</h2>
+          <div id="city-map"></div>
+          <div id="geography-notice" class="geography-notice" hidden><h3 id="geography-title">Географический просмотр</h3><p>Для этой территории доступны улицы и здания. Расчёт инициатив пока есть только для Астаны.</p><button id="return-astana" class="button button-outline">Вернуться к Астане</button></div>
+          <div id="district-focus" class="district-focus model-only"></div>
+        </div>
+      </details>
+      <section id="workspace" class="workspace model-only" aria-label="Выбор инициатив">
         <div class="catalog-area">
           <div class="section-heading"><h2>Выберите инициативы</h2><span class="quiet-tag">Шаг 1 из 2</span></div>
           <p class="section-description">Переключайте направления и добавляйте идеи в план.</p>
+          <p id="planning-district" class="section-description" hidden></p>
           <div id="filters" class="filters" role="group" aria-label="Направления инициатив"></div>
           <div id="error-box" class="error-box" role="alert" tabindex="-1" hidden></div>
           <div id="catalog" class="catalog-list"></div>
@@ -68,8 +80,9 @@
         <div class="section-heading"><h2 id="result-heading">Что изменится в городе</h2><span id="result-state" class="quiet-tag">Шаг 2 из 2</span></div>
         <div id="result-content" hidden></div>
       </section>
-      <div class="more-details">
+      <div class="more-details model-only">
         <details id="comparison-details" class="disclosure" hidden><summary>Сравнить два сценария</summary><section id="comparison-panel"></section></details>
+        <details id="saved-scenarios" class="disclosure"><summary>Сохранённые сценарии</summary><div id="scenario-library" class="disclosure-body"></div></details>
         <details id="city" class="disclosure">
           <summary>Показатели районов</summary>
           <div class="disclosure-body">

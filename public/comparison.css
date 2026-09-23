@@ -31,7 +31,14 @@
 .comparison-decrease { color: var(--red, #aa493c); font-weight: 600; }
 .comparison-status { margin: 16px 0 0; color: var(--muted, #75827c); font-size: 13px; }
 .comparison-status:empty { margin: 0; }
+.comparison-export { margin-top: 20px; }
+.comparison-export-button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--line, #dfe5de); border-radius: 8px; font: inherit; font-weight: 600; color: var(--green, #197052); background: #fff; cursor: pointer; }
+.comparison-export-button:hover:not(:disabled) { background: var(--green-soft, #eaf2e8); border-color: var(--green, #197052); }
+.comparison-export-button:focus-visible { outline: 3px solid var(--green, #197052); outline-offset: 3px; }
+.comparison-export-button:disabled { color: var(--muted, #75827c); background: var(--bg, #f5f6f2); cursor: not-allowed; }
+.comparison-export-hint { margin: 6px 0 0; color: var(--muted, #75827c); font-size: 13px; }
 @media (max-width: 560px) {
   .comparison-slots { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .comparison-cell { padding: 8px 3px; font-size: 13px; }
+  .comparison-export-button { width: 100%; }
 }

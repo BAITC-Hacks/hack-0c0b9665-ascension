@@ -1,4 +1,8 @@
+import { createCityMap } from './map.js';
+import { mountScenarioLibrary } from './scenario-library.js';
+
 const $ = (id) => document.getElementById(id);
+let cityMap;
 const directions = {
   transport: { name: 'Транспорт', icon: '↔' },
   ecology: { name: 'Экология', icon: '⌁' },
@@ -14,7 +18,7 @@ const demo = [
   { measureId: 'M5', districtId: 'saryarka' },
 ];
 const state = {
-  dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'transport', picks: {},
+  dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'transport', picks: {}, focusedDistrict: 'nura', hasScenarioData: true,
   result: null, busy: false, simulating: false, version: 0, mutationId: 0, simulationId: 0, explanationId: 0,
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -119,6 +123,9 @@ function invalidateResult() {
   $('results').hidden = true;
   $('result-state').textContent = 'Ожидает расчёта';
   renderDistricts(state.baseline, false);
+  cityMap?.setResult(null);
+  renderDistrictFocus();
+  window.dispatchEvent(new CustomEvent('scenario:invalidated'));
 }
 
 async function applyDecisions(decisions, message) {
@@ -159,18 +166,42 @@ function renderDistricts(result, calculated) {
   $('table-note').textContent = calculated ? 'В каждой ячейке: итоговое значение и изменение относительно исходного. Наведите курсор для значения «до».' : 'Исходные значения официального синтетического набора.';
 }
 
+function renderDistrictFocus() {
+  const result = state.result || state.baseline;
+  if (!result) return;
+  const district = result.districts.find(({ id }) => id === state.focusedDistrict) || result.districts[0];
+  const priorities = [...state.dataset.indicators].sort((a, b) => district.after[a.id] - district.after[b.id]).slice(0, 3);
+  const weakest = priorities[0];
+  $('district-focus').innerHTML = `<p><strong>${escapeHtml(district.name)}</strong> · Стоит обратить внимание на направление «${directions[weakest.direction].name}».</p><button class="button button-outline" id="focus-measures" data-direction="${weakest.direction}">Выбрать инициативы</button>`;
+}
+
+function selectDistrict(id) {
+  if (!state.dataset.districts.some((district) => district.id === id)) return;
+  state.focusedDistrict = id;
+  for (const measure of state.dataset.measures) {
+    if (measure.scope === 'district' && !state.decisions.some((decision) => decision.measureId === measure.id)) state.picks[measure.id] = id;
+  }
+  $('planning-district').textContent = `Район для новых мер: ${districtName(id)}`;
+  $('planning-district').hidden = false;
+  renderDistrictFocus();
+  renderCatalog();
+  announce(`Выбран район ${districtName(id)}. Новые районные меры будут предложены для него.`);
+}
+
 function renderResult(result) {
-  $('results').hidden = false;
+  $('results').hidden = !state.hasScenarioData;
   $('result-content').hidden = false;
   $('result-state').textContent = 'Расчёт завершён';
-  $('result-content').innerHTML = `<div class="result-grid"><article class="score-card"><div class="eyebrow">ASTANA QUALITY OF LIFE SCORE</div><div class="score-value">${number(result.score)}</div><div class="score-delta">${signed(result.deltaScore)} <span>к исходным ${number(result.baselineScore)}</span></div></article><article class="result-metric"><h3>Средняя оценка районов</h3><strong>${number(result.weightedAverage)}</strong><p>С учётом доли населения<br>Худший район: ${number(result.worstDistrictScore)}</p></article><article class="result-metric"><h3>Критические показатели</h3><strong>${result.criticalCount} <small style="font-size:13px;color:var(--muted)">/ 50</small></strong><p>До решений: ${state.baseline.criticalCount}<br>Стоимость: ${result.totalCost} · остаток: ${result.remainingBudget} у. е.</p></article></div>
-    <div class="result-detail"><h3>Дополнительный эффект сочетаний</h3><div class="synergy-list">${result.synergies.length ? result.synergies.map((synergy) => `<span class="synergy-chip">${synergy.pair.join(' + ')} · ${escapeHtml(districtName(synergy.districtId))} · ${Object.entries(synergy.effects).map(([id, effect]) => `${id} ${signed(effect, 0)}`).join(', ')}</span>`).join('') : '<p class="synergy-empty">В этом наборе нет активных синергий.</p>'}</div><details class="contributions" style="margin-top:16px"><summary>Вклад каждой меры с учётом лага</summary><ul>${result.contributions.map((contribution) => `<li><strong>${contribution.measureId}</strong> · ${contribution.districtIds.map(districtName).map(escapeHtml).join(', ')}: ${Object.entries(contribution.effects).map(([id, effect]) => `${id} ${signed(effect, 3)}`).join(', ')}. Реализовано ${number(contribution.realizedFactor * 100, 1)}% исходного эффекта.</li>`).join('')}</ul></details></div>
+  $('result-content').innerHTML = `<div class="result-grid"><article class="score-card"><div class="eyebrow">Качество жизни</div><div class="score-value">${number(result.score)}</div><div class="score-delta">${signed(result.deltaScore)} <span>к исходным ${number(result.baselineScore)}</span></div></article><article class="result-metric"><h3>Средняя оценка районов</h3><strong>${number(result.weightedAverage)}</strong><p>С учётом доли населения<br>Худший район: ${number(result.worstDistrictScore)}</p></article><article class="result-metric"><h3>Критические показатели</h3><strong>${result.criticalCount} <small style="font-size:13px;color:var(--muted)">/ 50</small></strong><p>До решений: ${state.baseline.criticalCount}<br>Стоимость: ${result.totalCost} · остаток: ${result.remainingBudget} у. е.</p></article></div>
+    <details class="result-detail"><summary>Подробности расчёта</summary><h3>Дополнительный эффект сочетаний</h3><div class="synergy-list">${result.synergies.length ? result.synergies.map((synergy) => `<span class="synergy-chip">${synergy.pair.join(' + ')} · ${escapeHtml(districtName(synergy.districtId))} · ${Object.entries(synergy.effects).map(([id, effect]) => `${id} ${signed(effect, 0)}`).join(', ')}</span>`).join('') : '<p class="synergy-empty">В этом наборе нет активных синергий.</p>'}</div><details class="contributions" style="margin-top:16px"><summary>Вклад каждой меры с учётом лага</summary><ul>${result.contributions.map((contribution) => `<li><strong>${contribution.measureId}</strong> · ${contribution.districtIds.map(districtName).map(escapeHtml).join(', ')}: ${Object.entries(contribution.effects).map(([id, effect]) => `${id} ${signed(effect, 3)}`).join(', ')}. Реализовано ${number(contribution.realizedFactor * 100, 1)}% исходного эффекта.</li>`).join('')}</ul></details></details>
     <section class="ai-panel" aria-labelledby="ai-heading"><div class="ai-heading"><h3 id="ai-heading">Почему получился такой результат</h3><span id="ai-mode" class="ai-mode">Анализ</span></div><div id="ai-body" aria-live="polite"></div></section>`;
   renderDistricts(result, true);
+  cityMap?.setResult(result);
+  renderDistrictFocus();
 }
 
 async function calculate() {
-  if (state.busy || state.simulating || state.decisions.length !== 5) return;
+  if (state.busy || state.simulating || state.decisions.length !== 5 || !state.hasScenarioData) return;
   clearErrors();
   const version = state.version;
   const requestId = ++state.simulationId;
@@ -208,7 +239,7 @@ async function explain(input, version) {
     $('ai-mode').textContent = isAI ? 'AI-анализ' : 'Без AI · расчётное объяснение';
     $('ai-mode').className = `ai-mode${isAI ? '' : ' offline'}`;
     const sections = [['Сильные стороны', explanation.strengths], ['Риски и компромиссы', explanation.risks], ['Рекомендации', explanation.recommendations]];
-    $('ai-body').innerHTML = `<p class="ai-summary">${escapeHtml(explanation.summary)}</p><div class="ai-columns">${sections.map(([title, items]) => `<div><h4>${title}</h4><ul>${(Array.isArray(items) && items.length ? items : ['Дополнительных замечаний нет.']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`).join('')}</div><div class="ai-footer"><p>${isAI ? 'Текст сформирован AI на основе рассчитанного сценария. Числовые показатели выше получены моделью города.' : 'AI сейчас недоступен. Показано детерминированное объяснение по правилам модели; оно не является LLM-анализом.'}</p><button class="retry-button" id="retry-ai">Повторить анализ</button></div>`;
+    $('ai-body').innerHTML = `<p class="ai-summary">${escapeHtml(explanation.summary)}</p><details class="ai-expanded"><summary>Риски и рекомендации</summary><div class="ai-columns">${sections.map(([title, items]) => `<div><h4>${title}</h4><ul>${(Array.isArray(items) && items.length ? items : ['Дополнительных замечаний нет.']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`).join('')}</div><div class="ai-footer"><p>${isAI ? 'Текст сформирован AI на основе рассчитанного сценария. Числовые показатели выше получены моделью города.' : 'AI сейчас недоступен. Показано детерминированное объяснение по правилам модели; оно не является LLM-анализом.'}</p><button class="retry-button" id="retry-ai">Повторить анализ</button></div></details>`;
     $('retry-ai').addEventListener('click', () => void explain(input, version));
   } catch (error) {
     if (state.version !== version || requestId !== state.explanationId || !state.result) return;
@@ -256,9 +287,41 @@ $('selected-list').addEventListener('change', (event) => {
 });
 $('demo-button').addEventListener('click', () => void applyDecisions(demo, 'Загружен официальный демо-сценарий.'));
 $('reset-button').addEventListener('click', async () => {
-  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'transport'; renderFilters(); renderCatalog(); }
+  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'transport'; $('planning-district').hidden = true; renderFilters(); renderCatalog(); }
 });
 $('simulate-button').addEventListener('click', () => void calculate());
+$('district-focus').addEventListener('click', (event) => {
+  const button = event.target.closest('#focus-measures');
+  if (!button) return;
+  selectDistrict(state.focusedDistrict);
+  state.filter = button.dataset.direction;
+  renderFilters();
+  renderCatalog();
+  $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+$('return-astana').addEventListener('click', () => cityMap?.setCity('astana'));
+window.addEventListener('city:changed', (event) => {
+  const city = event.detail;
+  if (!city) return;
+  state.hasScenarioData = city.hasScenarioData === true;
+  document.querySelectorAll('.model-only').forEach((element) => { element.hidden = !state.hasScenarioData; });
+  $('results').hidden = !state.hasScenarioData || !state.result;
+  $('geography-notice').hidden = state.hasScenarioData;
+  $('geography-title').textContent = `${city.name} · географический просмотр`;
+  $('map-heading').textContent = state.hasScenarioData ? 'Астана · карта и приоритеты' : `${city.name} · карта территории`;
+  announce(state.hasScenarioData ? 'Учебная модель Астаны доступна.' : `Открыта карта: ${city.name}. Показатели и расчёты этой территории ещё не подключены.`);
+});
+function ensureMap() {
+  if (cityMap || !state.dataset || !$('map-section').open) return;
+  cityMap = createCityMap({ container: $('city-map'), dataset: state.dataset, baseline: state.baseline, onDistrictSelect: selectDistrict });
+  if (state.result) cityMap.setResult(state.result);
+}
+$('map-section').addEventListener('toggle', ensureMap);
+function revealLinkedSection() {
+  const section = document.getElementById(location.hash.slice(1));
+  if (section instanceof HTMLDetailsElement) section.open = true;
+}
+window.addEventListener('hashchange', revealLinkedSection);
 window.addEventListener('scenario:load', (event) => {
   const input = event.detail?.scenario;
   if (!state.dataset) return;
@@ -266,7 +329,10 @@ window.addEventListener('scenario:load', (event) => {
     showErrors(['Сохранённый сценарий должен содержать список решений.']);
     return;
   }
-  void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.');
+  if (!state.hasScenarioData) cityMap?.setCity('astana');
+  void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.').then((applied) => {
+    if (applied) $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 });
 
 async function initialize() {
@@ -281,8 +347,12 @@ async function initialize() {
     renderCatalog();
     renderPlan();
     renderDistricts(baseline, false);
+    mountScenarioLibrary($('scenario-library'), { city: { hasScenarioData: true } });
     $('loading').hidden = true;
     $('app').hidden = false;
+    renderDistrictFocus();
+    revealLinkedSection();
+    ensureMap();
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
   } catch (error) {
     $('loading').hidden = true;
