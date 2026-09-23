@@ -1,0 +1,833 @@
+{
+  "checkedAt": "2026-09-23T12:23:20.952Z",
+  "url": "https://ascension-city-map.azamatbreach.workers.dev",
+  "deployedSourceSha": "9b5a774506cd81094a4cb2af0bc3d2b0c7e0c9a3",
+  "deployedVersion": "3ade751b-70bb-4b04-a579-3246fdadc00d",
+  "sourceReference": "Deployment operator; unchanged explain/runtime/http code verified against local audit base 9f3ec66c85d8aebcaed4200f1e93cb8e6c088082.",
+  "scope": "Two sequential public explanation requests, two simulations, and two invalid scenarios rejected before provider access. No direct provider credentials or real citizen records.",
+  "cases": [
+    {
+      "name": "A_school_in_nura",
+      "input": {
+        "decisions": [
+          {
+            "measureId": "M7",
+            "districtId": "nura"
+          },
+          {
+            "measureId": "M8",
+            "districtId": "nura"
+          },
+          {
+            "measureId": "M10",
+            "districtId": "nura"
+          },
+          {
+            "measureId": "M12"
+          },
+          {
+            "measureId": "M5",
+            "districtId": "saryarka"
+          }
+        ]
+      },
+      "result": {
+        "status": 200,
+        "durationMs": 403,
+        "checkedAt": "2026-09-23T12:23:21.358Z",
+        "body": {
+          "valid": true,
+          "errors": [],
+          "totalCost": 95,
+          "remainingBudget": 5,
+          "score": 56.54306999999999,
+          "weightedAverage": 58.07759999999999,
+          "worstDistrictScore": 52.962500000000006,
+          "criticalCount": 0,
+          "baselineScore": 52.557680000000005,
+          "deltaScore": 3.985389999999988,
+          "districts": [
+            {
+              "id": "esil",
+              "name": "Есиль",
+              "before": {
+                "T1": 45,
+                "T2": 62,
+                "E1": 68,
+                "E2": 72,
+                "S1": 48,
+                "S2": 55,
+                "B1": 78,
+                "B2": 60,
+                "C1": 75,
+                "C2": 70
+              },
+              "after": {
+                "T1": 45,
+                "T2": 62,
+                "E1": 68,
+                "E2": 72,
+                "S1": 48,
+                "S2": 55,
+                "B1": 78,
+                "B2": 60,
+                "C1": 75,
+                "C2": 74.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 62.99,
+              "afterScore": 63.4275
+            },
+            {
+              "id": "almaty",
+              "name": "Алматы",
+              "before": {
+                "T1": 40,
+                "T2": 75,
+                "E1": 50,
+                "E2": 55,
+                "S1": 60,
+                "S2": 65,
+                "B1": 62,
+                "B2": 52,
+                "C1": 50,
+                "C2": 60
+              },
+              "after": {
+                "T1": 40,
+                "T2": 75,
+                "E1": 50,
+                "E2": 55,
+                "S1": 60,
+                "S2": 65,
+                "B1": 62,
+                "B2": 52,
+                "C1": 50,
+                "C2": 64.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 57.059999999999995,
+              "afterScore": 57.497499999999995
+            },
+            {
+              "id": "saryarka",
+              "name": "Сарыарка",
+              "before": {
+                "T1": 50,
+                "T2": 70,
+                "E1": 42,
+                "E2": 40,
+                "S1": 62,
+                "S2": 68,
+                "B1": 58,
+                "B2": 55,
+                "C1": 45,
+                "C2": 55
+              },
+              "after": {
+                "T1": 50,
+                "T2": 70,
+                "E1": 42,
+                "E2": 48.75,
+                "S1": 62,
+                "S2": 68,
+                "B1": 58,
+                "B2": 55,
+                "C1": 47.5,
+                "C2": 59.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 8.75,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 2.5,
+                "C2": 4.375
+              },
+              "beforeScore": 54.650000000000006,
+              "afterScore": 56.3
+            },
+            {
+              "id": "baikonur",
+              "name": "Байконур",
+              "before": {
+                "T1": 52,
+                "T2": 68,
+                "E1": 55,
+                "E2": 50,
+                "S1": 58,
+                "S2": 60,
+                "B1": 52,
+                "B2": 58,
+                "C1": 55,
+                "C2": 58
+              },
+              "after": {
+                "T1": 52,
+                "T2": 68,
+                "E1": 55,
+                "E2": 50,
+                "S1": 58,
+                "S2": 60,
+                "B1": 52,
+                "B2": 58,
+                "C1": 55,
+                "C2": 62.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 56.629999999999995,
+              "afterScore": 57.067499999999995
+            },
+            {
+              "id": "nura",
+              "name": "Нура",
+              "before": {
+                "T1": 55,
+                "T2": 40,
+                "E1": 45,
+                "E2": 65,
+                "S1": 38,
+                "S2": 35,
+                "B1": 55,
+                "B2": 50,
+                "C1": 60,
+                "C2": 50
+              },
+              "after": {
+                "T1": 55,
+                "T2": 40,
+                "E1": 45,
+                "E2": 65,
+                "S1": 48,
+                "S2": 43.75,
+                "B1": 67.5,
+                "B2": 51.75,
+                "C1": 60,
+                "C2": 54.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 10,
+                "S2": 8.75,
+                "B1": 12.5,
+                "B2": 1.75,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 49.18000000000001,
+              "afterScore": 52.962500000000006
+            }
+          ],
+          "contributions": [
+            {
+              "measureId": "M5",
+              "districtIds": [
+                "saryarka"
+              ],
+              "effects": {
+                "E2": 8.75,
+                "C1": 2.5
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M7",
+              "districtIds": [
+                "nura"
+              ],
+              "effects": {
+                "S1": 10
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M8",
+              "districtIds": [
+                "nura"
+              ],
+              "effects": {
+                "S2": 8.75
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M10",
+              "districtIds": [
+                "nura"
+              ],
+              "effects": {
+                "B1": 10.5,
+                "B2": 1.75
+              },
+              "realizedFactor": 0.875
+            },
+            {
+              "measureId": "M12",
+              "districtIds": [
+                "esil",
+                "almaty",
+                "saryarka",
+                "baikonur",
+                "nura"
+              ],
+              "effects": {
+                "C2": 4.375
+              },
+              "realizedFactor": 0.875
+            }
+          ],
+          "synergies": [
+            {
+              "pair": [
+                "M10",
+                "M12"
+              ],
+              "districtId": "nura",
+              "effects": {
+                "B1": 2
+              }
+            }
+          ]
+        }
+      },
+      "explanation": {
+        "status": 200,
+        "durationMs": 8634,
+        "checkedAt": "2026-09-23T12:23:29.997Z",
+        "body": {
+          "mode": "ai",
+          "available": true,
+          "model": "gpt-6-astra",
+          "summary": "Учебный Score 52.56 → 56.54 (+3.99); стоимость 95 из 100, остаток 5. Сценарий улучшает общегородской результат и положение Нуры. Приоритет Нуры оправдан её сохраняющимся отставанием: социальные услуги укрепляются, но дефициты остаются. Компромисс — адресная поддержка слабого района при ограниченном охвате проблем остальных районов.",
+          "strengths": [
+            "Модульные школа и детсад, а также центр семейного здоровья улучшают социальную обеспеченность Нуры.",
+            "Освещение и камеры усиливают безопасность Нуры; цифровая платформа обращений дополняет этот эффект и улучшает обслуживание во всех районах.",
+            "Перевод частного сектора на чистое топливо улучшает экологическую ситуацию в Сарыарке."
+          ],
+          "risks": [
+            "Нура остаётся самым слабым районом: сохраняются дефициты образования и здравоохранения, а транспортные и экологические слабости не устранены.",
+            "В Сарыарке сохраняются экологические дефициты; в остальных районах улучшения ограничены работой с обращениями.",
+            "Эффекты социальных объектов и чистого топлива раскрываются с задержкой и пока реализованы частично.",
+            "Небольшой бюджетный резерв ограничивает гибкость сценария.",
+            "Данные и эффекты синтетические. Качественное объяснение модели может содержать неточности; это не подтверждённый прогноз для реального города."
+          ],
+          "recommendations": [
+            "Проверьте приоритеты самого слабого района: Нура, оценка 52.96.",
+            "Учитывайте задержки реализации: горизонт учебной модели — 8 кварталов. Это не календарный план реальных работ.",
+            "Сравните альтернативные наборы в панели сценариев. Любой изменённый план нужно заново проверить и рассчитать сервером.",
+            "Поиск замены не выполнялся сервером. Предварительные варианты в отдельной панели проверяются при повторном серверном расчёте."
+          ]
+        }
+      }
+    },
+    {
+      "name": "B_school_in_esil",
+      "input": {
+        "decisions": [
+          {
+            "measureId": "M7",
+            "districtId": "esil"
+          },
+          {
+            "measureId": "M8",
+            "districtId": "nura"
+          },
+          {
+            "measureId": "M10",
+            "districtId": "nura"
+          },
+          {
+            "measureId": "M12"
+          },
+          {
+            "measureId": "M5",
+            "districtId": "saryarka"
+          }
+        ]
+      },
+      "result": {
+        "status": 200,
+        "durationMs": 80,
+        "checkedAt": "2026-09-23T12:23:30.083Z",
+        "body": {
+          "valid": true,
+          "errors": [],
+          "totalCost": 95,
+          "remainingBudget": 5,
+          "score": 55.29777,
+          "weightedAverage": 58.1986,
+          "worstDistrictScore": 51.862500000000004,
+          "criticalCount": 1,
+          "baselineScore": 52.557680000000005,
+          "deltaScore": 2.740089999999995,
+          "districts": [
+            {
+              "id": "esil",
+              "name": "Есиль",
+              "before": {
+                "T1": 45,
+                "T2": 62,
+                "E1": 68,
+                "E2": 72,
+                "S1": 48,
+                "S2": 55,
+                "B1": 78,
+                "B2": 60,
+                "C1": 75,
+                "C2": 70
+              },
+              "after": {
+                "T1": 45,
+                "T2": 62,
+                "E1": 68,
+                "E2": 72,
+                "S1": 58,
+                "S2": 55,
+                "B1": 78,
+                "B2": 60,
+                "C1": 75,
+                "C2": 74.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 10,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 62.99,
+              "afterScore": 64.5275
+            },
+            {
+              "id": "almaty",
+              "name": "Алматы",
+              "before": {
+                "T1": 40,
+                "T2": 75,
+                "E1": 50,
+                "E2": 55,
+                "S1": 60,
+                "S2": 65,
+                "B1": 62,
+                "B2": 52,
+                "C1": 50,
+                "C2": 60
+              },
+              "after": {
+                "T1": 40,
+                "T2": 75,
+                "E1": 50,
+                "E2": 55,
+                "S1": 60,
+                "S2": 65,
+                "B1": 62,
+                "B2": 52,
+                "C1": 50,
+                "C2": 64.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 57.059999999999995,
+              "afterScore": 57.497499999999995
+            },
+            {
+              "id": "saryarka",
+              "name": "Сарыарка",
+              "before": {
+                "T1": 50,
+                "T2": 70,
+                "E1": 42,
+                "E2": 40,
+                "S1": 62,
+                "S2": 68,
+                "B1": 58,
+                "B2": 55,
+                "C1": 45,
+                "C2": 55
+              },
+              "after": {
+                "T1": 50,
+                "T2": 70,
+                "E1": 42,
+                "E2": 48.75,
+                "S1": 62,
+                "S2": 68,
+                "B1": 58,
+                "B2": 55,
+                "C1": 47.5,
+                "C2": 59.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 8.75,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 2.5,
+                "C2": 4.375
+              },
+              "beforeScore": 54.650000000000006,
+              "afterScore": 56.3
+            },
+            {
+              "id": "baikonur",
+              "name": "Байконур",
+              "before": {
+                "T1": 52,
+                "T2": 68,
+                "E1": 55,
+                "E2": 50,
+                "S1": 58,
+                "S2": 60,
+                "B1": 52,
+                "B2": 58,
+                "C1": 55,
+                "C2": 58
+              },
+              "after": {
+                "T1": 52,
+                "T2": 68,
+                "E1": 55,
+                "E2": 50,
+                "S1": 58,
+                "S2": 60,
+                "B1": 52,
+                "B2": 58,
+                "C1": 55,
+                "C2": 62.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 0,
+                "B1": 0,
+                "B2": 0,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 56.629999999999995,
+              "afterScore": 57.067499999999995
+            },
+            {
+              "id": "nura",
+              "name": "Нура",
+              "before": {
+                "T1": 55,
+                "T2": 40,
+                "E1": 45,
+                "E2": 65,
+                "S1": 38,
+                "S2": 35,
+                "B1": 55,
+                "B2": 50,
+                "C1": 60,
+                "C2": 50
+              },
+              "after": {
+                "T1": 55,
+                "T2": 40,
+                "E1": 45,
+                "E2": 65,
+                "S1": 38,
+                "S2": 43.75,
+                "B1": 67.5,
+                "B2": 51.75,
+                "C1": 60,
+                "C2": 54.375
+              },
+              "delta": {
+                "T1": 0,
+                "T2": 0,
+                "E1": 0,
+                "E2": 0,
+                "S1": 0,
+                "S2": 8.75,
+                "B1": 12.5,
+                "B2": 1.75,
+                "C1": 0,
+                "C2": 4.375
+              },
+              "beforeScore": 49.18000000000001,
+              "afterScore": 51.862500000000004
+            }
+          ],
+          "contributions": [
+            {
+              "measureId": "M5",
+              "districtIds": [
+                "saryarka"
+              ],
+              "effects": {
+                "E2": 8.75,
+                "C1": 2.5
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M7",
+              "districtIds": [
+                "esil"
+              ],
+              "effects": {
+                "S1": 10
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M8",
+              "districtIds": [
+                "nura"
+              ],
+              "effects": {
+                "S2": 8.75
+              },
+              "realizedFactor": 0.625
+            },
+            {
+              "measureId": "M10",
+              "districtIds": [
+                "nura"
+              ],
+              "effects": {
+                "B1": 10.5,
+                "B2": 1.75
+              },
+              "realizedFactor": 0.875
+            },
+            {
+              "measureId": "M12",
+              "districtIds": [
+                "esil",
+                "almaty",
+                "saryarka",
+                "baikonur",
+                "nura"
+              ],
+              "effects": {
+                "C2": 4.375
+              },
+              "realizedFactor": 0.875
+            }
+          ],
+          "synergies": [
+            {
+              "pair": [
+                "M10",
+                "M12"
+              ],
+              "districtId": "nura",
+              "effects": {
+                "B1": 2
+              }
+            }
+          ]
+        }
+      },
+      "explanation": {
+        "status": 200,
+        "durationMs": 8564,
+        "checkedAt": "2026-09-23T12:23:38.648Z",
+        "body": {
+          "mode": "ai",
+          "available": true,
+          "model": "gpt-6-astra",
+          "summary": "Учебный Score 52.56 → 55.30 (+2.74); стоимость 95 из 100, остаток 5. Сценарий улучшает общий результат, сочетая адресную поддержку районов с развитием городских сервисов. Нура остаётся приоритетом как самый слабый район: улучшения здравоохранения и безопасности не устраняют критический дефицит школ и детсадов.",
+          "strengths": [
+            "Поликлиника, освещение и камеры улучшают положение Нуры; цифровая платформа обращений дополнительно усиливает эффект безопасности.",
+            "Модульные школа и детсад укрепляют социальную инфраструктуру Есиля, а чистое топливо улучшает экологическую ситуацию в Сарыарке.",
+            "Платформа обращений улучшает городские сервисы во всех районах."
+          ],
+          "risks": [
+            "В Нуре обеспеченность школами и детсадами остаётся критической, а здравоохранение — сравнительно слабым даже после улучшения.",
+            "Адресные улучшения распределены неравномерно: Алматы и Байконур получают эффект только от платформы обращений.",
+            "Эффекты строительства, поликлиники и перехода на чистое топливо реализуются с задержкой и в рассматриваемом горизонте проявляются лишь частично.",
+            "Бюджет почти исчерпан, тогда как транспортные дефициты остаются без изменений.",
+            "Данные и эффекты синтетические. Качественное объяснение модели может содержать неточности; это не подтверждённый прогноз для реального города."
+          ],
+          "recommendations": [
+            "Проверьте приоритеты самого слабого района: Нура, оценка 51.86.",
+            "Проверьте оставшиеся критические показатели: Нура / Школы и детсады: 38.00.",
+            "Учитывайте задержки реализации: горизонт учебной модели — 8 кварталов. Это не календарный план реальных работ.",
+            "Сравните альтернативные наборы в панели сценариев. Любой изменённый план нужно заново проверить и рассчитать сервером.",
+            "Поиск замены не выполнялся сервером. Предварительные варианты в отдельной панели проверяются при повторном серверном расчёте."
+          ]
+        }
+      }
+    }
+  ],
+  "invalidCase": {
+    "input": {
+      "decisions": [
+        {
+          "measureId": "M7",
+          "districtId": "nura"
+        },
+        {
+          "measureId": "M8",
+          "districtId": "nura"
+        },
+        {
+          "measureId": "M2"
+        },
+        {
+          "measureId": "M12"
+        },
+        {
+          "measureId": "M5",
+          "districtId": "saryarka"
+        }
+      ]
+    },
+    "response": {
+      "status": 422,
+      "durationMs": 309,
+      "checkedAt": "2026-09-23T12:25:39.382Z",
+      "body": {
+        "valid": false,
+        "errors": [
+          {
+            "code": "BUDGET_EXCEEDED",
+            "message": "Стоимость 105 превышает бюджет 100."
+          }
+        ],
+        "totalCost": 105
+      }
+    }
+  },
+  "completedAt": "2026-09-23T12:25:39.383Z",
+  "invalidShapeAndBudgetCase": {
+    "input": {
+      "decisions": [
+        {
+          "measureId": "M7",
+          "districtId": "nura"
+        },
+        {
+          "measureId": "M8",
+          "districtId": "nura"
+        },
+        {
+          "measureId": "M2",
+          "districtId": "nura"
+        },
+        {
+          "measureId": "M12"
+        },
+        {
+          "measureId": "M5",
+          "districtId": "saryarka"
+        }
+      ]
+    },
+    "response": {
+      "status": 422,
+      "durationMs": 73,
+      "checkedAt": "2026-09-23T12:23:38.726Z",
+      "body": {
+        "valid": false,
+        "errors": [
+          {
+            "code": "CITY_DISTRICT_FORBIDDEN",
+            "message": "Для городской меры M2 район не указывается.",
+            "decisionIndex": 2
+          },
+          {
+            "code": "BUDGET_EXCEEDED",
+            "message": "Стоимость 105 превышает бюджет 100."
+          }
+        ],
+        "totalCost": 105
+      }
+    }
+  },
+  "findings": {
+    "liveExplanationAvailable": true,
+    "model": "gpt-6-astra",
+    "contrast": "Only M7 target changed from Nura to Esil. Model-generated strengths changed the school target to Esil; model-generated summary/risks identified the critical school/kindergarten deficit remaining in Nura.",
+    "verifiedFacts": {
+      "A": {
+        "cost": 95,
+        "score": 56.54307,
+        "criticalCount": 0,
+        "nuraS1": 48,
+        "esilS1": 48
+      },
+      "B": {
+        "cost": 95,
+        "score": 55.29777,
+        "criticalCount": 1,
+        "nuraS1": 38,
+        "esilS1": 58
+      }
+    },
+    "grounding": "Numeric summary and final recommendation text are rendered by server code. Assessment of semantic change separately used model-generated prose, strengths and risks.",
+    "cache": "Worker passes explicit apiKey to explainScenario; its success cache is disabled on that path. No cache bypass was requested.",
+    "limitations": [
+      "Two successful cases are not an exhaustive accuracy evaluation.",
+      "Model receives synthetic scenario data, not live city measurements, map features or citizen complaints.",
+      "Model prose is not fully semantically validated.",
+      "This evidence checks /api/explain; /api/plan has a separate live validation owned by the planner task."
+    ]
+  }
+}
