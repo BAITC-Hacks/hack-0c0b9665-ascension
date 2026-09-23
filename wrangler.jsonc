@@ -31,6 +31,7 @@
   ],
   "vars": {
     "PUBLIC_BASE_URL": "https://ascension-city-map.azamatbreach.workers.dev",
+    "WORKSPACE_ORIGIN": "https://ascension-city-map.azamatbreach.workers.dev",
     "TELEGRAM_BOT_USERNAME": "Ascension_City_bot",
     "OPENAI_MODEL": "gpt-6-astra",
     "AI_MAX_REQUESTS": "100",

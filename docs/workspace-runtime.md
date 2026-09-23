@@ -18,7 +18,7 @@ URL строится только на настроенном `WORKSPACE_ORIGIN`
 
 `src/runtime/worker-workspace.js` проверяет ту же конфигурацию, затем вызывает `TEAM_WORKSPACE.getByName('team').fetch(request)`. Исходные URL, метод, тело, Origin и cookie сохраняются. Внутренний `X-Workspace-Client-Address` перезаписывается значением платформенного `CF-Connecting-IP` либо `unknown`. Авторизация выполняется в сервисе внутри DO; IP используется только для ограничения входа.
 
-`src/cloudflare.js` экспортирует `TeamWorkspaceDurableObject`. Migration `v3-team-workspace` добавляет его SQLite-хранилище, сохраняя `v1` для AI budget и `v2-complaints` для обращений. Node SQLite не входит в Worker bundle. Настройки доступа в публичную конфигурацию не добавлены; для их включения необходимы отдельно выданные оператором значения.
+`src/cloudflare.js` экспортирует `TeamWorkspaceDurableObject`. Migration `v3-team-workspace` добавляет его SQLite-хранилище, сохраняя `v1` для AI budget и `v2-complaints` для обращений. Node SQLite не входит в Worker bundle. Несекретный `WORKSPACE_ORIGIN` в `wrangler.jsonc` равен `https://ascension-city-map.azamatbreach.workers.dev`. Оператор отдельно задаёт `WORKSPACE_SESSION_SECRET` и `WORKSPACE_ACCESS_POLICY` через секретное хранилище платформы; в репозитории их значений нет. При смене домена origin должен совпадать с фактическим адресом приложения.
 
 ## Проверка
 
