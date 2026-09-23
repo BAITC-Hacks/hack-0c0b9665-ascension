@@ -1,6 +1,7 @@
 import { PLACES, DISTRICT_ANCHORS, findPreset } from './places.js';
 import { mountCityExplorer } from './city-explorer.js';
 import { DISTRICT_COLORS, DISTRICT_SECTORS, DISTRICT_BOUNDS, sectorBounds } from './district-sectors.js';
+import { mountTransitPanel } from './transit-panel.js';
 
 const VERSION = '5.24.0';
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -74,6 +75,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   let searchController;
   let resizeObserver;
   let explorer;
+  const transit = mountTransitPanel({ host, city: state.city, reducedMotion });
   const currentDistricts = () => (state.result || baseline).districts;
   const metricName = () => state.metric === 'score' ? 'Оценка района' : dataset.indicators.find((i) => i.id === state.metric)?.name || state.metric;
   const districtValue = (district) => state.metric === 'score' ? district[state.phase === 'after' ? 'afterScore' : 'beforeScore'] : district[state.phase][state.metric];
@@ -267,6 +269,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     state.city = { ...next, hasScenarioData: next.id === 'astana' && next.hasScenarioData === true };
     hoverDistrict(null);
     explorer?.setCity(state.city);
+    transit.setCity(state.city);
     el('.citymap-city-name').textContent = state.city.name;
     el('.citymap-city-caption').textContent = state.city.hasScenarioData ? 'Демонстрационный сценарий · 5 районов' : 'Географический обзор · местные данные не подключены';
     const select = el('.citymap-place');
@@ -370,6 +373,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   }
 
   function failMap() {
+    transit.setMap(null);
     clearTimeout(loadingTimer);
     hoverDistrict(null);
     state.loaded = false;
@@ -392,6 +396,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
       if (state.destroyed) return;
       explorer?.destroy();
       explorer = null;
+      transit.setMap(null);
       state.map?.remove();
       state.loaded = false;
       state.map = new lib.Map({ container: el('.citymap-canvas'), style: STYLE_URL, center: state.is3D && state.city.hasScenarioData ? [71.4304, 51.1282] : state.city.center, zoom: state.is3D ? 15 : state.city.zoom ?? 11.5, maxZoom: 19, pitch: state.is3D ? 58 : 0, bearing: state.is3D ? -18 : 0, maxPitch: 65, attributionControl: false, cooperativeGestures: true, locale: { 'NavigationControl.ZoomIn': 'Приблизить', 'NavigationControl.ZoomOut': 'Отдалить', 'NavigationControl.ResetBearing': 'На север', 'AttributionControl.ToggleAttribution': 'Источники карты', 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MacHelpText': '⌘ + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MobileHelpText': 'Перемещайте карту двумя пальцами' } });
@@ -413,6 +418,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
         explorer = mountCityExplorer({ host, map, city: state.city, reducedMotion });
         explorer.setCity(state.city);
         explorer.setEnabled(state.is3D);
+        transit.setMap(map);
         updateMarkers();
         if (!state.is3D || state.city.bounds) showTerritory();
         else set3D(true);
@@ -463,5 +469,5 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   el('.citymap-retry').addEventListener('click', () => { libraryPromise = undefined; void initialize(); });
   renderDistricts();
   const ready = initialize();
-  return { setResult, setCity, focusDistrict, ready, destroy() { state.destroyed = true; clearTimeout(loadingTimer); searchController?.abort(); resizeObserver?.disconnect(); explorer?.destroy(); state.markers.forEach((marker) => marker.remove()); state.map?.remove(); host.replaceChildren(); } };
+  return { setResult, setCity, focusDistrict, ready, destroy() { state.destroyed = true; clearTimeout(loadingTimer); searchController?.abort(); resizeObserver?.disconnect(); explorer?.destroy(); transit.destroy(); state.markers.forEach((marker) => marker.remove()); state.map?.remove(); host.replaceChildren(); } };
 }

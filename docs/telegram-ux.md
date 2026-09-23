@@ -17,7 +17,7 @@
 После запуска обновлённого сервера один раз выполните из корня проекта:
 
 ```powershell
-& 'C:\Users\dania\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --env-file=.env.local src/telegram-setup.js
+npm run bot:setup
 ```
 
 Для другого компьютера с Node.js 24+ в PATH: `node --env-file=.env.local src/telegram-setup.js`.
