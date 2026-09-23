@@ -1,0 +1,36 @@
+.action-register { color: #14283b; background: #f5f8fb; border: 1px solid #d7e1e9; border-radius: 16px; padding: clamp(14px, 3vw, 24px); margin-block: 24px; font: 14px/1.5 system-ui, sans-serif; min-width: 0; }
+.action-register *, .action-register *::before, .action-register *::after { box-sizing: border-box; }
+.action-register [hidden] { display: none !important; }
+.action-register h2, .action-register h3, .action-register h4, .action-register p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.action-register-title { font-size: 22px; }
+.action-register-notice { background: #e9f0f6; border-left: 4px solid #446f94; padding: 12px; font-weight: 600; }
+.action-register-help, .action-register-hint, .action-register-district { color: #465e73; }
+.action-register-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 16px; }
+.action-register button { appearance: none; color: #123950; background: white; border: 1px solid #9baebf; border-radius: 8px; padding: 10px 14px; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; max-width: 100%; white-space: normal; }
+.action-register button.action-register-create { background: #154c71; border-color: #154c71; color: white; }
+.action-register button:disabled { opacity: .55; cursor: default; }
+.action-register button:hover:not(:disabled) { filter: brightness(.94); }
+.action-register button:focus-visible, .action-register input:focus-visible, .action-register textarea:focus-visible, .action-register select:focus-visible, .action-register summary:focus-visible { outline: 3px solid #168aca; outline-offset: 3px; }
+.action-register-summary { font-weight: 600; }
+.action-register-storage { color: #684612; }
+.action-register-message:empty, .action-register-validation:empty, .action-register-overdue:empty { display: none; }
+.action-register-group { border-top: 1px solid #cbd8e2; padding-block: 20px 4px; margin-top: 16px; min-width: 0; }
+.action-register-group-title { font-size: 18px; }
+.action-register-source { margin-bottom: 16px; }
+.action-register-source summary { cursor: pointer; padding-block: 6px; overflow-wrap: anywhere; }
+.action-register-source p { padding-inline: 8px; }
+.action-register-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+.action-register-card { border: 1px solid #d3dee8; border-radius: 10px; padding: 16px; background: white; min-width: 0; }
+.action-register-card-title { display: inline; font-size: 15px; font-weight: 700; }
+.action-register-card-toggle { cursor: pointer; overflow-wrap: anywhere; }
+.action-register-card-preview { display: block; margin-top: 6px; color: #465e73; font-size: 13px; }
+.action-register-card-details[open] .action-register-card-toggle { margin-bottom: 14px; }
+.action-register-field { display: flex; flex-direction: column; gap: 4px; margin-block: 10px; font-size: 13px; font-weight: 600; min-width: 0; }
+.action-register-field input, .action-register-field textarea, .action-register-field select { width: 100%; min-width: 0; max-width: 100%; border: 1px solid #9baebf; border-radius: 6px; padding: 9px; min-height: 42px; color: #14283b; background: white; font: 14px/1.4 system-ui, sans-serif; }
+.action-register-field textarea { resize: vertical; }
+.action-register-validation, .action-register-overdue { color: #a12424; font-weight: 600; }
+.action-register-deletion { margin-top: 16px; }
+.action-register-delete-panel { background: #fff4e6; border: 1px solid #dfbc8a; border-radius: 8px; padding: 12px; margin-top: 10px; }
+.action-register-delete-panel button { margin: 4px 8px 4px 0; }
+.action-register button.action-register-delete-confirm { color: #902222; border-color: #b44848; }
+@media (max-width: 440px) { .action-register-controls { flex-direction: column; } .action-register-controls button { width: 100%; } .action-register-card { padding: 12px; } }
