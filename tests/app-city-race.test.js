@@ -23,7 +23,7 @@ test('leaving Astana during a pending calculation restores the button and ignore
     return elements.get(id);
   };
   const state = { dataset: getDataset(), baseline: getBaseline(), decisions, totalCost: 95,
-    hasScenarioData: true, busy: false, simulating: false, version: 0, simulationId: 0,
+    hasScenarioData: true, busy: false, simulating: false, demoRunId: 0, demoRunning: false, version: 0, simulationId: 0,
     explanationId: 0, mutationId: 0, result: null, history: [] };
   const requests = [];
   const listeners = new Map();
@@ -45,7 +45,7 @@ test('leaving Astana during a pending calculation restores the button and ignore
     CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
     structuredClone, preferredScrollBehavior: () => 'instant',
     cityMap: { setResult() {} }, renderDistricts() {}, renderDistrictFocus() {}, renderCatalog() {},
-    clearErrors() {}, showErrors: errors => assert.fail(JSON.stringify(errors)), announce() {},
+    clearErrors() {}, setActionStatus() {}, showErrors: errors => assert.fail(JSON.stringify(errors)), announce() {},
     measureById: id => state.dataset.measures.find(measure => measure.id === id),
     districtOptions: () => '', escapeHtml: String, number: value => String(value), signed: value => String(value),
     scenario: () => structuredClone({ decisions: state.decisions }),
