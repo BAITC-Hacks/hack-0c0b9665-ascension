@@ -96,7 +96,7 @@ async function readProviderResponse(response, allowJsonMock) {
   try { return JSON.parse(chunks.join('')); } catch { throw new InvalidPlanResponse(); }
 }
 
-function parsePlan(response) {
+function parsePlan(response, normalizeMeasureCodes = false) {
   if (!isObject(response) || response.status !== 'completed' || !Array.isArray(response.output)
     || response.output.length > 32) throw new InvalidPlanResponse();
   const content = response.output.flatMap(item => Array.isArray(item?.content) ? item.content : []);
@@ -107,6 +107,21 @@ function parsePlan(response) {
   }
   let plan;
   try { plan = JSON.parse(parts[0].text); } catch { throw new InvalidPlanResponse(); }
+  // Nemotron may repeat catalogue IDs in prose despite the prompt. Resolve only
+  // exact known IDs to their authoritative names; other numbers and invented
+  // IDs remain untouched and are rejected by the evidence validator below.
+  if (normalizeMeasureCodes && isObject(plan)) {
+    const names = text => typeof text === 'string'
+      ? text.replace(/\bM\d+\b/gu, id => measures.get(id)?.name ?? id) : text;
+    plan.summary = names(plan.summary);
+    for (const field of ['unsupported', 'assumptions']) {
+      if (Array.isArray(plan[field])) plan[field] = plan[field].map(names);
+    }
+    if (Array.isArray(plan.decisions)) {
+      plan.decisions = plan.decisions.map(decision => isObject(decision)
+        ? { ...decision, rationale: names(decision.rationale) } : decision);
+    }
+  }
   if (!exactKeys(plan, fields) || !shortText(plan.summary, 1200)
     || !textList(plan.unsupported) || !textList(plan.assumptions)
     || !Array.isArray(plan.decisions) || plan.decisions.length > dataset.measures.length
@@ -206,7 +221,7 @@ export async function proposePlan(input, options = {}) {
           'Ascension AI временно недоступен. План не был рассчитан; попробуйте позже или соберите его вручную.');
       }
       const envelope = normalizeProviderResponse(await readProviderResponse(response, Boolean(options.fetchImpl)), provider);
-      const value = evaluatePlan(parsePlan(envelope));
+      const value = evaluatePlan(parsePlan(envelope, provider === 'nvidia'));
       return provider === 'nvidia' ? { ...value, provider, model,
         ...(configuration.backend ? { backend: configuration.backend } : {}) } : value;
     };

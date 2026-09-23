@@ -112,6 +112,26 @@ test('NVIDIA output cannot supply invented IDs, extra fields or calculated numbe
   assert.equal(value.provider, undefined);
 });
 
+test('NVIDIA prose resolves exact catalogue IDs without allowing invented IDs or numeric claims', async () => {
+  const proposal = plan();
+  proposal.summary = 'Приоритеты плана: M7, M8 и M10.';
+  proposal.decisions[0].rationale = 'Пользователь запросил M7.';
+  proposal.assumptions = ['M12 применяется по всему городу, M5 — в Сарыарке.'];
+  const value = await proposePlan(input, options(async () => jsonResponse(completion(proposal))));
+  assert.equal(value.mode, 'ai');
+  assert.equal(value.valid, true);
+  assert.doesNotMatch(value.modelComment.text, /M\d/u);
+  assert.doesNotMatch(value.decisionOrigins[0].modelRationale, /M\d/u);
+  assert.doesNotMatch(value.assumptions.join(' '), /M\d/u);
+  assert.deepEqual(value.result, result);
+  for (const summary of ['M999 улучшает город.', 'M7 стоит 95.', 'M7M999 улучшают город.']) {
+    const unsafe = { ...proposal, summary };
+    const rejected = await proposePlan(input, options(async () => jsonResponse(completion(unsafe))));
+    assert.equal(rejected.mode, 'unavailable');
+    assert.equal(rejected.reason, 'invalid_model_plan');
+  }
+});
+
 test('incomplete, tool, multiple-choice and non-JSON NVIDIA responses cannot be labeled AI', async () => {
   for (const change of [
     value => { value.choices[0].finish_reason = 'length'; },
@@ -193,7 +213,8 @@ test('Cloudflare NVIDIA runs real chat input through the same plan and explanati
     assert.equal(model, DEFAULT_CLOUDFLARE_NVIDIA_MODEL);
     assert.equal(body.model, undefined);
     assert.equal(body.stream, false);
-    assert.deepEqual(body.response_format, { type: 'json_object' });
+    assert.equal(body.response_format.type, 'json_schema');
+    assert.equal(body.response_format.json_schema.strict, true);
     assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
     assert.equal(runOptions.returnRawResponse, true);
     assert.ok(runOptions.signal instanceof AbortSignal);
