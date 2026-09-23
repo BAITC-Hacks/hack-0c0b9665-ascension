@@ -85,6 +85,14 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     destination.append(node);
   };
   move(mapHost, root);
+  // Keep map-owned controls under its host so its selectors and listeners work.
+  const mapSettings = element('div', 'cc-map-settings cc-glass');
+  mapSettings.setAttribute('aria-label', 'Настройки карты и районов');
+  mapHost.append(mapSettings);
+  restore.push(() => mapSettings.remove());
+  for (const selector of ['.citymap-toolbar', '.citymap-sector-toolbar', '.citymap-data-toolbar', '.citymap-district-list']) {
+    move(mapHost.querySelector(selector), mapSettings);
+  }
   move(document.querySelector('.hero-actions'), $('.cc-header-actions'));
   const panes = new Map();
   function addPane(id, nodes, title, description) {
@@ -105,6 +113,10 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   for (const node of [...document.querySelectorAll('#app > section')]) {
     if (!node.id || node.id === 'map-section' || panes.has(node.id)) continue;
     addPane(node.id, [node], node.querySelector('h2, h3')?.textContent || 'Дополнительный модуль', 'Открыть инструмент');
+  }
+  const transitPanel = mapHost.querySelector('.transit-panel');
+  if (transitPanel) {
+    addPane('transit', [transitPanel], 'Автобусы и остановки', 'Каталог маршрутов и остановки OpenStreetMap');
   }
   const toolsPane = element('div', 'cc-pane cc-tools-pane');
   toolsPane.hidden = true;
@@ -176,9 +188,10 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     if (id === 'map-section' || id === 'top') { closePanel(); return; }
     const panel = panes.get(id);
     if (!panel) return;
-    if (!modelAvailable && id !== 'tools') map?.setCity?.('astana');
+    if (!modelAvailable && !['tools', 'transit'].includes(id)) map?.setCity?.('astana');
     if (!activePanel) previousFocus = document.activeElement;
     activePanel = id;
+    if (id === 'transit' && transitPanel) transitPanel.open = true;
     setLayers(false);
     panes.forEach(({ pane }, key) => { pane.hidden = key !== id; });
     $('#cc-drawer-title').textContent = panel.title;
@@ -412,6 +425,8 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     window.dispatchEvent(new CustomEvent('ascension:apply-plan', { detail: { decisions: structuredClone(proposal) } }));
   });
   document.body.classList.add('cc-active');
+  // This workspace opens in 3D even when the shared map defaults to districts.
+  mapHost.querySelector('[data-view="3d"]')?.click();
   window.dispatchEvent(new Event('resize'));
   return {
     openPanel,
