@@ -243,7 +243,7 @@ test('HTTP security headers preserve map assets and citizen geolocation with res
     }));
     assert.deepEqual(directives.get('script-src'), ["'self'"]);
     assert.deepEqual(directives.get('worker-src'), ["'self'", 'blob:']);
-    assert.deepEqual(directives.get('connect-src'), ["'self'", 'https://tiles.openfreemap.org', 'https://photon.komoot.io']);
+    assert.deepEqual(directives.get('connect-src'), ["'self'", 'https://tiles.openfreemap.org', 'https://photon.komoot.io', 'https://overpass-api.de']);
     assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
     assert.deepEqual(directives.get('object-src'), ["'none'"]);
   }
