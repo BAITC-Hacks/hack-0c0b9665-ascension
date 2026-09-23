@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, unlink, rmdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createTelegramProcessor, createTelegramTransport, formatTelegramStatusNotification } from '../src/complaints/telegram.js';
+import { createTelegramProcessor, createTelegramTransport, formatTelegramStatusNotification, TELEGRAM_BUTTONS as B, TELEGRAM_COMMANDS } from '../src/complaints/telegram.js';
 import { createTelegramForwarder, runTelegramPolling } from '../src/telegram-poll.js';
 import { createComplaintStore } from '../src/complaints/store.js';
 
@@ -40,7 +40,7 @@ function update(id, content, chat = 100) {
 
 function harness(store = fakeStore(), extra = {}) {
   const sent = [];
-  const processUpdate = createTelegramProcessor({ store, publicBaseUrl: 'https://civic.example/', sendMessage: async (chatId, text) => { sent.push({ chatId, text }); }, ...extra });
+  const processUpdate = createTelegramProcessor({ store, publicBaseUrl: 'https://civic.example/', sendMessage: async (chatId, text, options) => { sent.push({ chatId, text, options }); }, ...extra });
   return { store, sent, processUpdate };
 }
 
@@ -308,4 +308,128 @@ test('polling advances offset only after server acceptance and retries failed up
   assert.deepEqual(offsets, [0, 11, 12]);
   assert.deepEqual(forwarded, [10, 11, 11]);
   assert.equal(errors.length, 1);
+});
+
+test('first-time user submits through buttons with a separate address step and preview', async () => {
+  const { processUpdate, sent, store } = harness();
+  const buttons = () => sent.at(-1).options.replyMarkup.keyboard.flat();
+  await processUpdate(update(1, '/start'));
+  assert.deepEqual(buttons().map(button => button.text), [B.new, B.status, B.help, B.support]);
+  assert.equal(store.records.length, 0);
+  await processUpdate(update(2, B.new));
+  assert.match(sent.at(-1).text, /согласие/u);
+  assert.ok(buttons().some(button => button.text === B.agree));
+  await processUpdate(update(3, B.agree));
+  assert.match(sent.at(-1).text, /Шаг 1 из 3/u);
+  await processUpdate(update(4, 'Тест: у перехода не работает фонарь.'));
+  assert.match(sent.at(-1).text, /Шаг 2 из 3/u);
+  assert.ok(buttons().some(button => button.request_location === true));
+  await processUpdate(update(5, B.address));
+  await processUpdate(update(6, 'Тестовая улица, дом 10'));
+  assert.match(sent.at(-1).text, /Шаг 3 из 3/u);
+  await processUpdate(update(7, B.photo));
+  await processUpdate(update(8, { photo: [{ file_id: 'synthetic-photo' }] }));
+  await processUpdate(update(9, B.review));
+  assert.equal(store.records.length, 0, 'preview must not submit');
+  assert.match(sent.at(-1).text, /Тестовая улица, дом 10[\s\S]*Фото: 1/u);
+  assert.ok(buttons().some(button => button.text === B.send));
+  const sendUpdate = update(10, B.send);
+  assert.equal((await processUpdate(sendUpdate)).submitted, true);
+  assert.equal((await processUpdate(sendUpdate)).duplicateUpdate, true);
+  assert.equal(store.records.length, 1);
+  assert.equal(store.records[0].text, 'Тест: у перехода не работает фонарь.');
+  assert.equal(store.records[0].address, 'Тестовая улица, дом 10');
+  assert.equal(store.records[0].attachments.length, 1);
+  assert.deepEqual(buttons().map(button => button.text), [B.new, B.status, B.help, B.support]);
+});
+
+test('menu, help, support and restart command preserve draft without collecting navigation text', async () => {
+  const { processUpdate, sent, store } = harness();
+  await processUpdate(update(1, B.new));
+  await processUpdate(update(2, B.agree));
+  await processUpdate(update(3, 'Тест: переполнен контейнер у остановки.'));
+  await processUpdate(update(4, B.menu));
+  await processUpdate(update(5, 'Этот текст не должен попасть в обращение.'));
+  await processUpdate(update(6, B.help));
+  await processUpdate(update(7, B.support));
+  await processUpdate(update(8, 'Вопрос поддержке, не текст обращения.'));
+  await processUpdate(update(9, '/start'));
+  assert.ok(sent.at(-1).options.replyMarkup.keyboard.flat().some(button => button.text === B.resume));
+  await processUpdate(update(10, B.resume));
+  await processUpdate(update(11, B.skip));
+  assert.match(sent.at(-1).text, /Шаг 3 из 3/u);
+  await processUpdate(update(12, B.review));
+  await processUpdate(update(13, B.send));
+  assert.equal(store.records[0].text, 'Тест: переполнен контейнер у остановки.');
+  assert.equal(store.records[0].address, '');
+});
+
+test('new request requires a deliberate reset before discarding an existing draft', async () => {
+  const { processUpdate, sent, store } = harness();
+  await processUpdate(update(1, B.agree));
+  await processUpdate(update(2, 'Первое тестовое обращение о дороге.'));
+  await processUpdate(update(3, B.new));
+  assert.match(sent.at(-1).text, /уже есть черновик/u);
+  await processUpdate(update(4, B.resume));
+  await processUpdate(update(5, B.review));
+  assert.match(sent.at(-1).text, /Первое тестовое обращение/u);
+  await processUpdate(update(6, B.new));
+  await processUpdate(update(7, B.reset));
+  await processUpdate(update(8, B.send));
+  assert.equal(store.records.length, 0);
+  assert.match(sent.at(-1).text, /согласие/u);
+  await processUpdate(update(9, B.agree));
+  await processUpdate(update(10, 'Второе тестовое обращение о фонаре.'));
+  await processUpdate(update(11, B.send));
+  assert.equal(store.records[0].text, 'Второе тестовое обращение о фонаре.');
+});
+
+test('status button accepts a number as the next message and keeps chat ownership checks', async () => {
+  const { processUpdate, sent, store } = harness();
+  await processUpdate(update(1, B.agree));
+  await processUpdate(update(2, 'Скрытое содержание обращения про фонарь.'));
+  await processUpdate(update(3, B.send));
+  await processUpdate(update(4, B.status, 200));
+  await processUpdate(update(5, 'C-1', 200));
+  assert.match(sent.at(-1).text, /не найдено/u);
+  await processUpdate(update(6, 'C-1 private-token-C-1', 200));
+  assert.match(sent.at(-1).text, /Новое/u);
+  assert.doesNotMatch(sent.at(-1).text, /Скрытое|private-token/u);
+  await processUpdate(update(7, B.status));
+  await processUpdate(update(8, 'C-1'));
+  assert.match(sent.at(-1).text, /Новое/u);
+  assert.equal(store.records.length, 1);
+});
+
+test('support exposes only the configured contact and never pretends to forward a request', async () => {
+  for (const supportUrl of ['', 'http://insecure.example', 'https://user:secret@t.me/SupportTest']) {
+    const { processUpdate, sent, store } = harness(undefined, { supportUrl });
+    await processUpdate(update(1, B.support));
+    assert.match(sent.at(-1).text, /Контакт оператора пока не подключён/u);
+    assert.doesNotMatch(sent.at(-1).text, /secret|insecure/u);
+    await processUpdate(update(2, 'Помогите с тестовой проблемой.'));
+    assert.equal(store.records.length, 0);
+  }
+  const { processUpdate, sent } = harness(undefined, { supportUrl: '@SupportTest' });
+  await processUpdate(update(1, B.support));
+  assert.match(sent.at(-1).text, /https:\/\/t\.me\/SupportTest/u);
+  assert.match(sent.at(-1).text, /не пересылаются оператору/u);
+});
+
+test('menu transport forwards keyboard and registers private chat commands with native menu', async () => {
+  const calls = [];
+  const transport = createTelegramTransport({ token: TEST_TOKEN, fetchImpl: async (url, options) => {
+    calls.push({ method: url.split('/').at(-1), body: JSON.parse(options.body) });
+    return jsonResponse(true);
+  } });
+  const replyMarkup = { keyboard: [[{ text: B.menu }]], resize_keyboard: true };
+  await transport.sendMessage('100', 'Главное меню', { replyMarkup, chat_id: '200' });
+  assert.deepEqual(calls[0].body.reply_markup, replyMarkup);
+  assert.equal(calls[0].body.chat_id, '100');
+  await transport.configureMenu();
+  assert.deepEqual(calls.slice(1).map(call => call.method), ['setMyCommands', 'setChatMenuButton', 'setMyDescription']);
+  assert.deepEqual(calls[1].body.scope, { type: 'all_private_chats' });
+  assert.deepEqual(calls[1].body.commands, TELEGRAM_COMMANDS);
+  assert.deepEqual(calls[2].body.menu_button, { type: 'commands' });
+  assert.ok(calls[3].body.description.length <= 512);
 });

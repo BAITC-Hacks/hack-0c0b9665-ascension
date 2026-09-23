@@ -3,8 +3,45 @@ const MAX_DRAFTS = 1000;
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const STATUS_LABELS = { new: 'Новое', in_progress: 'В работе', resolved: 'Решено', rejected: 'Отклонено' };
-const CONSENT_PROMPT = 'Для передачи обращения в акимат нужно согласие на обработку текста, фото и указанного вами места. Эти сведения и Telegram ID доступны только сотрудникам; в публичной проверке они не показываются. Подтвердите /agree или отмените /cancel. Не отправляйте чужие персональные данные.';
-const DRAFT_HELP = 'Опишите проблему текстом или отправьте фото с подписью. Можно добавить ещё фото, геолокацию и адрес командой /address адрес. Когда всё готово, нажмите /send. Отмена: /cancel.';
+const CONSENT_PROMPT = '📝 Новое обращение\n\nДля передачи обращения в акимат нужно ваше согласие на обработку текста, фото и указанного места. Эти сведения и Telegram ID доступны сотрудникам; в публичной проверке они не показываются. Не отправляйте чужие персональные данные.\n\nНажмите «✅ Согласен, продолжить» или отправьте /agree. До отправки обращение можно отменить.';
+const DESCRIPTION_PROMPT = 'Шаг 1 из 3. Что случилось?\n\nОпишите городскую проблему одним сообщением: что не работает и где это заметили. Например: «Возле дома не горит фонарь, вечером темно». Нужно не меньше 10 символов. Можно сразу отправить фото с подписью.';
+const HELP_TEXT = '❓ Как пользоваться\n\n1. Нажмите «📝 Новое обращение» и подтвердите согласие.\n2. Опишите проблему. При желании добавьте адрес, геолокацию и фото через скрепку.\n3. Проверьте черновик и нажмите «✅ Отправить обращение».\n\nВ ответ придут номер и личный код. По кнопке «🔎 Проверить статус» можно узнать результат; в этом же чате достаточно номера.\n\n«🏠 Главное меню» сохраняет черновик на 30 минут бездействия. «❌ Отменить обращение» удаляет его. При перезапуске бота незавершённый черновик нужно заполнить снова.\n\nКоманды также работают: /menu, /new, /status, /help, /support, /cancel. Быстрая отправка готового черновика: /send.';
+
+export const TELEGRAM_BUTTONS = Object.freeze({
+  new: '📝 Новое обращение', status: '🔎 Проверить статус', help: '❓ Как пользоваться',
+  support: '💬 Техподдержка', menu: '🏠 Главное меню', agree: '✅ Согласен, продолжить',
+  cancel: '❌ Отменить обращение', resume: '↩️ Продолжить обращение', address: '📍 Указать адрес',
+  location: '📌 Отправить геолокацию', photo: '📷 Добавить фото', skip: 'Пропустить адрес',
+  review: '👀 Проверить и отправить', send: '✅ Отправить обращение', edit: '✏️ Дополнить обращение',
+  reset: '🗑 Начать заново',
+});
+export const TELEGRAM_COMMANDS = Object.freeze([
+  { command: 'menu', description: 'Главное меню' },
+  { command: 'new', description: 'Создать обращение о городской проблеме' },
+  { command: 'status', description: 'Проверить статус обращения' },
+  { command: 'help', description: 'Как пользоваться ботом' },
+  { command: 'support', description: 'Техническая поддержка' },
+  { command: 'cancel', description: 'Отменить незавершённое обращение' },
+  { command: 'start', description: 'Начать работу с ботом' },
+]);
+const BUTTON_COMMANDS = new Map(Object.entries(TELEGRAM_BUTTONS).map(([command, label]) => [label, command]));
+const B = TELEGRAM_BUTTONS;
+
+function keyboard(rows, placeholder = 'Выберите действие в меню') {
+  return { keyboard: rows.map(row => row.map(button => typeof button === 'string' ? { text: button } : button)),
+    resize_keyboard: true, is_persistent: true, input_field_placeholder: placeholder };
+}
+
+function supportLink(value) {
+  if (typeof value !== 'string') return '';
+  const raw = value.trim();
+  if (/^@[A-Za-z0-9_]{5,32}$/u.test(raw)) return `https://t.me/${raw.slice(1)}`;
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' && ['t.me', 'telegram.me'].includes(url.hostname)
+      && !url.username && !url.password && !url.hash && raw.length <= 512 ? url.href : '';
+  } catch { return ''; }
+}
 
 function telegramError(code, message, status = 502) {
   return Object.assign(new Error(message), { code, status });
@@ -38,11 +75,63 @@ export function formatTelegramStatusNotification(complaint) {
   return lines.join('\n');
 }
 
-export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '' }) {
+export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '', supportUrl = '' }) {
   if (!store?.create || !store?.get || !store?.track) throw new TypeError('Нужно хранилище обращений.');
   const drafts = new Map();
   const updates = new Map();
   const chatQueues = new Map();
+  const screens = new Map();
+  const support = supportLink(supportUrl);
+
+  function activeDraft(chatId) {
+    const draft = drafts.get(chatId);
+    if (draft && Date.now() - draft.updatedAt <= DRAFT_TTL_MS) return draft;
+    drafts.delete(chatId);
+    return null;
+  }
+
+  function screenFor(chatId) {
+    const now = Date.now();
+    for (const [id, screen] of screens) if (now - screen.updatedAt > DRAFT_TTL_MS) screens.delete(id);
+    if (!screens.has(chatId)) {
+      if (screens.size >= MAX_DRAFTS) screens.delete(screens.keys().next().value);
+      screens.set(chatId, { mode: 'menu', updatedAt: now });
+    }
+    const screen = screens.get(chatId);
+    screen.updatedAt = now;
+    return screen;
+  }
+
+  function menuKeyboard(chatId) {
+    return keyboard([...(activeDraft(chatId) ? [[B.resume]] : []), [B.new, B.status], [B.help, B.support]]);
+  }
+
+  const consentKeyboard = () => keyboard([[B.agree], [B.menu, B.cancel]], 'Подтвердите согласие или вернитесь в меню');
+  const navigationKeyboard = chatId => keyboard([...(activeDraft(chatId) ? [[B.resume]] : []), [B.menu]]);
+
+  function draftKeyboard(draft) {
+    return keyboard([
+      ...(draft.text.trim().length >= 10 ? [[B.review]] : []),
+      [B.address, { text: B.location, request_location: true }],
+      [B.photo, ...(!draft.address && !draft.location && !draft.locationSkipped ? [B.skip] : [])],
+      [B.menu, B.cancel],
+    ], 'Опишите проблему или добавьте детали');
+  }
+
+  function nextStep(draft) {
+    if (draft.text.trim().length < 10) return DESCRIPTION_PROMPT;
+    if (!draft.address && !draft.location && !draft.locationSkipped) {
+      return 'Шаг 2 из 3. Где находится проблема?\n\nНажмите «📍 Указать адрес» и напишите улицу и дом. Или отправьте геолокацию кнопкой ниже — только если вы сейчас на месте проблемы. Адрес необязателен: его можно пропустить.';
+    }
+    return 'Шаг 3 из 3. Всё почти готово.\n\nПри желании добавьте фото через скрепку или напишите дополнительные подробности. Затем нажмите «👀 Проверить и отправить». Обращение ещё не отправлено.';
+  }
+
+  function draftSummary(draft) {
+    return ['👀 Проверьте обращение', '', draft.text.length > 1800 ? `${draft.text.slice(0, 1800)}…\n(Показано начало; отправится полный текст.)` : draft.text,
+      '', `Адрес: ${draft.address || 'не указан'}`,
+      `Геолокация: ${draft.location ? `${draft.location.lat}, ${draft.location.lon}` : 'не указана'}`,
+      `Фото: ${draft.attachments.length}`, '', 'Обращение ещё не отправлено. Если всё верно, нажмите «✅ Отправить обращение».'].join('\n');
+  }
 
   function draftFor(chatId) {
     const now = Date.now();
@@ -59,7 +148,7 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
   function receiptReply(receipt) {
     const id = receipt.complaint.id;
     const link = trackingLink(publicBaseUrl, id, receipt.trackingToken);
-    return `Обращение принято. Номер: ${id}\nКод проверки: ${receipt.trackingToken}\nСтатус: /status ${id}\nДля проверки на сайте сохраните номер и код. Не передавайте код другим.${link ? `\n${link}` : ''}`;
+    return `✅ Обращение принято. Номер: ${id}\nКод проверки: ${receipt.trackingToken}\n\nСохраните это сообщение. Чтобы узнать результат, нажмите «${B.status}» и отправьте номер. В этом чате код не нужен.\nБыстрая проверка: /status ${id}\n\nНа сайте нужны номер и личный код. Не передавайте код другим.${link ? `\n${link}` : ''}`;
   }
 
   async function prepare(update, chatId) {
@@ -68,22 +157,50 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     if (callback && !['consent:agree', 'consent:cancel'].includes(callback)) return { result: { ignored: true } };
     const raw = callback === 'consent:agree' ? '/agree' : callback === 'consent:cancel' ? '/cancel' : String(message.text ?? message.caption ?? '');
     const match = raw.trim().match(/^\/(\w+)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S]*))?$/u);
-    const command = match?.[1]?.toLowerCase();
+    const command = match?.[1]?.toLowerCase() ?? BUTTON_COMMANDS.get(raw.trim());
     const argument = match?.[2]?.trim() ?? '';
-    const reply = (text, extra = {}) => ({ text, result: { handled: true, ...extra } });
+    const screen = screenFor(chatId);
+    const reply = (text, extra = {}, markup = menuKeyboard(chatId)) => ({ text, markup, result: { handled: true, ...extra } });
+    const consentReply = () => { screen.mode = 'consent'; return reply(CONSENT_PROMPT, {}, consentKeyboard()); };
+    const continueDraft = () => {
+      const draft = activeDraft(chatId);
+      if (!draft) { screen.mode = 'menu'; return reply('Незавершённого обращения нет. Нажмите «📝 Новое обращение», чтобы начать.'); }
+      if (!draft.consent) return consentReply();
+      draft.updatedAt = Date.now();
+      screen.mode = 'draft';
+      return reply(nextStep(draft), {}, draftKeyboard(draft));
+    };
 
     if (command === 'cancel') {
       drafts.delete(chatId);
-      return reply('Черновик удалён. Для нового обращения: /start.');
+      screen.mode = 'menu';
+      return reply('Черновик удалён, обращение не отправлено. Вы в главном меню.');
     }
-    if (command === 'start') {
+    if (command === 'start' || command === 'menu') {
+      screen.mode = 'menu';
+      return reply(`${command === 'start' ? 'Здравствуйте! Я помощник Ascension City. Помогу сообщить о городской проблеме и узнать статус обращения.' : '🏠 Главное меню'}\n\nВыберите действие кнопкой ниже. Команды запоминать не нужно.${activeDraft(chatId) ? '\n\nУ вас есть незавершённое обращение. Нажмите «↩️ Продолжить обращение», чтобы вернуться к нему.' : ''}`);
+    }
+    if (command === 'new' || (command === 'reset' && screen.mode === 'reset')) {
+      const draft = activeDraft(chatId);
+      if (command === 'new' && draft && (draft.text || draft.attachments.length || draft.address || draft.location)) {
+        screen.mode = 'reset';
+        return reply('У вас уже есть черновик. Можно продолжить его или начать заново. Если начать заново, текст и вложения старого черновика будут удалены.', {}, keyboard([[B.resume], [B.reset], [B.menu]]));
+      }
       drafts.delete(chatId);
       draftFor(chatId);
-      return reply(`Здравствуйте! Здесь можно сообщить о городской проблеме.\n${CONSENT_PROMPT}\nПроверка существующего обращения: /status НОМЕР КОД.`);
+      return consentReply();
     }
-    if (command === 'status') {
-      const parts = argument.split(/\s+/u).filter(Boolean);
-      if (parts.length < 1 || parts.length > 2) return reply('Проверка: /status НОМЕР КОД. В своём чате код можно опустить.');
+    if (command === 'resume' || command === 'edit') return continueDraft();
+    if (command === 'help' || command === 'support') {
+      screen.mode = command;
+      const text = command === 'help' ? HELP_TEXT : `💬 Техподдержка\n\n${support ? `Чтобы написать человеку, откройте контакт поддержки:\n${support}\n\nОпишите, на каком шаге возникла проблема. Можно приложить скриншот и номер обращения. Личный код проверки отправлять не нужно.` : 'Контакт оператора пока не подключён. Ответы на частые вопросы:\n\n• Не получается отправить? Подтвердите согласие и добавьте описание не короче 10 символов.\n• Как прикрепить фото? Нажмите скрепку в поле сообщения.\n• Где номер обращения? Он в сообщении «Обращение принято».\n• Пропал черновик? После 30 минут бездействия или перезапуска начните новое обращение.'}\n\nСообщения из этого раздела не пересылаются оператору.`;
+      return reply(text, {}, navigationKeyboard(chatId));
+    }
+    if (command === 'status' || (!command && screen.mode === 'status')) {
+      screen.mode = 'status';
+      const query = command ? argument : raw.trim();
+      const parts = query.split(/\s+/u).filter(Boolean);
+      if (!parts.length || parts.length > 2 || (!message.text && !callback)) return reply('🔎 Проверка статуса\n\nОтправьте номер из сообщения «Обращение принято». Если вы создавали обращение в этом чате, этого достаточно. Для обращения с сайта отправьте НОМЕР и КОД через пробел.\n\nВернуться назад: «🏠 Главное меню».', {}, navigationKeyboard(chatId));
       let complaint;
       try {
         if (parts[1]) complaint = await store.track(parts[0], parts[1]);
@@ -94,7 +211,8 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
       } catch (error) {
         if (error.status !== 404) throw error;
       }
-      if (!complaint) return reply('Обращение не найдено. Проверьте номер и код проверки.');
+      if (!complaint) return reply('Обращение не найдено. Проверьте номер и код проверки и отправьте их ещё раз. Номер можно скопировать из сообщения о принятии обращения.', {}, navigationKeyboard(chatId));
+      screen.mode = 'menu';
       return reply(formatTelegramStatusNotification(complaint));
     }
     if (command === 'send') {
@@ -112,45 +230,78 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
         });
       } catch (error) {
         if (error.status >= 400 && error.status < 500) {
-          if (!active?.consent) return reply(CONSENT_PROMPT);
-          if (active.text.trim().length < 10) return reply('Добавьте текст проблемы или подпись к фото (не меньше 10 символов), затем /send.');
-          return reply('Не удалось сохранить черновик. Проверьте длину текста (до 5000 символов), адреса (до 300) и приложите не больше 10 фото.');
+          if (!active?.consent) return consentReply();
+          screen.mode = 'draft';
+          if (active.text.trim().length < 10) return reply(DESCRIPTION_PROMPT, {}, draftKeyboard(active));
+          return reply('Не удалось сохранить черновик. Проверьте длину текста (до 5000 символов), адреса (до 300) и приложите не больше 10 фото.', {}, draftKeyboard(active));
         }
         throw error;
       }
       if (String(receipt.complaint.telegramChatId) !== chatId) return reply('Не удалось подтвердить это обращение. Начните новое: /start.');
       if (!receipt.duplicateUpdate) drafts.delete(chatId);
+      if (!receipt.duplicateUpdate) screen.mode = 'menu';
       return reply(receiptReply(receipt), { submitted: true, complaintId: receipt.complaint.id, duplicateUpdate: !!receipt.duplicateUpdate });
     }
-    if (command === 'help') return reply(`${DRAFT_HELP}\nПроверка статуса: /status НОМЕР КОД.\n${CONSENT_PROMPT}`);
-    if (command && !['agree', 'address'].includes(command)) return reply('Неизвестная команда. Помощь: /help.');
+    if (command === 'review') {
+      const draft = activeDraft(chatId);
+      if (!draft?.consent) return consentReply();
+      if (draft.text.trim().length < 10) return continueDraft();
+      screen.mode = 'review';
+      return reply(draftSummary(draft), {}, keyboard([[B.send], [B.edit], [B.menu, B.cancel]], 'Проверьте обращение перед отправкой'));
+    }
+    if (command && !['agree', 'address', 'photo', 'location', 'skip'].includes(command)) {
+      return reply('Не удалось распознать команду. Выберите действие в главном меню или откройте /help.');
+    }
+    if (!command && ['help', 'support', 'reset'].includes(screen.mode)) {
+      return reply(screen.mode === 'support' ? `Чтобы связаться с поддержкой, ${support ? `откройте контакт: ${support}` : 'дождитесь подключения контакта оператора. Пока доступна помощь /help.'}` : 'Выберите действие кнопкой ниже. Для возврата к черновику нажмите «↩️ Продолжить обращение».', {}, navigationKeyboard(chatId));
+    }
+    if (!command && screen.mode === 'menu' && activeDraft(chatId)) {
+      return reply('Черновик сохранён. Чтобы добавить текст или вложения, сначала нажмите «↩️ Продолжить обращение».');
+    }
+    if (!command && !activeDraft(chatId) && !message.photo?.length && !message.location && raw.trim().length < 10) {
+      return reply('Я помогу оформить обращение о городской проблеме. Нажмите «📝 Новое обращение» или выберите другое действие в меню.');
+    }
     const draft = draftFor(chatId);
     if (command === 'agree') {
       draft.consent = true;
-      return reply(`Согласие получено. ${draft.text || draft.attachments.length ? 'Черновик сохранён в этом чате. ' : ''}${DRAFT_HELP}`);
+      screen.mode = 'draft';
+      return reply(`Согласие получено.\n\n${nextStep(draft)}`, {}, draftKeyboard(draft));
     }
-    if (command === 'address') {
-      if (!argument || argument.length > 300) return reply('Укажите адрес: /address улица, дом (до 300 символов).');
-      draft.address = argument;
+    if (['address', 'photo', 'location', 'skip'].includes(command) && !draft.consent) return consentReply();
+    if (command === 'address' && !argument) {
+      screen.mode = 'address';
+      return reply('📍 Напишите адрес следующим сообщением: улица, дом и ориентир. Например: «ул. Тестовая, 10, возле остановки». До 300 символов.\n\nМожно также отправить геолокацию, если вы сейчас на месте проблемы.', {}, keyboard([[{ text: B.location, request_location: true }], [B.resume, B.menu]], 'Улица, дом, ориентир'));
+    }
+    if (command === 'photo' || command === 'location' || command === 'skip') {
+      screen.mode = 'draft';
+      if (command === 'skip') { draft.locationSkipped = true; return reply(nextStep(draft), {}, draftKeyboard(draft)); }
+      return reply(command === 'photo' ? '📷 Нажмите скрепку возле поля ввода и выберите фото. Можно отправить до 10 фото. Подпись добавится к описанию. Фото необязательно: продолжить можно без него.' : '📌 Нажмите кнопку геолокации ниже, если вы на месте проблемы. Для другого места укажите адрес или выберите точку через скрепку → «Геопозиция».', {}, draftKeyboard(draft));
+    }
+    if (command === 'address' || (!command && screen.mode === 'address' && message.text)) {
+      const address = command === 'address' ? argument : raw.trim();
+      if (!address || address.length > 300) return reply('Укажите адрес до 300 символов: улица, дом и ориентир.', {}, navigationKeyboard(chatId));
+      draft.address = address;
     } else if (message.location) {
       const { latitude: lat, longitude: lon } = message.location;
-      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return reply('Не удалось прочитать геолокацию. Отправьте её заново или укажите /address адрес.');
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return reply('Не удалось прочитать геолокацию. Отправьте её заново или укажите /address адрес.', {}, draftKeyboard(draft));
       draft.location = { lat, lon };
     } else {
       const text = raw.trim();
-      if (text && draft.text.length + text.length + (draft.text ? 1 : 0) > 5000) return reply('Текст обращения не должен превышать 5000 символов. Начните заново: /cancel.');
+      if (text && draft.text.length + text.length + (draft.text ? 1 : 0) > 5000) return reply('В обращении может быть до 5000 символов. Последнее сообщение не добавлено; предыдущий текст сохранён. Сократите дополнение или проверьте готовый черновик.', {}, draftKeyboard(draft));
       const photos = Array.isArray(message.photo) ? message.photo : [];
       const photo = [...photos].reverse().find((item) => typeof item?.file_id === 'string' && item.file_id.length > 0 && item.file_id.length <= 500);
-      if (!text && !photo) return reply(`Поддерживаются текст, фото и геолокация. ${DRAFT_HELP}`);
+      if (!text && !photo) return reply('Пока поддерживаются текст, фото и геолокация. Голосовое сообщение или документ не добавлены. Опишите проблему текстом или прикрепите фото.', {}, draft.consent ? draftKeyboard(draft) : consentKeyboard());
       if (photo && !draft.attachments.some((item) => item.fileId === photo.file_id)) {
-        if (draft.attachments.length >= 10) return reply('Можно приложить не больше 10 фото. Отправьте черновик: /send.');
+        if (draft.attachments.length >= 10) return reply('Можно приложить не больше 10 фото. Уже добавленные фото сохранены. Нажмите «👀 Проверить и отправить».', {}, draftKeyboard(draft));
         const attachment = { type: 'photo', fileId: photo.file_id };
         if (typeof photo.file_unique_id === 'string' && photo.file_unique_id.length > 0 && photo.file_unique_id.length <= 500) attachment.fileUniqueId = photo.file_unique_id;
         draft.attachments.push(attachment);
       }
       if (text) draft.text += `${draft.text ? '\n' : ''}${text}`;
     }
-    return reply(draft.consent ? 'Добавлено в черновик. Можно добавить фото, /address адрес или геолокацию. Отправить обращение: /send.' : CONSENT_PROMPT);
+    if (!draft.consent) return consentReply();
+    screen.mode = 'draft';
+    return reply(`Добавлено в черновик.\n\n${nextStep(draft)}`, {}, draftKeyboard(draft));
   }
 
   return async function processUpdate(update) {
@@ -167,7 +318,7 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     const previous = chatQueues.get(chatId) ?? Promise.resolve();
     const pending = previous.catch(() => {}).then(async () => {
       entry.prepared ??= await prepare(update, chatId);
-      if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text);
+      if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text, { replyMarkup: entry.prepared.markup });
       entry.complete = true;
       return entry.prepared.result;
     });
@@ -227,6 +378,7 @@ export function createTelegramTransport({ token = '', fetchImpl = globalThis.fet
   if (!token) return {
     configured: false,
     sendMessage: async () => ({ skipped: true, reason: 'not_configured' }),
+    configureMenu: async () => ({ skipped: true, reason: 'not_configured' }),
     getUpdates: async () => [],
     getPhoto: async () => { throw telegramError('TELEGRAM_NOT_CONFIGURED', 'Telegram не настроен.', 503); },
   };
@@ -259,9 +411,17 @@ export function createTelegramTransport({ token = '', fetchImpl = globalThis.fet
 
   return {
     configured: true,
-    async sendMessage(chatId, text) {
+    async sendMessage(chatId, text, { replyMarkup } = {}) {
       if (!/^-?\d{1,20}$/u.test(String(chatId)) || typeof text !== 'string' || !text || text.length > 4096) throw telegramError('TELEGRAM_INVALID_MESSAGE', 'Некорректное сообщение для Telegram.', 400);
-      return call('sendMessage', { chat_id: String(chatId), text, link_preview_options: { is_disabled: true } });
+      if (replyMarkup != null && (typeof replyMarkup !== 'object' || Array.isArray(replyMarkup) || JSON.stringify(replyMarkup).length > 8192)) throw telegramError('TELEGRAM_INVALID_MARKUP', 'Некорректное меню Telegram.', 400);
+      return call('sendMessage', { chat_id: String(chatId), text, link_preview_options: { is_disabled: true },
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}) });
+    },
+    async configureMenu() {
+      await call('setMyCommands', { commands: TELEGRAM_COMMANDS, scope: { type: 'all_private_chats' } });
+      await call('setChatMenuButton', { menu_button: { type: 'commands' } });
+      await call('setMyDescription', { description: 'Ascension City помогает сообщить о городской проблеме: опишите её, при желании добавьте фото и место, а затем проверяйте статус обращения. Нажмите «Начать» — бот подскажет каждый шаг.' });
+      return { configured: true, commandCount: TELEGRAM_COMMANDS.length };
     },
     async getUpdates(offset = 0) {
       if (!Number.isSafeInteger(offset) || offset < 0) throw telegramError('TELEGRAM_INVALID_OFFSET', 'Некорректный номер обновления.', 400);

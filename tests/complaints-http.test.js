@@ -17,7 +17,7 @@ async function fixture(t, options = {}) {
   const store = createComplaintStore({ filePath });
   const messages = [];
   const transport = {
-    sendMessage: async (chatId, text) => { messages.push({ chatId, text }); return { message_id: messages.length }; },
+    sendMessage: async (chatId, text, options) => { messages.push({ chatId, text, options }); return { message_id: messages.length }; },
     getPhoto: async () => ({ data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]), contentType: 'image/jpeg' }),
   };
   const server = createAppServer({ aiConfigured: () => false,
@@ -39,6 +39,20 @@ async function fixture(t, options = {}) {
   };
   return { store, filePath, messages, transport, base, call };
 }
+
+test('webhook delivers main menu and configured support without creating a complaint', async t => {
+  const { call, store, messages } = await fixture(t, { telegramSupportUrl: '@SyntheticSupport' });
+  for (const [update_id, text] of [[1, '/start'], [2, '💬 Техподдержка']]) {
+    const result = await call('/api/telegram/webhook', { method: 'POST',
+      headers: { 'X-Telegram-Bot-Api-Secret-Token': HOOK },
+      body: { update_id, message: { chat: { id: 123456, type: 'private' }, from: { id: 123456 }, text } } });
+    assert.equal(result.status, 200);
+  }
+  assert.ok(messages[0].options.replyMarkup.keyboard.flat().some(button => button.text === '📝 Новое обращение'));
+  assert.match(messages[1].text, /https:\/\/t\.me\/SyntheticSupport/u);
+  assert.ok(messages[1].options.replyMarkup.keyboard.flat().some(button => button.text === '🏠 Главное меню'));
+  assert.equal((await store.list({})).complaints.length, 0);
+});
 
 test('web intake → staff correction and resolution → private tracking → persisted restart', async t => {
   const { call, store, filePath } = await fixture(t);

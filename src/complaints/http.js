@@ -46,6 +46,7 @@ export function createComplaintRoutes(options = {}) {
   const processUpdate = options.processUpdate ?? createTelegramProcessor({
     store, sendMessage: transport.sendMessage,
     publicBaseUrl: options.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '',
+    supportUrl: options.telegramSupportUrl ?? process.env.TELEGRAM_SUPPORT_URL ?? '',
   });
   const canSend = Boolean(token || options.transport);
   const rate = new Map();
