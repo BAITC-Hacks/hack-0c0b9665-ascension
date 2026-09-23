@@ -1,0 +1,65 @@
+/* Motion only: load after the visual styles. Content never depends on animation. */
+:root {
+  --motion-quick: 160ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :where(.button, .text-button, .add-button, .remove-button, .retry-button,
+    .filter, .nav-item, .comparison-load, .comparison-export-button) {
+    transition-property: transform, background-color, border-color, color, opacity;
+    transition-duration: var(--motion-quick);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .measure-card {
+    transition: transform var(--motion-quick) var(--motion-ease),
+      border-color var(--motion-quick) var(--motion-ease);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :where(.button, .text-button, .add-button, .retry-button, .filter,
+      .comparison-load, .comparison-export-button):not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+
+    .measure-card:has(button:not(:disabled)):hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  :where(.button, .text-button, .add-button, .remove-button, .retry-button,
+    .filter, .comparison-load, .comparison-export-button):not(:disabled):active {
+    transform: translateY(1px);
+    transition-duration: 80ms;
+  }
+
+  /* Focus rings and keyboard interactions must never wait for movement. */
+  :where(button, a):focus-visible,
+  .measure-card:focus-within {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* The application owns the bar width; feedback animates the displayed values. */
+#budget-bar { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  :where(button, .nav-item, .measure-card) {
+    transform: none !important;
+  }
+}
+
+@media print {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
