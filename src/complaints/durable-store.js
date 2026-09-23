@@ -13,7 +13,7 @@ function corruptStorage() {
     { status: 500, code: 'COMPLAINT_STORAGE_CORRUPT' });
 }
 
-function serialized(storage, operation) {
+export function runWithComplaintStorageLock(storage, operation) {
   const previous = queues.get(storage) ?? Promise.resolve();
   const result = previous.then(operation);
   const tail = result.then(() => undefined, () => undefined);
@@ -36,7 +36,7 @@ async function load(storage) {
 export function createDurableComplaintStore({ storage }) {
   if (!storage?.list || !storage?.transaction) throw new TypeError('Нужно постоянное хранилище Durable Object.');
   return createComplaintStoreCore({
-    run: operation => serialized(storage, async () => operation(await load(storage))),
+    run: operation => runWithComplaintStorageLock(storage, async () => operation(await load(storage))),
     async save(records) {
       validateComplaintRecords(records);
       try {
