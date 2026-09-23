@@ -8,6 +8,7 @@ Type=simple
 User=ascension
 Group=ascension
 WorkingDirectory=/opt/ascension
+Environment=WORKSPACE_DB_PATH=/var/lib/ascension/workspace.sqlite
 EnvironmentFile=/etc/ascension.env
 ExecStart=/usr/bin/node /opt/ascension/src/server.js
 Restart=on-failure

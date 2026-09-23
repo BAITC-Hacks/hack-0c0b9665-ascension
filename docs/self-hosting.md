@@ -67,6 +67,7 @@ sudoedit /etc/ascension.env
 HOST=127.0.0.1
 PORT=3000
 COMPLAINTS_FILE=/var/lib/ascension/complaints.json
+WORKSPACE_DB_PATH=/var/lib/ascension/workspace.sqlite
 ADMIN_TOKEN=YOUR_OWN_RANDOM_ADMIN_SECRET
 PUBLIC_BASE_URL=https://city.example.com
 BOT_SERVER_URL=http://127.0.0.1:3000
@@ -86,7 +87,7 @@ sudo systemctl status ascension --no-pager
 curl --fail http://127.0.0.1:3000/api/health
 ```
 
-Служба поднимается после перезагрузки системы и перезапускается при аварийном завершении. `StateDirectory` создаёт `/var/lib/ascension` с владельцем `ascension`; этот каталог остаётся при перезапуске и обновлении исходников. Не меняйте `COMPLAINTS_FILE` в этой конфигурации: остальные каталоги доступны службе только для чтения. Поведение директив описано в [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) и [systemd.exec](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html).
+Служба поднимается после перезагрузки системы и перезапускается при аварийном завершении. `StateDirectory` создаёт `/var/lib/ascension` с владельцем `ascension`; этот каталог остаётся при перезапуске и обновлении исходников. Служба задаёт `WORKSPACE_DB_PATH` для SQLite общего реестра; `/etc/ascension.env` может переопределить его, поэтому не оставляйте там пустое значение. Сохраняйте `COMPLAINTS_FILE` и `WORKSPACE_DB_PATH` внутри `/var/lib/ascension`: остальные каталоги доступны службе только для чтения. Настройка доступа к реестру описана в [документации реестра](workspace.md). Поведение директив описано в [systemd.service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) и [systemd.exec](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html).
 
 После изменения `/etc/ascension.env` выполните `sudo systemctl restart ascension`; при активном polling также `sudo systemctl restart ascension-bot`. Диагностика: `sudo journalctl -u ascension -u ascension-bot -n 50 --no-pager`. HTTP `/api/health` проверяет живость процесса, но не заменяет создание и повторную проверку синтетического обращения.
 
@@ -103,7 +104,7 @@ sudo systemctl reload caddy
 
 ### Резервная копия и обновление
 
-Перед обновлением остановите polling, если он включён, затем веб-службу. Скопируйте `/var/lib/ascension/complaints.json` в защищённое место вне репозитория и `public/`; сохраните также `/etc/ascension.env` отдельно с ограниченным доступом. Обновите исходники, выполните `npm test` и `node scripts/self-host-smoke.js`, затем запустите веб-службу и выбранный Telegram-режим. При восстановлении используйте резервную копию с владельцем `ascension`, правами `600` и остановленной службой. Не удаляйте файл при ошибке чтения: сервер сообщает о повреждении без его перезаписи.
+Перед обновлением остановите polling, если он включён, затем веб-службу. Пока обе службы остановлены, скопируйте весь каталог `/var/lib/ascension` в защищённое место вне репозитория и `public/`; сохраните также `/etc/ascension.env` отдельно с ограниченным доступом. Копия состояния должна включать `complaints.json`, `workspace.sqlite` и существующие файлы `workspace.sqlite-wal`/`workspace.sqlite-shm`: SQLite работает в режиме WAL, поэтому одной базы без её журнала недостаточно. Неиспользованные хранилища могут ещё не существовать. Обновите исходники, выполните `npm test` и `node scripts/self-host-smoke.js`, затем запустите веб-службу и выбранный Telegram-режим. Восстанавливайте весь набор файлов из одной копии при остановленных службах, с владельцем `ascension`, правами `700` для каталога и `600` для файлов. Не удаляйте файл при ошибке чтения: сервер сообщает о повреждении без его перезаписи.
 
 ## 4. Docker Compose — дополнительный вариант
 
@@ -116,11 +117,11 @@ docker compose --env-file .env.local ps
 
 Откройте `http://127.0.0.1:3000`; панель акима потребует `ADMIN_TOKEN` и при локальном доступе через контейнер. Compose не запустится с пустым токеном. Для другого порта добавьте `APP_PORT=3100` в `.env.local`; внутренний порт остаётся 3000. Для публичного сайта используйте Caddy на хосте из предыдущего раздела, при смене `APP_PORT` исправьте порт прокси. Статика, сервер и данные кейса входят в образ; `.env.local` и обращения исключены из контекста сборки.
 
-Контейнер работает пользователем `node`; JSON хранится в постоянном named volume `complaints`, смонтированном в `/app/var`. Пересоздание контейнера и `docker compose down` сохраняют volume. **`down -v` удаляет обращения.** Не запускайте несколько экземпляров `app` с этим volume. Политика `restart: unless-stopped` возобновляет контейнер после аварии процесса и запуска Docker daemon; `healthcheck` показывает состояние, но сам по себе не перезапускает зависший процесс.
+Контейнер работает пользователем `node`; JSON обращений и SQLite общего реестра по умолчанию хранятся в постоянном named volume `complaints`, смонтированном в `/app/var`. Если задаёте `WORKSPACE_DB_PATH`, оставляйте его внутри `/app/var`, например `/app/var/workspace.sqlite`. Пересоздание контейнера и `docker compose down` сохраняют volume. **`down -v` удаляет обращения и общий реестр.** Не запускайте несколько экземпляров `app` с этим volume. Политика `restart: unless-stopped` возобновляет контейнер после аварии процесса и запуска Docker daemon; `healthcheck` показывает состояние, но сам по себе не перезапускает зависший процесс.
 
 После изменения окружения примените `docker compose --env-file .env.local up -d --force-recreate`; простой `restart` не загружает новую конфигурацию. Если включён polling, добавьте к этой команде `--profile telegram` перед `up`, чтобы согласованно пересоздать оба контейнера.
 
-Для резервной копии остановите `app` и `bot`, скопируйте `/app/var/complaints.json` из остановленного `app` командой `docker compose --env-file .env.local cp app:/app/var/complaints.json ./complaints-backup.json`, перенесите копию в защищённое место вне репозитория, затем запустите выбранные службы. Копия содержит данные обращений; не добавляйте её в Git. Создайте первое учебное обращение перед проверкой резервного копирования — пустой сервер ещё не создаёт JSON.
+Для резервной копии остановите `bot`, если он включён, затем `app`. Пока оба контейнера остановлены, скопируйте весь каталог состояния командой `docker compose --env-file .env.local cp app:/app/var /absolute/path/outside-repository/ascension-state-backup`, заменив путь на новое защищённое место вне репозитория. Копия должна содержать `complaints.json`, `workspace.sqlite` и существующие `workspace.sqlite-wal`/`workspace.sqlite-shm`; не копируйте только SQLite без её журнала. Неиспользованные хранилища могут ещё не существовать. Затем запустите выбранные службы. Копия содержит данные обращений и общего реестра; не добавляйте её в Git. При восстановлении остановите оба контейнера и восстановите весь набор файлов из одной копии в `/app/var` с владельцем `node`; сохраняйте права доступа каталога и файлов.
 
 Синтаксис: [Compose services](https://docs.docker.com/reference/compose-file/services/), [профили](https://docs.docker.com/compose/how-tos/profiles/), [перезапуск и изменения конфигурации](https://docs.docker.com/reference/cli/docker/compose/restart/).
 
@@ -168,7 +169,7 @@ npm run bot:hosted
 npm run bot:status
 ```
 
-Для systemd используйте `sudo node --env-file=/etc/ascension.env /opt/ascension/src/telegram-mode.js hosted`; для Docker — `docker compose --env-file .env.local exec app node src/telegram-mode.js hosted`. Адрес берётся из `TELEGRAM_HOSTED_URL`, при пустом значении — из `PUBLIC_BASE_URL`; задайте публичный HTTPS origin без пути, query и фрагмента. Команда проверяет готовность сервера и совпадение секрета, затем регистрирует `/api/telegram/webhook` с одним соединением, передаёт Telegram секрет для заголовка `X-Telegram-Bot-Api-Secret-Token` и сохраняет ожидающие обновления. Это реальное изменение настроек выбранного бота. Polling и webhook одновременно не используются: [Telegram Bot API](https://core.telegram.org/bots/api#getupdates), [setWebhook](https://core.telegram.org/bots/api#setwebhook).
+Для systemd используйте `sudo node --env-file=/etc/ascension.env /opt/ascension/src/telegram-mode.js hosted`; для Docker — `docker compose --env-file .env.local exec app node src/telegram-mode.js hosted`. Адрес берётся из `TELEGRAM_HOSTED_URL`, при пустом значении — из `PUBLIC_BASE_URL`; задайте публичный HTTPS origin своей инсталляции без пути, query и фрагмента. В `.env.example` `TELEGRAM_HOSTED_URL` пуст: адрес командного демо не следует использовать для собственного бота. Команда проверяет готовность сервера и совпадение секрета, затем регистрирует `/api/telegram/webhook` с одним соединением, передаёт Telegram секрет для заголовка `X-Telegram-Bot-Api-Secret-Token` и сохраняет ожидающие обновления. Это реальное изменение настроек выбранного бота. Polling и webhook одновременно не используются: [Telegram Bot API](https://core.telegram.org/bots/api#getupdates), [setWebhook](https://core.telegram.org/bots/api#setwebhook).
 
 Проверка своим Telegram-аккаунтом: `/start` → `/agree` → учебный текст → `/address Учебная улица 42` → `/send`. Сохраните номер и код, измените статус и решение в панели, проверьте уведомление и `/status НОМЕР` в том же чате. На сайте для проверки нужны номер и личный код. Фото остаётся ссылкой на файл Telegram и требует его доступности. Telegram не работает полностью офлайн; синтетические тесты `npm test` проверяют обработчик без реальных отправок.
 
