@@ -31,6 +31,17 @@ export async function api(path, options = {}) {
   return data;
 }
 
+export const COMPLAINTS_UNAVAILABLE = 'Приём обращений на этом сервере ещё недоступен. Введённые данные не отправлены. Попробуйте проверить доступность позже.';
+
+export async function getComplaintConfig() {
+  const config = await api('/api/citizen/config', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  if (!config || Array.isArray(config) || typeof config.demoMode !== 'boolean'
+    || typeof config.adminConfigured !== 'boolean' || config.analysisMode !== 'rules') {
+    throw new Error(COMPLAINTS_UNAVAILABLE);
+  }
+  return config;
+}
+
 export function renderTimeline(history = [], { publicView = false } = {}) {
   if (!Array.isArray(history) || !history.length) return '<p class="field-hint">История пока пуста.</p>';
   return `<ol class="timeline">${history.map(item => `<li><strong>${escapeHTML(labelFor('status', item.status, 'Обращение обновлено'))}</strong><time datetime="${escapeHTML(item.at)}">${escapeHTML(formatDate(item.at))}</time>${!publicView && item.assignee ? `<p>Ответственный: ${escapeHTML(item.assignee)}</p>` : ''}${item.resolution ? `<p>${escapeHTML(item.resolution)}</p>` : ''}${!publicView && item.note ? `<p>${escapeHTML(item.note)}</p>` : ''}</li>`).join('')}</ol>`;
@@ -40,6 +51,16 @@ function initCitizen() {
   const $ = id => document.getElementById(id);
   const form = $('complaint-form');
   let receiptLink = '';
+  let serviceAvailable = false;
+  let pendingTracking = false;
+  const retryAvailability = document.createElement('button');
+  retryAvailability.type = 'button';
+  retryAvailability.className = 'button secondary small';
+  retryAvailability.textContent = 'Проверить доступность';
+  retryAvailability.hidden = true;
+  $('mode-note').after(retryAvailability);
+  $('submit-button').disabled = true;
+  $('tracking-button').disabled = true;
   const showError = (id, message) => { $(id).textContent = message; $(id).hidden = !message; };
 
   $('complaint-text').addEventListener('input', () => { $('text-count').textContent = `${$('complaint-text').value.length} / 5000`; });
@@ -60,6 +81,7 @@ function initCitizen() {
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    if (!serviceAvailable) { showError('submit-error', COMPLAINTS_UNAVAILABLE); return; }
     showError('submit-error', '');
     const lat = $('latitude').value.trim();
     const lon = $('longitude').value.trim();
@@ -87,7 +109,7 @@ function initCitizen() {
     } catch (error) {
       showError('submit-error', `${error.message} Введённые данные остались в форме.`);
     } finally {
-      $('submit-button').disabled = false;
+      $('submit-button').disabled = !serviceAvailable;
       $('submit-button').innerHTML = 'Отправить обращение <span aria-hidden="true">↗</span>';
     }
   });
@@ -115,6 +137,7 @@ function initCitizen() {
 
   $('tracking-form').addEventListener('submit', async event => {
     event.preventDefault();
+    if (!serviceAvailable) { showError('tracking-error', COMPLAINTS_UNAVAILABLE); return; }
     showError('tracking-error', '');
     $('tracking-result').hidden = true;
     $('tracking-button').disabled = true;
@@ -125,25 +148,51 @@ function initCitizen() {
     } catch (error) {
       showError('tracking-error', error.status === 404 ? 'Обращение не найдено. Проверьте номер и личный код из квитанции.' : error.message);
     } finally {
-      $('tracking-button').disabled = false;
+      $('tracking-button').disabled = !serviceAvailable;
       $('tracking-button').innerHTML = 'Проверить статус <span aria-hidden="true">→</span>';
     }
   });
 
-  api('/api/citizen/config').then(config => {
-    $('mode-note').textContent = `${config.demoMode ? 'Локальное демо' : 'Сервис обращений'} · классификация по локальным правилам, решение проверяет сотрудник. Это не подтверждённый ИИ-анализ.`;
-    if (config.telegramUrl) {
-      let url;
-      try { url = new URL(config.telegramUrl); } catch { /* Invalid config stays unavailable. */ }
-      if (url?.protocol === 'https:' && ['t.me', 'telegram.me'].includes(url.hostname)) {
-        $('telegram-link').href = url.href;
-        $('telegram-link').hidden = false;
-        $('telegram-note').textContent = 'Можно отправить текст и фотографию через бота.';
-        return;
+  async function checkAvailability() {
+    serviceAvailable = false;
+    retryAvailability.disabled = true;
+    $('submit-button').disabled = true;
+    $('tracking-button').disabled = true;
+    $('telegram-link').hidden = true;
+    $('mode-note').textContent = 'Проверяем доступность приёма обращений…';
+    $('telegram-note').textContent = 'Проверяем подключение Telegram…';
+    try {
+      const config = await getComplaintConfig();
+      serviceAvailable = true;
+      retryAvailability.hidden = true;
+      showError('submit-error', '');
+      showError('tracking-error', '');
+      $('mode-note').textContent = `${config.demoMode ? 'Локальное демо' : 'Сервис обращений'} · классификация по локальным правилам, решение проверяет сотрудник. Это не подтверждённый ИИ-анализ.`;
+      if (config.telegramUrl) {
+        let url;
+        try { url = new URL(config.telegramUrl); } catch { /* Invalid config stays unavailable. */ }
+        if (url?.protocol === 'https:' && ['t.me', 'telegram.me'].includes(url.hostname)) {
+          $('telegram-link').href = url.href;
+          $('telegram-link').hidden = false;
+          $('telegram-note').textContent = 'Можно отправить текст и фотографию через бота.';
+        }
       }
+      if ($('telegram-link').hidden) $('telegram-note').textContent = 'Telegram пока не подключён. Обращение можно отправить через форму.';
+    } catch {
+      $('mode-note').textContent = COMPLAINTS_UNAVAILABLE;
+      $('telegram-note').textContent = 'Отправка через форму и подключение Telegram на этом сервере не подтверждены.';
+      retryAvailability.hidden = false;
+    } finally {
+      retryAvailability.disabled = false;
+      $('submit-button').disabled = !serviceAvailable;
+      $('tracking-button').disabled = !serviceAvailable;
     }
-    $('telegram-note').textContent = 'Telegram пока не подключён. Обращение можно отправить через форму.';
-  }).catch(() => { $('telegram-note').textContent = 'Не удалось проверить подключение Telegram. Используйте форму на сайте.'; });
+    if (serviceAvailable && pendingTracking) {
+      pendingTracking = false;
+      $('tracking-form').requestSubmit();
+    }
+  }
+  retryAvailability.addEventListener('click', checkAvailability);
 
   if (location.hash.length > 1) {
     const params = new URLSearchParams(location.hash.slice(1));
@@ -154,9 +203,10 @@ function initCitizen() {
       $('tracking-id').value = id;
       $('tracking-token').value = token;
       history.replaceState(null, '', `${location.pathname}${location.search}`);
-      $('tracking-form').requestSubmit();
+      pendingTracking = true;
     }
   }
+  checkAvailability();
 }
 
 if (document.body.dataset.page === 'citizens') initCitizen();
