@@ -4,6 +4,7 @@ import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBaseline, getDataset, simulate, validateScenario } from './core/simulator.js';
 import { explainScenario, isAIConfigured } from './ai/explain.js';
+import { createComplaintRoutes } from './complaints/http.js';
 
 const MAX_JSON_BYTES = 32 * 1024;
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
@@ -131,13 +132,15 @@ async function sendStatic(request, response, pathname, publicDir) {
 
 /** Returns an unbound Node HTTP server. Tests may inject explain, aiConfigured and publicDir. */
 export function createAppServer({ explain = explainScenario, aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, complaints = {} } = {}) {
   const staticRoot = resolve(publicDir);
+  const handleComplaints = createComplaintRoutes(complaints);
   return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
     try {
       const pathname = getPath(request);
+      if (await handleComplaints(request, response, pathname, { readJson, sendJson })) return;
       const expectedMethod = API_METHODS.get(pathname);
       if (expectedMethod) {
         if (request.method !== expectedMethod) {
