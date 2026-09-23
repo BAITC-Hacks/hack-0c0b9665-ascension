@@ -1,0 +1,31 @@
+.team-workspace { margin-block: 20px; color: #14283b; background: #f4f8fb; border: 1px solid #cfdae5; border-radius: 14px; font: 14px/1.5 system-ui, sans-serif; min-width: 0; max-width: 100%; }
+.team-workspace *, .team-workspace *::before, .team-workspace *::after { box-sizing: border-box; }
+.team-workspace [hidden] { display: none !important; }
+.team-workspace-summary { padding: 16px; font-weight: 700; cursor: pointer; overflow-wrap: anywhere; }
+.team-workspace-content { padding: 0 16px 16px; min-width: 0; }
+.team-workspace h2, .team-workspace h3, .team-workspace p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.team-workspace-title { font-size: 20px; }
+.team-workspace h3 { font-size: 16px; }
+.team-workspace-help, .team-workspace-identity { color: #405a70; }
+.team-workspace-message { padding: 10px; background: #e3f0f9; border-radius: 8px; }
+.team-workspace-message:empty { display: none; }
+.team-workspace-error, .team-workspace-warning { color: #773411; background: #fff3e7; padding: 10px; border-radius: 8px; }
+.team-workspace-login, .team-workspace-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; margin-block: 12px; min-width: 0; }
+.team-workspace-field { display: flex; flex: 1 1 220px; flex-direction: column; gap: 4px; min-width: 0; font-weight: 600; }
+.team-workspace input { min-width: 0; width: 100%; max-width: 100%; min-height: 44px; border: 1px solid #9bafc0; border-radius: 8px; padding: 10px; background: white; color: #14283b; font: inherit; }
+.team-workspace button { min-height: 44px; max-width: 100%; appearance: none; padding: 10px 14px; color: #173c56; background: white; border: 1px solid #9bafc0; border-radius: 8px; font: inherit; font-weight: 600; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.team-workspace button.team-workspace-publish, .team-workspace button.team-workspace-connect { color: white; background: #154c71; border-color: #154c71; }
+.team-workspace button:disabled { opacity: .52; cursor: default; }
+.team-workspace button:hover:not(:disabled) { filter: brightness(.95); }
+.team-workspace button:focus-visible, .team-workspace input:focus-visible, .team-workspace summary:focus-visible { outline: 3px solid #138bd0; outline-offset: 3px; }
+.team-workspace-confirmation { padding: 12px; border: 1px solid #d9ac7b; border-radius: 10px; margin-block: 12px; }
+.team-workspace-confirmation button { margin: 4px 8px 4px 0; }
+.team-workspace-acknowledgement { display: flex; align-items: start; gap: 10px; margin-block: 14px 6px; overflow-wrap: anywhere; }
+.team-workspace input.team-workspace-acknowledge { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin: 2px 0 0; }
+.team-workspace-explanation { border-top: 1px solid #cfdae5; padding-top: 12px; }
+.team-workspace-explanation summary { cursor: pointer; padding-block: 4px; overflow-wrap: anywhere; }
+.team-workspace-explanation p { margin-top: 8px; }
+.team-workspace-journal { min-width: 0; }
+.team-workspace-entries { padding-left: 24px; margin-block: 8px 16px; max-height: 260px; overflow-y: auto; }
+.team-workspace-entries li { overflow-wrap: anywhere; padding-bottom: 8px; }
+@media (max-width: 440px) { .team-workspace-controls, .team-workspace-login { flex-direction: column; align-items: stretch; } .team-workspace-field { flex-basis: auto; } .team-workspace-controls button, .team-workspace-confirmation button { width: 100%; margin-inline: 0; } }

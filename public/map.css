@@ -109,6 +109,35 @@
 .citymap .maplibregl-ctrl-group button { width: 31px; height: 32px; }
 .citymap .maplibregl-ctrl-top-right { top: 11px; }
 .citymap-is-unavailable .citymap-map-tools, .citymap-is-unavailable .citymap-location, .citymap-is-unavailable .citymap-legend { visibility: hidden; }
+.citymap-sector-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 12px 21px; border-top: 1px solid #edf1ee; background: #fbfcfa; }
+.citymap-sector-toolbar > div:first-child { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.citymap-sector-toolbar strong { font-size: 11px; color: #405b50; }
+.citymap-sector-caption { font-size: 10px; color: #7c8c82; }
+.citymap-sector-symbol { flex-shrink: 0; width: 20px; height: 20px; border: 3px solid #fff; border-radius: 50%; background: conic-gradient(#218e83 0 72deg, #4286c5 72deg 144deg, #c18a29 144deg 216deg, #8b6bb7 216deg 288deg, #d77968 288deg); box-shadow: 0 0 0 1px #dee6df; }
+.citymap-sector-actions { display: flex; align-items: center; gap: 7px; }
+.citymap-sector-actions button { min-height: 38px; padding: 8px 12px; border: 1px solid #dbe5de; border-radius: 8px; background: #fff; color: #486758; font-size: 11px; font-weight: 600; }
+.citymap-sector-actions button:hover { background: #eef4ef; }
+.citymap-sector-toggle[aria-pressed="true"] { background: #e9f2ec; border-color: #b9d0c1; color: #225d47; }
+.citymap-show-all span { margin-left: 6px; }
+.citymap-interaction-hint { margin: 0; padding: 12px 21px; background: #f7faf7; border-bottom: 1px solid #e8efe8; color: #536d60; font-size: 11px; line-height: 1.7; }
+.citymap-interaction-hint > span { margin-left: 12px; color: #829387; font-size: 10px; }
+.citymap-sector-dot { display: inline-block; flex: 0 0 9px; width: 9px; height: 9px; border-radius: 3px; background: var(--district-color); }
+.citymap-district-card { border-top: 3px solid var(--district-color); }
+.citymap-district-card:hover, .citymap-district-card.is-previewed { border-color: var(--district-color); background: color-mix(in srgb, var(--district-color) 8%, #fff); }
+.citymap-district-card.is-selected { border-color: var(--district-color); background: color-mix(in srgb, var(--district-color) 10%, #fff); box-shadow: inset 0 0 0 1px var(--district-color); }
+.citymap-district-card > strong { display: flex; align-items: center; gap: 8px; }
+.citymap-selected-check { margin-left: auto; visibility: hidden; color: var(--district-color); font-size: 13px; }
+.citymap-district-card.is-selected .citymap-selected-check { visibility: visible; }
+.citymap-marker.is-previewed .citymap-marker-number { box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--district-color); }
+.citymap-marker.is-selected .citymap-marker-number { box-shadow: 0 0 0 3px #fffe, 0 0 0 5px var(--district-color); }
+.citymap-hover-tip { position: absolute; z-index: 4; pointer-events: none; width: 215px; max-width: calc(100% - 16px); padding: 13px 15px; border: 1px solid #fff; border-left: 4px solid var(--district-color); border-radius: 10px; background: #fffffff5; box-shadow: 0 8px 26px #16382926; backdrop-filter: blur(12px); }
+.citymap-hover-tip > strong { display: flex; align-items: center; gap: 8px; color: #264537; font-size: 14px; }
+.citymap-hover-tip > span { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; color: #748479; font-size: 11px; }
+.citymap-hover-tip b { color: #365a44; font-size: 13px; }
+.citymap-hover-tip small { display: block; margin-top: 8px; color: #839387; font-size: 9px; }
+.citymap:not(.citymap-exploring) .citymap-map-tools { top: 164px; }
+.citymap:not(.citymap-exploring) .maplibregl-ctrl-group button, .citymap:not(.citymap-exploring) .citymap-map-tools button { width: 42px; height: 44px; }
+.citymap:not(.citymap-exploring) .citymap-inspector { border-top: 3px solid var(--district-color, #bed0c2); }
 @media (max-width: 1000px) {
   .citymap-toolbar { gap: 16px; padding: 16px; }
   .citymap-place-label { flex-basis: 190px; }
@@ -159,6 +188,31 @@
   .citymap-network-note { left: 12px; max-width: calc(100% - 70px); font-size: 10px; }
   .citymap-search-status { padding: 9px 13px; font-size: 11px; }
   .citymap .maplibregl-control-container .maplibregl-ctrl-attrib { font-size: 7px; }
+  .citymap-sector-toolbar { padding: 10px 12px; gap: 9px; }
+  .citymap-sector-caption { flex-basis: 100%; padding-left: 29px; margin-top: -4px; }
+  .citymap-sector-actions { width: 100%; }
+  .citymap-sector-actions button { flex: 1; min-height: 44px; font-size: 11px; }
+  .citymap-interaction-hint { padding: 11px 13px; font-size: 10px; }
+  .citymap-interaction-hint > span { display: block; margin-left: 0; }
+  .citymap:not(.citymap-exploring) .citymap-stage { height: 430px; overflow: visible; margin-bottom: 160px; }
+  .citymap:not(.citymap-exploring) .citymap-inspector { top: calc(100% + 1px); bottom: auto; left: 0; width: 100%; height: 160px; border: 0; border-bottom: 1px solid #e4ece5; border-radius: 0; box-shadow: none; background: #fff; padding: 13px 16px; }
+  .citymap:not(.citymap-exploring) .citymap-inspector h3 { font-size: 19px; }
+  .citymap:not(.citymap-exploring) .citymap-inspector-value { margin: 10px 0 0; }
+  .citymap:not(.citymap-exploring) .citymap-priority { position: absolute; right: 16px; bottom: 17px; width: 45%; max-width: 185px; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid #e7ece7; }
+  .citymap:not(.citymap-exploring) .citymap-inspector-value > span { max-width: 90px; }
+  .citymap:not(.citymap-exploring) .citymap-inspector-delta { font-size: 8px; }
+  .citymap:not(.citymap-exploring) .citymap-legend { left: 12px; right: auto; bottom: 39px; width: 135px; }
+  .citymap:not(.citymap-exploring) .citymap-location { max-width: calc(100% - 81px); }
+  .citymap-district-list { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .citymap-district-card:last-child { grid-column: 1 / -1; }
+  .citymap:not(.citymap-has-data):not(.citymap-exploring) .citymap-stage { margin-bottom: 220px; }
+  .citymap:not(.citymap-has-data):not(.citymap-exploring) .citymap-inspector { height: 220px; }
+}
+@media (max-width: 380px) {
+  .citymap.citymap-has-data:not(.citymap-exploring) .citymap-stage { margin-bottom: 230px; }
+  .citymap.citymap-has-data:not(.citymap-exploring) .citymap-inspector { height: 230px; }
+  .citymap:not(.citymap-exploring) .citymap-inspector-value > span { max-width: none; }
+  .citymap:not(.citymap-exploring) .citymap-priority { position: static; width: 100%; max-width: none; margin-top: 12px; padding: 10px 0 0; border-left: 0; border-top: 1px solid #e7ece7; }
 }
 @media (prefers-reduced-motion: reduce) { .citymap-loader { animation: none; } .citymap * { transition: none !important; } }
 @media print { .citymap-toolbar, .citymap-map-tools, .citymap-search-credit { display: none; } .citymap-stage { height: 350px; } .citymap { break-inside: avoid; box-shadow: none; } }
