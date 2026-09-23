@@ -320,7 +320,10 @@ window.addEventListener('city:changed', (event) => {
   if (!city) return;
   currentCity = city;
   state.hasScenarioData = city.hasScenarioData === true;
-  if (!state.hasScenarioData) invalidateResult();
+  if (!state.hasScenarioData) {
+    invalidateResult();
+    renderPlan();
+  }
   document.querySelectorAll('.model-only').forEach((element) => { element.hidden = !state.hasScenarioData; });
   $('geography-notice').hidden = state.hasScenarioData;
   $('geography-title').textContent = `${city.name} · географический просмотр`;
