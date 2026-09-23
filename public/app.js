@@ -207,6 +207,7 @@ function selectDistrict(id) {
 
 function ensureMap() {
   if (cityMap || !panelsReady || !state.dataset || !$('map-section').open) return;
+  const focusedElement = document.activeElement;
   // Restoring the map must not change districts already picked in the catalog.
   let restoring = true;
   cityMap = createCityMap({ container: $('city-map'), dataset: state.dataset, baseline: state.baseline,
@@ -218,6 +219,8 @@ function ensureMap() {
     cityMap.setResult(state.result);
   } finally {
     restoring = false;
+    // Initial district synchronization must keep keyboard focus on the disclosure.
+    if (focusedElement?.isConnected) focusedElement.focus?.({ preventScroll: true });
   }
 }
 
