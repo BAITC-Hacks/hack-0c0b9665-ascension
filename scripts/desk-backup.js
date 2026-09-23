@@ -1,0 +1,12 @@
+import { DatabaseSync, backup } from 'node:sqlite';
+import { mkdirSync, existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+const source=resolve(process.env.DESK_DB_PATH || 'var/desk.sqlite');
+if(!existsSync(source))throw new Error('База не существует. Сначала настройте кабинет.');
+const target=resolve(process.argv[2] || `backups/desk-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`);
+if(source===target||existsSync(target))throw new Error('Выберите новый файл резервной копии.');
+mkdirSync(dirname(target),{recursive:true,mode:0o700});
+const db=new DatabaseSync(source);await backup(db,target);db.close();
+const check=new DatabaseSync(target);const result=check.prepare('PRAGMA integrity_check').get();check.close();
+if(result.integrity_check!=='ok')throw new Error('Проверка копии не пройдена.');
+console.log(`Резервная копия проверена: ${target}`);

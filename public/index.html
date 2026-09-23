@@ -8,8 +8,11 @@
   <title>Аким на 5 часов · Ascension</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/comparison.css">
+  <link rel="stylesheet" href="/illustrations.css">
+  <link rel="stylesheet" href="/budget-story.css"><link rel="stylesheet" href="/experience-nav.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/comparison.js"></script>
+  <script type="module" src="/budget-story.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
@@ -20,6 +23,11 @@
     </a>
     <div class="sidebar-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
     <nav>
+      <a class="nav-item" href="/desk.html" title="Обращения жителей"><span aria-hidden="true">✉</span> Обращения жителей</a>
+      <a class="nav-item" href="/akim.html" title="Кабинет акима"><span aria-hidden="true">◈</span> Кабинет акима</a>
+      <a class="nav-item" href="/demo.html" title="Демонстрация за 90 секунд"><span aria-hidden="true">▷</span> Демонстрация за 90 секунд</a>
+      <a class="nav-item" href="/resident.html" title="Моё обращение"><span aria-hidden="true">◎</span> Моё обращение</a>
+      <a class="nav-item" href="/results.html" title="Что изменилось в городе"><span aria-hidden="true">✓</span> Что изменилось в городе</a>
       <a class="nav-item active" href="#workspace"><span aria-hidden="true">▦</span> Конструктор решений</a>
       <a class="nav-item" href="#city"><span aria-hidden="true">◫</span> Показатели районов</a>
       <a class="nav-item" href="#results"><span aria-hidden="true">↗</span> Результат сценария</a>
@@ -40,18 +48,20 @@
     </header>
     <div class="page-content">
       <section class="hero" aria-labelledby="page-title">
-        <div><div class="eyebrow"><span class="status-dot"></span> СИМУЛЯТОР ГОРОДСКИХ РЕШЕНИЙ</div><h1 id="page-title">Каким станет город —<br><span>решаете вы.</span></h1><p>Распределите бюджет между пятью инициативами.<br class="desktop-break"> Посмотрите, что изменится для жителей каждого района.</p></div>
-        <div class="hero-actions"><button class="button button-outline" id="demo-button" disabled><span aria-hidden="true">▷</span> Загрузить демо</button><button class="text-button" id="reset-button" disabled>Начать заново <span aria-hidden="true">↻</span></button><span class="hero-hint">Учебная модель · горизонт 8 кварталов</span></div>
+        <picture class="hero-art" aria-hidden="true"><source media="(max-width: 560px)" srcset="/assets/illustrations/city-hero-mobile.webp"><img src="/assets/illustrations/city-hero.webp" alt="" width="1536" height="1024" fetchpriority="high" decoding="async"></picture>
+        <div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> СИМУЛЯТОР ГОРОДСКИХ РЕШЕНИЙ</div><h1 id="page-title">Каким станет город —<br><span>решаете вы.</span></h1><p>Распределите бюджет между пятью инициативами.<br class="desktop-break"> Посмотрите, что изменится для жителей каждого района.</p>
+          <div class="hero-actions"><button class="button button-outline" id="demo-button" disabled><span aria-hidden="true">▷</span> Загрузить демо</button><button class="text-button" id="reset-button" disabled>Начать заново <span aria-hidden="true">↻</span></button></div><span class="hero-hint">Учебная модель · горизонт 8 кварталов</span>
+        </div>
       </section>
 
       <div id="loading" class="loading-state" role="status">Загружаем исходные данные города…</div>
       <div id="fatal-error" class="error-box" role="alert" hidden></div>
       <div id="app" hidden>
         <section class="overview-grid" aria-label="Параметры сценария">
-          <article class="overview-card"><div class="metric-label">Исходный Score <span class="metric-icon" aria-hidden="true">↗</span></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
-          <article class="overview-card"><div class="metric-label">Бюджет города <span class="metric-icon" aria-hidden="true">₸</span></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Единый старт для каждого сценария</div></article>
-          <article class="overview-card"><div class="metric-label">Осталось распределить <span class="metric-icon" aria-hidden="true">◷</span></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
-          <article class="overview-card"><div class="metric-label">Решений в сценарии <span class="metric-icon" aria-hidden="true">▦</span></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
+          <article class="overview-card"><div class="metric-label">Исходный Score <img class="metric-icon" src="/assets/illustrations/services.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
+          <article class="overview-card"><div class="metric-label">Бюджет города <img class="metric-icon" src="/assets/illustrations/budget.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Единый старт для каждого сценария</div></article>
+          <article class="overview-card"><div class="metric-label">Осталось распределить <img class="metric-icon" src="/assets/illustrations/budget.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
+          <article class="overview-card"><div class="metric-label">Решений в сценарии <img class="metric-icon" src="/assets/illustrations/plan.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
         </section>
 
         <section id="workspace" class="workspace" aria-label="Конструктор сценария">
@@ -74,11 +84,12 @@
 
         <section id="results" class="results-section" aria-labelledby="result-heading">
           <div class="section-heading"><div><div class="eyebrow">02 / ВЛИЯНИЕ РЕШЕНИЙ</div><h2 id="result-heading">Результат сценария</h2></div><span id="result-state" class="quiet-tag">Ожидает расчёта</span></div>
-          <div id="result-placeholder" class="result-placeholder"><span class="placeholder-icon" aria-hidden="true">↗</span><div><h3>У каждого решения есть последствия</h3><p>Соберите пять инициатив и рассчитайте их влияние на город.<br>Здесь появятся Score, изменения по районам и объяснение результата.</p></div></div>
+          <div id="result-placeholder" class="result-placeholder"><img class="result-placeholder-art" src="/assets/illustrations/people.webp" alt="" width="104" height="104" loading="lazy" decoding="async"><div><h3>У каждого решения есть последствия</h3><p>Соберите пять инициатив и рассчитайте их влияние на город.<br>Здесь появятся Score, изменения по районам и объяснение результата.</p></div></div>
           <div id="result-content" hidden></div>
         </section>
 
         <section id="comparison-panel"></section>
+        <section id="saved-scenario-panel" class="table-panel" style="padding:24px;margin-top:24px"><h2>Сохранить сценарий команды</h2><p>Рассчитайте сценарий, затем сохраните его в кабинете. Потребуется вход в командную учётную запись.</p><form id="save-scenario-form"><label for="scenario-name">Название сценария</label> <input id="scenario-name" required maxlength="100" placeholder="Например: Приоритеты Нуры"><button id="save-scenario" class="button button-primary" disabled>Сохранить сценарий</button></form><p id="save-scenario-status" role="status"></p><a href="/desk.html">Открыть сохранённые сценарии и обращения</a></section>
 
         <section id="city" class="city-section" aria-labelledby="city-heading">
           <div class="section-heading"><div><div class="eyebrow">03 / ГОРОД В ДЕТАЛЯХ</div><h2 id="city-heading">За числами — пять районов</h2></div><span class="quiet-tag" id="district-state">Исходная картина</span></div>

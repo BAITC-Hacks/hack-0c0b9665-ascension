@@ -1,10 +1,33 @@
 const $ = (id) => document.getElementById(id);
 const directions = {
-  transport: { name: 'Транспорт', icon: '↔' },
-  ecology: { name: 'Экология', icon: '⌁' },
-  social: { name: 'Социальная сфера', icon: '♡' },
-  safety: { name: 'Безопасность', icon: '◇' },
-  services: { name: 'Городской сервис', icon: '▦' },
+  transport: { name: 'Транспорт' },
+  ecology: { name: 'Экология' },
+  social: { name: 'Социальная сфера' },
+  safety: { name: 'Безопасность' },
+  services: { name: 'Городской сервис' },
+};
+const measureArtwork = {
+  M1: 'transport.webp',
+  M2: 'traffic-lights.webp',
+  M3: 'light-rail.webp',
+  M4: 'ecology.webp',
+  M5: 'clean-heating.webp',
+  M6: 'green-belt.webp',
+  M7: 'school.webp',
+  M8: 'clinic.webp',
+  M9: 'sports.webp',
+  M10: 'safety.webp',
+  M11: 'safe-crossing.webp',
+  M12: 'digital-service.webp',
+  M13: 'utilities.webp',
+  M14: 'emergency-crew.webp',
+};
+const districtArtwork = {
+  esil: 'district-yesil.webp',
+  almaty: 'district-almaty.webp',
+  saryarka: 'district-saryarka.webp',
+  baikonur: 'district-baikonur.webp',
+  nura: 'district-nura.webp',
 };
 const demo = [
   { measureId: 'M7', districtId: 'nura' },
@@ -80,7 +103,7 @@ function renderCatalog() {
     const direction = directions[measure.direction];
     const note = selected ? 'Уже в вашем плане' : full ? 'В плане уже 5 решений' : needsDistrict ? 'Сначала выберите район' : `Эффекты до учёта лага ${measure.lag} кв.`;
     return `<article class="measure-card${selected ? ' is-selected' : ''}" data-measure="${measure.id}">
-      <div class="measure-top"><span class="direction-tag" data-direction="${measure.direction}"><span aria-hidden="true">${direction.icon}</span>${direction.name}</span><span class="measure-id">${measure.id}</span></div>
+      <div class="measure-top"><div class="measure-category"><img class="direction-art" src="/assets/illustrations/${measureArtwork[measure.id]}" alt="" width="56" height="56" loading="lazy" decoding="async"><span class="direction-tag" data-direction="${measure.direction}">${direction.name}</span></div><span class="measure-id">${measure.id}</span></div>
       <h3>${escapeHtml(measure.name)}</h3>
       <div class="measure-meta"><span class="measure-cost">${measure.cost}<small>у. е.</small></span><span class="measure-lag">Лаг: ${measure.lag} кв.</span><span class="measure-lag">${measure.scope === 'city' ? 'Весь город' : 'Один район'}</span></div>
       <div class="effect-chips">${Object.entries(measure.effects).map(([id, effect]) => `<span class="effect-chip${effect < 0 ? ' negative' : ''}" title="${escapeHtml(indicatorName(id))}">${id} ${signed(effect, 0)}</span>`).join('')}</div>
@@ -93,7 +116,7 @@ function renderCatalog() {
 
 function renderPlan() {
   $('selected-list').innerHTML = state.decisions.length === 0
-    ? '<div class="empty-plan"><span class="empty-plan-icon" aria-hidden="true">+</span><div><h3>Всё начинается с первого шага</h3><p>Добавьте инициативы из каталога<br>или загрузите демо-сценарий.</p></div></div>'
+    ? '<div class="empty-plan"><img class="empty-plan-art" src="/assets/illustrations/plan.webp" alt="" width="92" height="92" decoding="async"><div><h3>Всё начинается с первого шага</h3><p>Добавьте инициативы из каталога<br>или загрузите демо-сценарий.</p></div></div>'
     : state.decisions.map((decision, index) => {
       const measure = measureById(decision.measureId);
       return `<article class="selected-item"><span class="selected-number">${index + 1}</span><div class="selected-info"><h3>${measure.id} · ${escapeHtml(measure.name)}</h3>${measure.scope === 'district' ? `<label class="sr-only" for="selected-${measure.id}">Район для ${escapeHtml(measure.name)}</label><select id="selected-${measure.id}" data-change="${measure.id}"${state.busy ? ' disabled' : ''}>${districtOptions(decision.districtId)}</select>` : '<span class="selected-cost">Весь город · все 5 районов</span>'}<p class="selected-cost">${measure.cost} у. е.</p></div><button class="remove-button" data-remove="${measure.id}" aria-label="Удалить: ${escapeHtml(measure.name)}"${state.busy ? ' disabled' : ''}>×</button></article>`;
@@ -158,7 +181,7 @@ function renderDistricts(result, calculated) {
   $('district-summary').innerHTML = result.districts.map((district) => {
     const critical = state.dataset.indicators.filter(({ id }) => district.after[id] < 40).length;
     const share = state.dataset.districts.find(({ id }) => id === district.id).populationShare;
-    return `<article class="district-card"><h3>${escapeHtml(district.name)}</h3><p class="district-population">${number(share * 100, 0)}% населения</p><span class="district-value">${number(district.afterScore)}</span>${calculated ? `<span class="district-change">${signed(district.afterScore - district.beforeScore)}</span>` : ''}<div class="district-mini-track" aria-hidden="true"><span style="width:${district.afterScore}%"></span></div><p class="district-critical${critical ? ' has-critical' : ''}">${critical ? `Критических показателей: ${critical}` : 'Без критических показателей'}</p></article>`;
+    return `<article class="district-card"><div class="district-heading"><h3>${escapeHtml(district.name)}</h3><img class="district-people" src="/assets/illustrations/${districtArtwork[district.id]}" alt="" width="36" height="36" loading="lazy" decoding="async"></div><p class="district-population">${number(share * 100, 0)}% населения</p><span class="district-value">${number(district.afterScore)}</span>${calculated ? `<span class="district-change">${signed(district.afterScore - district.beforeScore)}</span>` : ''}<div class="district-mini-track" aria-hidden="true"><span style="width:${district.afterScore}%"></span></div><p class="district-critical${critical ? ' has-critical' : ''}">${critical ? `Критических показателей: ${critical}` : 'Без критических показателей'}</p></article>`;
   }).join('');
   $('indicator-table').innerHTML = `<thead><tr><th scope="col">Показатель</th>${result.districts.map((district) => `<th scope="col">${escapeHtml(district.name)}</th>`).join('')}</tr></thead><tbody>${state.dataset.indicators.map((indicator) => `<tr><th scope="row"><span>${indicator.id}</span>${escapeHtml(indicator.name)}</th>${result.districts.map((district) => `<td${district.after[indicator.id] < 40 ? ' class="critical"' : ''} title="До: ${number(district.before[indicator.id])}${district.after[indicator.id] < 40 ? '. Критическое значение, ниже 40' : ''}">${number(district.after[indicator.id])}${calculated ? `<span class="cell-delta${district.delta[indicator.id] < 0 ? ' negative' : ''}">${signed(district.delta[indicator.id])}</span>` : ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
   $('table-note').textContent = calculated ? 'В каждой ячейке: итоговое значение и изменение относительно исходного. Наведите курсор для значения «до».' : 'Исходные значения официального синтетического набора.';
@@ -289,6 +312,7 @@ async function initialize() {
     $('loading').hidden = true;
     $('app').hidden = false;
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
+    await loadDeskScenario();
   } catch (error) {
     $('loading').hidden = true;
     $('fatal-error').hidden = false;
@@ -297,3 +321,45 @@ async function initialize() {
   }
 }
 void initialize();
+
+// Saved team scenarios use the server calculation, never client-supplied scores.
+let deskSnapshot = null;
+let linkedComplaint = null;
+const deskParams = new URLSearchParams(location.search);
+window.addEventListener('scenario:calculated', event => {
+  deskSnapshot = structuredClone(event.detail);
+  $('save-scenario').disabled = false;
+  $('save-scenario-status').textContent = 'Готов к сохранению последний рассчитанный сценарий. Изменения формы без расчёта сюда не попадут.';
+});
+async function deskRequest(path, body) {
+  const response = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'X-Desk-Request': '1' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) });
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.message || 'Не удалось выполнить действие.');
+  return data;
+}
+$('save-scenario-form').addEventListener('submit', async event => {
+  event.preventDefault(); if(!deskSnapshot) return;
+  const button = $('save-scenario'); button.disabled = true;
+  try {
+    const saved = await deskRequest('/api/desk/scenarios', { name: $('scenario-name').value, scenario: deskSnapshot.scenario, complaintId: linkedComplaint });
+    $('save-scenario-status').textContent = `Сценарий «${saved.name}» сохранён на сервере. Доступен в кабинете обращений.`;
+  } catch(error) { $('save-scenario-status').textContent = `${error.message} При необходимости войдите в кабинет в другой вкладке и повторите сохранение.`; }
+  finally { button.disabled = !deskSnapshot; }
+});
+async function loadDeskScenario() {
+  try {
+    if(deskParams.has('saved')) {
+      const saved = await deskRequest('/api/desk/scenarios');
+      const item = saved.find(s => s.id === Number(deskParams.get('saved')));
+      if(!item) throw new Error('Сохранённый сценарий не найден.');
+      if(await applyDecisions(item.scenario.decisions, 'Сохранённый сценарий загружен. Рассчитайте его повторно.')) { linkedComplaint=item.complaintId; $('scenario-name').value=item.name; }
+    } else if(deskParams.has('complaint')) {
+      const item = await deskRequest(`/api/desk/complaints/${Number(deskParams.get('complaint'))}`);
+      const measure = measureById(deskParams.get('measure'));
+      if(!measure) throw new Error('Мера не найдена.');
+      const decision = { measureId: measure.id };
+      if(measure.scope === 'district') decision.districtId=deskParams.get('district');
+      if(await applyDecisions([decision], `Добавлена мера для обращения № ${item.id}. Дополните сценарий до пяти решений.`)) { linkedComplaint=item.id; $('scenario-name').value=`Обращение № ${item.id}`; }
+    }
+  } catch(error) { $('save-scenario-status').textContent=error.message; }
+}

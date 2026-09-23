@@ -1,3 +1,4 @@
+import { createDesk } from './desk/api.js';
 import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
@@ -53,16 +54,16 @@ function getPath(request) {
   return pathname;
 }
 
-function readJson(request) {
+function readJson(request, maxBytes = MAX_JSON_BYTES) {
   const mediaType = (request.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
   if (mediaType !== 'application/json'
     || (request.headers['content-encoding'] && request.headers['content-encoding'] !== 'identity')) {
     request.resume();
     throw new RequestError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Ожидается тело application/json без сжатия.');
   }
-  if (Number(request.headers['content-length']) > MAX_JSON_BYTES) {
+  if (Number(request.headers['content-length']) > maxBytes) {
     request.resume();
-    throw new RequestError(413, 'BODY_TOO_LARGE', 'Размер JSON не должен превышать 32 KiB.');
+    throw new RequestError(413, 'BODY_TOO_LARGE', 'Превышен допустимый размер запроса.');
   }
   return new Promise((resolveBody, reject) => {
     let bytes = 0;
@@ -71,10 +72,10 @@ function readJson(request) {
     request.on('data', (chunk) => {
       if (failed) return;
       bytes += chunk.length;
-      if (bytes > MAX_JSON_BYTES) {
+      if (bytes > maxBytes) {
         failed = true;
         chunks.length = 0;
-        reject(new RequestError(413, 'BODY_TOO_LARGE', 'Размер JSON не должен превышать 32 KiB.'));
+        reject(new RequestError(413, 'BODY_TOO_LARGE', 'Превышен допустимый размер запроса.'));
         return;
       }
       chunks.push(chunk);
@@ -131,13 +132,15 @@ async function sendStatic(request, response, pathname, publicDir) {
 
 /** Returns an unbound Node HTTP server. Tests may inject explain, aiConfigured and publicDir. */
 export function createAppServer({ explain = explainScenario, aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, deskOptions = {} } = {}) {
+  const desk = createDesk(deskOptions);
   const staticRoot = resolve(publicDir);
-  return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (request, response) => {
+  const server = createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
     try {
       const pathname = getPath(request);
+      if (await desk.handle(request, response, pathname, readJson, sendJson)) return;
       const expectedMethod = API_METHODS.get(pathname);
       if (expectedMethod) {
         if (request.method !== expectedMethod) {
@@ -175,6 +178,8 @@ export function createAppServer({ explain = explainScenario, aiConfigured = isAI
       });
     }
   });
+  server.once('close', () => desk.close());
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env.local src/server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "desk:user": "node --env-file-if-exists=.env.local scripts/desk-user.js",
+    "desk:backup": "node --env-file-if-exists=.env.local scripts/desk-backup.js"
   }
 }

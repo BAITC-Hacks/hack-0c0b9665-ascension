@@ -1,0 +1,35 @@
+import { createRequire } from 'node:module';
+import { mkdtemp,rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { once } from 'node:events';
+import assert from 'node:assert/strict';
+import { createAppServer } from '../src/server.js';
+import { openStore,passwordHash } from '../src/desk/store.js';
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const dir=await mkdtemp(join(tmpdir(),'desk-browser-')), dbPath=join(dir,'db.sqlite');
+const db=openStore(dbPath);db.prepare('INSERT INTO users VALUES(?,?,?)').run('tester',passwordHash('browser-test-password'),'admin');db.close();
+const server=createAppServer({deskOptions:{path:dbPath}});server.listen(0,'127.0.0.1');await once(server,'listening');
+const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL || 'chrome'});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+const url=`http://127.0.0.1:${server.address().port}`;
+try{
+ await page.goto(url+'/desk.html');await page.getByLabel('Логин',{exact:true}).fill('tester');await page.getByLabel('Пароль',{exact:true}).fill('browser-test-password');await page.getByRole('button',{name:'Войти',exact:true}).click();await page.getByRole('button',{name:'Создать демо-обращение'}).waitFor();
+ await page.getByRole('button',{name:'Создать демо-обращение'}).click();await page.getByLabel('Описание проблемы').fill('Тест: не работает фонарь <script>throw Error("xss")</script>');await page.locator('#create-form [name=districtId]').selectOption('nura');await page.locator('#create-form [name=category]').selectOption('safety');await page.getByRole('button',{name:'Зарегистрировать демо-обращение'}).click();await page.getByRole('heading',{name:'Карточка обращения'}).waitFor();
+ await page.locator('#edit-form [name=status]').selectOption('review');await page.getByLabel('Внутренний комментарий').fill('Проверить фонарь');await page.getByRole('button',{name:'Сохранить изменения'}).click();await page.waitForFunction(()=>document.querySelector('#edit-form [name=note]')?.value==='');
+ await page.locator('#edit-form [name=status]').selectOption('work');await page.getByRole('button',{name:'Сохранить изменения'}).click();await page.waitForFunction(()=>!!document.querySelector('#edit-form [name=status] option[value=resolved]'));
+ await page.locator('#edit-form [name=status]').selectOption('resolved');await page.getByRole('button',{name:'Сохранить изменения'}).click();await page.getByText('Для этого статуса заполните ответ жителю.',{exact:true}).waitFor();await page.getByLabel('Ответ жителю',{exact:true}).fill('Фонарь восстановлен (демо)');await page.getByRole('button',{name:'Сохранить изменения'}).click();await page.waitForFunction(()=>document.querySelector('#edit-form [name=publicReply]')?.value==='');
+ await page.locator('input[type=file]').setInputFiles({name:'pixel.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=','base64')});await page.getByRole('button',{name:'Загрузить фото'}).click();await page.locator('.photos img').waitFor();
+ await page.getByRole('button',{name:'Обновить карточку'}).click();await page.locator('.photos img').waitFor();await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+ await page.getByLabel('Поиск',{exact:true}).fill('несуществующее');await page.getByRole('button',{name:'Найти',exact:true}).click();await page.getByRole('heading',{name:'Обращений не найдено'}).waitFor();await page.getByRole('button',{name:'Сбросить',exact:true}).click();await page.getByRole('button',{name:'Открыть обращение 1'}).waitFor();assert.equal(await page.getByRole('button',{name:'Назад',exact:true}).isDisabled(),true);
+ for(let n=0;n<11;n++) await page.request.post(url+'/api/desk/complaints',{headers:{'X-Desk-Request':'1'},data:{submissionId:'page-'+n,text:'Дополнительное демо '+n,category:'other',districtId:null}});
+ await page.getByRole('button',{name:'Обновить',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#next').disabled);await page.getByRole('button',{name:'Далее',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#page').textContent.includes('Страница 2'));await page.getByRole('button',{name:'Назад',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#page').textContent.includes('Страница 1'));
+ await page.goto(url+'/desk.html?complaint=1');await page.getByRole('heading',{name:'Карточка обращения'}).waitFor();await page.getByText('Связать с городской мерой',{exact:true}).click();await page.locator('#measure-form [name=measure]').selectOption('M10');await page.getByRole('button',{name:'Открыть меру в конструкторе'}).click();await page.waitForURL('**/?complaint=1**');await page.waitForFunction(()=>document.querySelector('#decision-count')?.textContent==='1');
+ await page.getByRole('button',{name:'Загрузить демо'}).click();await page.waitForFunction(()=>document.querySelector('#decision-count')?.textContent==='5');await page.locator('#simulate-button').click();await page.waitForFunction(()=>document.querySelector('#save-scenario')?.disabled===false);await page.getByLabel('Название сценария').fill('Сценарий A');await page.getByRole('button',{name:'Сохранить сценарий',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#save-scenario-status').textContent.includes('сохранён на сервере'));
+ await page.getByLabel('Название сценария').fill('Сценарий B');await page.getByRole('button',{name:'Сохранить сценарий',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#save-scenario-status').textContent.includes('«Сценарий B»'));
+ await page.goto(url+'/desk.html');await page.getByRole('button',{name:'Сравнить',exact:true}).first().click();await page.getByRole('button',{name:'Сравнить',exact:true}).click();await page.locator('#saved-comparison table').waitFor();await page.reload();await page.getByText('Сценарий A',{exact:true}).waitFor();
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/desk-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.getByRole('button',{name:'Загрузить',exact:true}).first().click();await page.waitForFunction(()=>document.querySelector('#decision-count')?.textContent==='5');
+ await page.goto(url+'/desk.html');await page.getByRole('button',{name:'Выйти',exact:true}).click();await page.getByRole('button',{name:'Войти',exact:true}).waitFor();assert.deepEqual(errors,[]);
+ console.log('PASS: login, creation, XSS text, transitions, required reply, photo, refresh, search, reset, pagination, measure handoff, calculation, server save, comparison, reload, mobile 390px, logout; no browser errors.');
+}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
