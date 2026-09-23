@@ -1,7 +1,6 @@
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isAIConfigured } from './ai/explain.js';
 import { createComplaintRoutes } from './complaints/http.js';
 import { handleApiRequest } from './http/api.js';
 import { errorResult } from './http/errors.js';
@@ -10,6 +9,8 @@ import { createNodeExplanation } from './runtime/node-explanation.js';
 import { readNodeJson } from './runtime/node-json.js';
 import { configuredPublicOrigin } from './runtime/node-origin.js';
 import { sendNodeStatic } from './runtime/node-static.js';
+import { createNodeAIAdmission } from './runtime/ai-admission.js';
+import { createPlanning } from './runtime/planning.js';
 
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -25,12 +26,15 @@ function sendJson(response, { status, body: value, headers = {} }) {
 }
 
 /** Node composition root. Construct once so admission counters survive across requests. */
-export function createRequestHandler({ aiConfigured = isAIConfigured,
+export function createRequestHandler({ aiConfigured,
   publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, complaints = {}, ...options } = {}) {
   const staticRoot = resolve(publicDir);
+  const configured = aiConfigured ?? (() => Boolean(env.OPENAI_API_KEY?.trim()));
   const handleComplaints = createComplaintRoutes(complaints);
   const trustedOrigin = configuredPublicOrigin(publicOrigin, env);
-  const explain = createNodeExplanation({ ...options, aiConfigured, env });
+  const admission = createNodeAIAdmission({ ...options, aiConfigured: configured, env });
+  const explain = createNodeExplanation({ ...options, aiConfigured: configured, env, admission });
+  const plan = createPlanning({ admission, plan: options.plan });
   return async (request, response) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);
     try {
@@ -49,7 +53,7 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
         return;
       }
       const result = await handleApiRequest({ pathname, method: request.method, headers, origin,
-        readJson: () => readNodeJson(request, headers), aiConfigured: aiConfigured(), explain });
+        readJson: () => readNodeJson(request, headers), aiConfigured: configured(), explain, plan });
       request.resume();
       if (result) return sendJson(response, result);
       requireMethod(request.method, ['GET', 'HEAD']);
