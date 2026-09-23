@@ -1,0 +1,6 @@
+.location-map-panel { margin-top: 24px; padding: 28px; }
+.location-map-panel h2 { margin: 0 0 12px; }
+.location-map-panel .button-row { flex-wrap: wrap; margin: 18px 0; }
+.location-map-credit { margin-top: 14px; font-size: 12px; color: #657b83; }
+.location-map-credit a { color: inherit; }
+@media (max-width: 600px) { .location-map-panel { padding: 20px; } }

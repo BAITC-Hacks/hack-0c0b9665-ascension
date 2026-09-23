@@ -230,13 +230,13 @@ test('HTTP zero AI allowance disables provider dispatch without breaking determi
   assert.equal(calls, 0);
 });
 
-test('HTTP security headers allow local map assets and only the selected map services', async (t) => {
+test('HTTP security headers preserve map assets and citizen geolocation with restricted external services', async (t) => {
   const port = await startServer(t);
-  for (const path of ['/', '/api/health', '/api/missing']) {
+  for (const path of ['/', '/citizens.html', '/mayor.html', '/api/health', '/api/citizen/config', '/api/missing']) {
     const response = await request(port, path);
     assert.equal(response.headers['x-frame-options'], 'DENY');
     assert.equal(response.headers['referrer-policy'], 'no-referrer');
-    assert.equal(response.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
+    assert.equal(response.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=(self)');
     const directives = new Map(response.headers['content-security-policy'].split('; ').map(value => {
       const [name, ...sources] = value.split(' ');
       return [name, sources];

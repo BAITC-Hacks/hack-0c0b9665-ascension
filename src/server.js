@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isAIConfigured } from './ai/explain.js';
+import { createComplaintRoutes } from './complaints/http.js';
 import { handleApiRequest } from './http/api.js';
 import { errorResult } from './http/errors.js';
 import { getPath, requireMethod, SECURITY_HEADERS } from './http/policy.js';
@@ -25,8 +26,9 @@ function sendJson(response, { status, body: value, headers = {} }) {
 
 /** Node composition root. Construct once so admission counters survive across requests. */
 export function createRequestHandler({ aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, ...options } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, complaints = {}, ...options } = {}) {
   const staticRoot = resolve(publicDir);
+  const handleComplaints = createComplaintRoutes(complaints);
   const trustedOrigin = configuredPublicOrigin(publicOrigin, env);
   const explain = createNodeExplanation({ ...options, aiConfigured, env });
   return async (request, response) => {
@@ -37,6 +39,15 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
       const protocol = request.socket.encrypted ? 'https' : 'http';
       // Forwarded headers are client-controlled unless a trusted proxy policy is configured.
       const origin = trustedOrigin ?? `${protocol}://${request.headers.host}`;
+      // Citizen intake is a Node-only extension with its own storage and authentication.
+      // Adapt its existing transport helpers without changing the shared simulator API.
+      if (await handleComplaints(request, response, pathname, {
+        readJson: () => readNodeJson(request, headers),
+        sendJson: (target, status, body) => sendJson(target, { status, body }),
+      })) {
+        request.resume();
+        return;
+      }
       const result = await handleApiRequest({ pathname, method: request.method, headers, origin,
         readJson: () => readNodeJson(request, headers), aiConfigured: aiConfigured(), explain });
       request.resume();

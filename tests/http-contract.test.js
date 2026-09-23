@@ -95,7 +95,7 @@ function assertSecurityHeaders(response) {
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(response.headers.get('x-frame-options'), 'DENY');
   assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
-  assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+  assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=(self)');
   assert.equal(response.headers.get('access-control-allow-origin'), null);
   const policy = response.headers.get('content-security-policy');
   assert.match(policy, /(?:^|;\s*)script-src 'self'(?:;|$)/);

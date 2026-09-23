@@ -6,7 +6,7 @@ export const SECURITY_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self)',
   'Content-Security-Policy': [
     "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://tiles.openfreemap.org",
