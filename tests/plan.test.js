@@ -72,6 +72,8 @@ test('valid plan uses strict catalogue enums and returns only the authoritative 
   assert.deepEqual(output.validation, validateScenario(scenario()));
   assert.deepEqual(output.result, simulate(scenario()));
   assert.equal(output.result.totalCost, 95);
+  assert.match(output.summary, /симуляция рассчитана.*95 из 100/);
+  assert.deepEqual(output.modelComment, { label: 'Непроверенный комментарий Ascension AI', text: plan().summary });
   assert.ok(Math.abs(output.result.score - 56.54307) < 1e-8);
   assert.ok(output.decisionOrigins.every(origin => origin.source === 'requested'));
   assert.match(output.assumptions.join(' '), /синтетическ/);
@@ -106,8 +108,28 @@ test('suggested additions remain explicit even when the provider omits their ass
   proposal.decisions[4].rationale = 'Предложено для улучшения качества воздуха.';
   const output = await proposePlan({ prompt: 'Дополни социальный план мерами для качества воздуха.' }, reply(proposal));
   assert.equal(output.valid, true);
-  assert.deepEqual(output.decisionOrigins[4], { decisionIndex: 4, source: 'suggested', rationale: proposal.decisions[4].rationale });
+  assert.equal(output.decisionOrigins[4].decisionIndex, 4);
+  assert.equal(output.decisionOrigins[4].source, 'suggested');
+  assert.match(output.decisionOrigins[4].rationale, /Дополнение, предложенное моделью/);
+  assert.equal(output.decisionOrigins[4].modelRationale, `Непроверенная интерпретация Ascension AI: ${proposal.decisions[4].rationale}`);
   assert.match(output.assumptions[0], /Дополнение Ascension AI:.*чистое топливо.*Сарыарка/);
+});
+
+test('server status and rationale cannot be replaced by model claims in words', async () => {
+  const proposal = plan();
+  proposal.summary = 'Оценка вырастет на двадцать баллов.';
+  proposal.decisions[0].rationale = 'Симуляция уже успешно проведена.';
+  proposal.assumptions = ['Рост составит двадцать баллов.'];
+  for (const decisions of [proposal.decisions, proposal.decisions.slice(0, 1)]) {
+    const output = await proposePlan(input, reply({ ...proposal, decisions }));
+    assert.doesNotMatch(output.summary, /двадцать/);
+    assert.match(output.summary, decisions.length === 5 ? /симуляция рассчитана/ : /симуляция не выполнена/);
+    assert.doesNotMatch(output.decisionOrigins[0].rationale, /успешно проведена/);
+    assert.equal(output.modelComment.label, 'Непроверенный комментарий Ascension AI');
+    assert.equal(output.modelComment.text, proposal.summary);
+    assert.match(output.decisionOrigins[0].modelRationale, /^Непроверенная интерпретация Ascension AI:/);
+    assert.match(output.assumptions[0], /^Допущение Ascension AI, требует проверки:/);
+  }
 });
 
 test('hallucinated IDs, district IDs, fields and provider supplied numbers cannot become simulation facts', async () => {
@@ -243,16 +265,32 @@ test('oversize Content-Length and chunked provider envelopes are cancelled befor
   assert.equal(streamCancelled, true);
 });
 
-test('provider redirects fail without reading the redirected response body', async () => {
-  for (const response of [{ ok: false, status: 302 }, { ok: true, status: 200, redirected: true }]) {
+test('provider redirects and errors abort the request and cancel unread bodies', async () => {
+  for (const response of [
+    { ok: false, status: 302 }, { ok: true, status: 200, redirected: true },
+    { ok: false, status: 429 }, { ok: false, status: 503 },
+  ]) {
     let bodyRead = false;
+    let cancelled = false;
+    let signal;
     const output = await proposePlan(input, options(async (_url, init) => {
       assert.equal(init.redirect, 'manual');
-      return { ...response, json: async () => { bodyRead = true; return envelope(plan()); } };
+      signal = init.signal;
+      return {
+        ...response,
+        body: { cancel: async () => { cancelled = true; } },
+        json: async () => { bodyRead = true; return envelope(plan()); },
+      };
     }));
-    unavailable(output, 'provider_error');
+    unavailable(output, response.status === 429 ? 'rate_limited' : 'provider_error');
     assert.equal(bodyRead, false);
+    assert.equal(signal.aborted, true);
+    assert.equal(cancelled, true);
   }
+  const closedStream = await proposePlan(input, options(async () => ({
+    ok: false, status: 503, body: { cancel: async () => { throw new Error('Already aborted'); } },
+  })));
+  unavailable(closedStream, 'provider_error');
 });
 
 test('timeout aborts the transport and also bounds a stalled response body', async () => {
