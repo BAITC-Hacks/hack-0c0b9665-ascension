@@ -180,6 +180,57 @@ function parseStore(raw) {
   return data.registers;
 }
 
+function allowedKeys(value, keys) {
+  if (!record(value) || Reflect.ownKeys(value).some((key) => typeof key !== 'string' || !keys.includes(key))) throw new Error('fields');
+}
+
+function jsonValue(value, seen = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number' && finite(value)) return;
+  if (!value || typeof value !== 'object' || seen.has(value)
+    || (Array.isArray(value) ? Object.getPrototypeOf(value) !== Array.prototype
+      : ![Object.prototype, null].includes(Object.getPrototypeOf(value)))) throw new Error('value');
+  if (Object.values(Object.getOwnPropertyDescriptors(value)).some((descriptor) => !Object.hasOwn(descriptor, 'value'))) throw new Error('accessor');
+  if (Array.isArray(value) && Reflect.ownKeys(value).some((key) => typeof key !== 'string'
+    || (key !== 'length' && (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length)))) throw new Error('array fields');
+  seen.add(value);
+  for (const item of Array.isArray(value) ? value : Object.values(value)) jsonValue(item, seen);
+  seen.delete(value);
+}
+
+/** Strict transport document, independent from the input. Local v1 migration stays in parseStore. */
+export function normalizeActionDocument(document, { maxBytes = 128 * 1024 } = {}) {
+  try {
+    if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 128 * 1024) throw new Error('limit');
+    allowedKeys(document, ['schemaVersion', 'registers']);
+    jsonValue(document);
+    if (document.schemaVersion !== ACTION_REGISTER_SCHEMA_VERSION || !Array.isArray(document.registers)
+      || document.registers.length > ACTION_REGISTER_LIMIT) throw new Error('schema');
+    for (const entry of document.registers) {
+      allowedKeys(entry, ['id', 'sourceKey', 'createdAt', 'source', 'actions']);
+      allowedKeys(entry.source, ['city', 'scenario', 'result', 'calculatedAt', 'labels']);
+      allowedKeys(entry.source.city, ['id', 'name']);
+      allowedKeys(entry.source.scenario, ['decisions']);
+      allowedKeys(entry.source.result, ['valid', 'score', 'totalCost', 'remainingBudget', 'criticalCount']);
+      if (!Array.isArray(entry.source.scenario.decisions) || !Array.isArray(entry.source.labels)
+        || !Array.isArray(entry.actions)) throw new Error('arrays');
+      for (const decision of entry.source.scenario.decisions) allowedKeys(decision, ['measureId', 'districtId']);
+      for (const label of entry.source.labels) allowedKeys(label, ['measureId', 'districtId', 'measureName', 'districtName']);
+      for (const action of entry.actions) {
+        allowedKeys(action, ['id', 'measureId', 'districtId', 'measureName', 'districtName', 'owner', 'dueDate', 'criterion', 'status', 'evidence', 'implementation']);
+        allowedKeys(action.implementation, ['siteAddress', 'siteBasis', 'siteSourceUrl', 'kpi', 'budget', 'prerequisites', 'nextStep']);
+        allowedKeys(action.implementation.kpi, ['name', 'unit', 'baseline', 'target', 'source']);
+        allowedKeys(action.implementation.budget, ['capexKzt', 'opexKzt', 'estimateSource', 'estimateDate']);
+      }
+    }
+    const raw = JSON.stringify(document);
+    if (new TextEncoder().encode(raw).byteLength > maxBytes) throw new Error('size');
+    return { schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, registers: parseStore(raw) };
+  } catch {
+    throw Object.assign(new Error('Документ реестра не принят: нужна корректная схема 2 без посторонних полей, до 10 наборов и 128 КиБ UTF-8.'), { code: 'INVALID' });
+  }
+}
+
 function csvCell(value) {
   let content = String(value ?? '');
   // Treat manual text as text when opened in spreadsheet software.
@@ -336,7 +387,8 @@ export function mountActionRegister(container, { dataset = null, city = null } =
     sourceInfo.append(node('summary', '', `Исходный сценарий · ${entry.id}`),
       node('p', '', `Расчёт: ${new Date(entry.source.calculatedAt).toLocaleString('ru-RU')}. Score учебной модели: ${entry.source.result.score}. Стоимость: ${entry.source.result.totalCost} условных единиц.`),
       node('p', '', entry.source.labels.map((label) => `${label.measureId}: ${label.measureName} — ${label.districtName}`).join('; ')),
-      node('p', '', 'Это сохранённый источник поручений; последующие расчёты его не меняют. JSON-экспорт содержит снимок.'));
+      node('p', '', 'Это сохранённый источник поручений; последующие расчёты его не меняют. JSON-экспорт содержит снимок.'),
+      node('p', '', 'Справочный снимок. После переноса реестра его цифры не считаются проверенными сервером; требуется новый расчёт.'));
     const cards = node('div', 'action-register-cards');
     entry.actions.forEach((action, index) => cards.append(actionCard(action, index)));
     const deletion = node('div', 'action-register-deletion');
@@ -508,10 +560,41 @@ export function mountActionRegister(container, { dataset = null, city = null } =
   });
   registers.forEach(appendRegister);
   refresh();
-  return { dispose() {
-    if (disposed) return;
-    disposed = true;
-    cleanups.forEach((cleanup) => cleanup());
-    root.remove();
-  } };
+  function assertMounted() {
+    if (disposed) throw Object.assign(new Error('Реестр уже отключён.'), { code: 'DISPOSED' });
+  }
+  return {
+    getDocument() {
+      assertMounted();
+      return normalizeActionDocument({ schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, registers });
+    },
+    // Caller must obtain explicit Pull/replace confirmation and offer a backup first.
+    applyDocument(document) {
+      assertMounted();
+      const next = normalizeActionDocument(document);
+      const raw = JSON.stringify(next);
+      try {
+        if (blocked || window.localStorage.getItem(ACTION_REGISTER_STORAGE_KEY) !== persistedRaw) throw new Error('blocked');
+        window.localStorage.setItem(ACTION_REGISTER_STORAGE_KEY, raw);
+      } catch {
+        throw Object.assign(new Error('Не удалось сохранить полученный реестр в этом браузере. Текущие записи не заменены; проверьте хранилище или конфликт вкладок.'), { code: 'STORAGE' });
+      }
+      // Commit the view only after full validation and a successful local write.
+      persistedRaw = raw;
+      registers = next.registers;
+      current = null;
+      list.replaceChildren();
+      registers.forEach(appendRegister);
+      storageState = 'Полученный ручной реестр сохранён в этом браузере. Снимки расчёта — справочные.';
+      refresh();
+      setMessage('Ручные записи заменены после загрузки. Для новых поручений рассчитайте текущий сценарий заново.');
+      return { savedLocally: true };
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      cleanups.forEach((cleanup) => cleanup());
+      root.remove();
+    },
+  };
 }

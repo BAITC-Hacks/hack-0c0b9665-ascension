@@ -5,7 +5,10 @@ self.addEventListener('message', ({ data }) => {
   const requestId = data?.requestId;
   if (typeof requestId !== 'string' || !requestId || requestId.length > 128) return;
   try {
-    const result = buildPolicyOptions(data.scenario, { limit: data.limit ?? 6 });
+    const result = buildPolicyOptions(data.scenario, {
+      limit: data.limit ?? 6,
+      constraints: data.constraints,
+    });
     self.postMessage({ requestId, data: result });
   } catch {
     self.postMessage({ requestId, error: {

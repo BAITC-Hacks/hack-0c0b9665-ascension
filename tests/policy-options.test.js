@@ -259,3 +259,117 @@ test('limit is bounded, deterministic and only truncates display after complete 
     assert.equal(result.emptyReason?.code ?? null, normalized === 0 ? 'LIMIT_ZERO' : null);
   }
 });
+
+test('exact decision locks preserve both measure and district, including city measures', () => {
+  const input = official();
+  const constraints = { lockedDecisions: [input.decisions[4], input.decisions[3]] };
+  const output = buildPolicyOptions(input, { constraints, limit: 12 });
+  assert.equal(output.constraintScope, 'constrained');
+  assert.ok(output.options.length > 0);
+  assert.ok(output.explored < buildPolicyOptions(input).explored);
+  for (const option of output.options) {
+    for (const lock of constraints.lockedDecisions) assert.ok(option.scenario.decisions.some(decision =>
+      decision.measureId === lock.measureId && decision.districtId === lock.districtId));
+    assert.notEqual(option.changed.removed.measureId, 'M5');
+    assert.notEqual(option.changed.removed.measureId, 'M12');
+  }
+});
+
+test('priority frontier matches independently filtered exhaustive candidates before ranking or display limit', () => {
+  const input = official();
+  const baseline = simulate(input);
+  const all = enumerate(input).valid;
+  for (const protectedIndicator of [{ indicatorId: 'E2' }, { indicatorId: 'E2', districtId: 'saryarka' },
+    { indicatorId: 'T1', districtId: 'nura' }]) {
+    for (const lockedDecisions of [[], [input.decisions[0]]]) {
+      const constraints = { lockedDecisions, protectedIndicator };
+      const allowed = all.filter(item => lockedDecisions.every(lock => item.scenario.decisions.some(decision =>
+        JSON.stringify(decision) === JSON.stringify(lock))) && baseline.districts.every(district => {
+        if (protectedIndicator.districtId && district.id !== protectedIndicator.districtId) return true;
+        return item.result.districts.find(other => other.id === district.id).after[protectedIndicator.indicatorId]
+          >= district.after[protectedIndicator.indicatorId];
+      }));
+      const frontier = allowed.filter(item => metrics(item.result).some((value, index) => value > metrics(baseline)[index])
+        && ![baseline, ...allowed.map(other => other.result)].some(other => strictlyBetter(other, item.result)));
+      const output = buildPolicyOptions(input, { constraints, limit: 12 });
+      assert.equal(output.exhaustiveWithinScope, true);
+      assert.equal(output.validCandidates, allowed.length);
+      assert.equal(output.paretoCandidates, frontier.length);
+      assert.deepEqual(new Set(output.options.map(item => signature(item.scenario))),
+        new Set(frontier.map(item => signature(item.scenario))));
+      const capped = buildPolicyOptions(input, { constraints, limit: 1 });
+      assert.equal(capped.paretoCandidates, frontier.length);
+      assert.equal(capped.validCandidates, allowed.length);
+      assert.deepEqual(capped.options, output.options.slice(0, 1));
+    }
+  }
+  const protectedOutput = buildPolicyOptions(input, { constraints: { protectedIndicator: { indicatorId: 'E2' } } });
+  assert.ok(protectedOutput.rejectedByConstraints > 0);
+  assert.notEqual(protectedOutput.options[0]?.id, buildPolicyOptions(input, { limit: 1 }).options[0]?.id);
+});
+
+test('all decisions locked returns an explicit empty allowed search, not an unrestricted recommendation', () => {
+  const input = official();
+  const output = buildPolicyOptions(input, { constraints: { lockedDecisions: input.decisions } });
+  assert.equal(output.valid, true);
+  assert.equal(output.constraintScope, 'constrained');
+  assert.equal(output.exhaustiveWithinScope, true);
+  assert.equal(output.emptyReason.code, 'ALL_DECISIONS_LOCKED');
+  assert.equal(output.explored, 0);
+  assert.deepEqual(output.options, []);
+});
+
+test('malformed constraints fail closed and never silently broaden the search', () => {
+  for (const constraints of [null, [], 'E1', 1, new Date(), new Map(), { unexpected: true }, { lockedDecisions: null },
+    { lockedDecisions: [{}] }, { lockedDecisions: [{ measureId: 'M7' }] },
+    { lockedDecisions: [{ measureId: 'M7', districtId: 'esil' }] },
+    { lockedDecisions: [{ measureId: 'M1', districtId: 'nura' }] },
+    { lockedDecisions: [{ measureId: 'M12', districtId: 'nura' }] },
+    { lockedDecisions: [{ measureId: 'M12', districtId: undefined }] },
+    { lockedDecisions: [{ measureId: 'M12', extra: true }] },
+    { lockedDecisions: [{ measureId: 'M12' }, { measureId: 'M12' }] },
+    { protectedIndicator: {} }, { protectedIndicator: 'E1' },
+    { protectedIndicator: { indicatorId: 'E99' } },
+    { protectedIndicator: { indicatorId: 'E1', districtId: null } },
+    { protectedIndicator: { indicatorId: 'E1', districtId: 'unknown' } },
+    { protectedIndicator: { indicatorId: 'E1', minimum: 0 } },
+  ]) {
+    const output = buildPolicyOptions(official(), { constraints });
+    assert.equal(output.valid, false, JSON.stringify(constraints));
+    assert.equal(output.exhaustiveWithinScope, false);
+    assert.equal(output.emptyReason.code, 'INVALID_CONSTRAINTS');
+    assert.equal(output.errors[0].code, 'INVALID_CONSTRAINTS');
+    assert.equal(output.explored, 0);
+    assert.deepEqual(output.options, []);
+  }
+});
+
+test('constraints are canonical, deterministic, copied and backward compatible', () => {
+  const input = freeze(official());
+  const constraints = freeze({ lockedDecisions: [input.decisions[3], input.decisions[0]],
+    protectedIndicator: { indicatorId: 'E1', districtId: 'saryarka' } });
+  const expected = buildPolicyOptions(input, { constraints });
+  assert.deepEqual(buildPolicyOptions(input, { constraints: { ...constraints,
+    lockedDecisions: [...constraints.lockedDecisions].reverse() } }), expected);
+  const modified = buildPolicyOptions(input, { constraints });
+  modified.constraints.lockedDecisions[0].measureId = 'M999';
+  modified.constraints.protectedIndicator.indicatorId = 'E99';
+  assert.deepEqual(buildPolicyOptions(input, { constraints }), expected);
+  assert.deepEqual(buildPolicyOptions(input, { constraints: {} }), buildPolicyOptions(input));
+});
+
+test('worsened indicators name every model regression against the calculated baseline', () => {
+  const output = buildPolicyOptions(official());
+  assert.ok(output.options.some(option => option.worsenedIndicators.length));
+  for (const option of output.options) {
+    const expected = option.result.districts.flatMap(district => getDataset().indicators
+      .filter(({ id }) => district.after[id] < output.baseline.result.districts.find(previous => previous.id === district.id).after[id])
+      .map(({ id }) => `${district.id}:${id}`));
+    assert.deepEqual(option.worsenedIndicators.map(item => `${item.districtId}:${item.indicatorId}`), expected);
+    for (const item of option.worsenedIndicators) {
+      assert.ok(item.indicatorName.length > item.indicatorId.length);
+      assert.equal(item.delta, item.value - item.baseline);
+      assert.ok(item.delta < 0);
+    }
+  }
+});

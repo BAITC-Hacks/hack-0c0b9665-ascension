@@ -15,12 +15,12 @@
   "normalization": "UTF-8, CRLF normalized to LF",
   "inputs": {
     "data/city.json": "27bbcf973fb79170b0ce89b447be2e63afb8ef3022d76f52121863fc782d1103",
-    "src/browser/policy-options-worker.js": "da30693d624dfcb626c7654d50faf40cb11ef2a063874ad20b6667bb41c9ab0b",
-    "src/core/policy-options.js": "7aa1980d75426f60cc486fed18991a6e5b8488424e57bf4ee192aa0783a8bc92",
+    "src/browser/policy-options-worker.js": "48408bfb45b75f45892298ec6b62fc6720354effd5ccf3db14393cf5f971bdae",
+    "src/core/policy-options.js": "6d6d7b8f1fdbc5f2e94d5e0b16d8b7562991e1bfffdde7f9ef73062633134347",
     "src/core/simulator.js": "c48ee6859187eb760e35df365e0444ca355cfa602edf9f517e3fd478e04aca05"
   },
   "output": {
     "path": "public/policy-options-worker.js",
-    "sha256": "1241c22fba37b392b1de37d5b73754ea1720025470bf103f792e1ff5db11052d"
+    "sha256": "307aedc2385b7b66cb9b6d541c972f140bd35a3cf2652820107f2ba4ce355296"
   }
 }
