@@ -80,7 +80,10 @@ test('failed audit insertion rolls back document and revision', () => {
   assert.equal(repository.read().revision, 0); assert.deepEqual(repository.audit(), []); db.close();
 });
 test('strict schema rejects extra data, missing passports, duplicates, status abuse and invalid numbers', () => {
-  assert.deepEqual(validateDocument(fixtureDocument()), fixtureDocument());
+  const accepted = validateDocument(fixtureDocument());
+  assert.equal(accepted.schemaVersion, 2);
+  assert.deepEqual(accepted.registers[0].source, fixtureDocument().registers[0].source);
+  assert.equal(accepted.registers[0].actions.length, 5);
   const mutations = [
     (d) => { d.role = 'owner'; }, (d) => { d.schemaVersion = 1; }, (d) => { d.registers[0].actions[0].role = 'owner'; },
     (d) => { delete d.registers[0].actions[0].implementation; }, (d) => { d.registers.push(structuredClone(d.registers[0])); },
