@@ -31,7 +31,7 @@ function fixture() {
       status: index === 0 ? 'completed' : 'draft', evidence: index === 0 ? 'Подтверждение пользователя' : '',
       implementation: { siteAddress: 'Адрес, введённый человеком', siteBasis: '', siteSourceUrl: '',
         kpi: { name: '', unit: '', baseline: null, target: 0, source: '' },
-        budget: { capexKzt: 0, opexKzt: null, estimateSource: '', estimateDate: '' },
+        budget: { capexKzt: 0, opexKzt: null, opexPeriod: '', estimateSource: '', estimateDate: '' },
         prerequisites: '', nextStep: '' },
     })),
   }] };
@@ -104,6 +104,32 @@ test('normalization returns a validated independent v2 document and does not mut
   assert.equal(source.registers[0].actions[0].owner, 'Ручной ответственный');
   assert.equal(source.registers[0].actions[0].implementation.kpi.target, 0);
   assert.deepEqual(normalizeActionDocument({ schemaVersion: 2, registers: [] }), { schemaVersion: 2, registers: [] });
+});
+
+test('historical v2 transport documents normalize a missing OPEX period without mutating input and apply successfully', () => {
+  const historical = fixture();
+  for (const action of historical.registers[0].actions) delete action.implementation.budget.opexPeriod;
+  const rawBefore = JSON.stringify(historical);
+  const normalized = normalizeActionDocument(historical);
+  assert.equal(JSON.stringify(historical), rawBefore);
+  assert.deepEqual(normalized, fixture());
+  const historicalBytes = Buffer.byteLength(rawBefore, 'utf8');
+  const normalizedBytes = Buffer.byteLength(JSON.stringify(normalized), 'utf8');
+  assert.ok(normalizedBytes > historicalBytes);
+  assert.throws(() => normalizeActionDocument(historical, { maxBytes: historicalBytes }), errorCode('INVALID'), 'defaults cannot push the returned document over its size limit');
+  assert.deepEqual(normalizeActionDocument(historical, { maxBytes: normalizedBytes }), normalized);
+  const ui = setup();
+  assert.deepEqual(ui.mount.applyDocument(historical), { savedLocally: true });
+  assert.deepEqual(ui.mount.getDocument(), fixture());
+  assert.deepEqual(JSON.parse(ui.storage.raw), fixture());
+  assert.equal(JSON.stringify(historical), rawBefore);
+  assert.equal(field(ui.cards()[0], 'opex-period').value, '');
+  ui.mount.dispose();
+  for (const value of [null, 0, undefined, false, {}, [], 'x'.repeat(201)]) {
+    const invalid = fixture();
+    invalid.registers[0].actions[0].implementation.budget.opexPeriod = value;
+    assert.throws(() => normalizeActionDocument(invalid), errorCode('INVALID'));
+  }
 });
 
 test('strict workspace documents reject v1, unknown fields at every level and invalid cardinalities', () => {

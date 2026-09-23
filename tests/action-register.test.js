@@ -473,7 +473,7 @@ test('CSV keeps multiline manual text and quotes intact while neutralizing sprea
   }
   row.push(value); rows.push(row);
   assert.equal(rows.length, 6);
-  assert.ok(rows.every((item) => item.length === 25));
+  assert.ok(rows.every((item) => item.length === 26));
   assert.equal(rows[1][5], '\'=HYPERLINK("https://example.invalid","test")');
   assert.equal(rows[1][7], 'Первый пункт, с запятой\nВторой "пункт"');
   assert.equal(rows[1][9], "'@formula");
