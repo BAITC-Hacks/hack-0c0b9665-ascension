@@ -14,3 +14,52 @@ main{margin-left:232px}.topbar{height:76px;padding:0 43px;border-bottom:1px soli
 @media(max-width:560px){.sidebar{position:static;width:100%;height:62px;padding:13px 20px;display:block}.brand{justify-content:flex-start}.brand>span:last-child{display:block;font-size:12px}.brand-caption{font-size:8px}.brand-mark{height:34px;width:34px}.sidebar nav{display:none}main{margin-left:0}.topbar{height:49px;padding:0 20px}.topbar-tag{font-size:8px;letter-spacing:1px}.breadcrumb{font-size:9px}.breadcrumb span{margin:0 8px}.page-content{padding:29px 20px 0}.hero{display:block;margin-bottom:25px}.hero h1{font-size:clamp(27px,8vw,37px);letter-spacing:-1.5px;margin-top:15px}.hero p{font-size:11px}.hero-actions{flex-direction:row;justify-content:flex-start;padding-top:19px;gap:17px}.hero .eyebrow{font-size:8px;letter-spacing:1.3px}.button-outline{min-height:38px;padding:6px 12px;min-width:153px}.overview-grid{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:27px}.overview-card{padding:15px 17px}.metric-label{min-height:0;font-size:10px}.metric-number{font-size:32px;margin:13px 0 10px}.metric-description{font-size:8px}.metric-icon{display:block}.budget-track{margin-top:18px}.decision-dots{margin-top:17px}.plan-panel{padding:18px}.selected-list:has(.selected-item){grid-template-columns:1fr}.plan-summary{gap:14px}.plan-summary>div{font-size:9px}.plan-summary strong{font-size:12px}.plan-summary strong small{font-size:8px}.catalog-grid{grid-template-columns:1fr;gap:12px}.measure-card{padding:18px}.measure-card h3{min-height:0;font-size:14px}.measure-meta{margin-top:13px}.effect-chip{font-size:10px}.measure-top{margin-bottom:10px}.direction-tag{font-size:10px}.measure-id{font-size:11px}.scope-picker{margin-top:0}select{min-height:40px;font-size:12px}.add-button{min-height:40px;font-size:12px}.add-note{font-size:10px}.field-label{font-size:10px}.city-scope{min-height:40px;font-size:11px}.filters{gap:6px;margin:18px 0}.filter{font-size:11px;padding:8px 10px}.filter-count{margin-left:4px}.section-heading{align-items:center}.section-heading h2{font-size:21px}.quiet-tag{font-size:8px;max-width:90px}.section-description{font-size:11px}.results-section,.city-section{margin-top:35px}.result-placeholder{padding:24px;gap:17px;align-items:flex-start}.placeholder-icon{min-width:38px;height:38px;font-size:21px}.result-placeholder h3{font-size:12px}.result-placeholder p{font-size:10px}.result-grid{grid-template-columns:1fr 1fr;gap:10px}.score-card{grid-column:1/-1;padding:23px}.score-value{font-size:49px;margin:10px 0}.result-metric{padding:18px}.result-metric h3{font-size:10px}.result-metric strong{font-size:29px}.result-detail{padding:19px}.ai-panel{padding:21px}.ai-summary{font-size:11px}.ai-columns{padding-top:18px}.ai-footer{align-items:flex-start}.ai-footer p{max-width:70%;font-size:8px}.retry-button{font-size:9px;padding:6px 8px;white-space:nowrap}.district-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.district-card:last-child{grid-column:1/-1}.district-card:last-child .district-mini-track{max-width:100%}.district-value{font-size:28px}.district-critical{font-size:9px}.table-toolbar{padding:17px}th,td{padding:12px 15px}thead th:first-child{min-width:215px}.table-note{padding:13px 17px;font-size:8px}.method-section{padding:22px;gap:19px;margin-top:30px}.formula{font-size:9px;gap:10px}.formula strong{font-size:22px}.formula b{font-size:15px}.method-section .method-note{font-size:8px}footer{font-size:8px;flex-wrap:wrap;gap:7px;padding:23px 0}.desktop-break{display:none}}
 #comparison-panel{margin-top:32px}.comparison-root .comparison-table{min-width:0;white-space:normal}.comparison-root .comparison-table th,.comparison-root .comparison-table td{min-width:0;position:static}.comparison-root .comparison-table thead th:first-child{min-width:0}
 @media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Compact flow: keep the current visual theme; reveal supporting tools on demand. */
+.compact-layout main{margin:0}
+.compact-header{max-width:1240px;margin:auto;padding:20px 30px;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line)}
+.compact-brand{display:flex;align-items:center;gap:15px;text-decoration:none;font-weight:650;letter-spacing:1.2px;font-size:15px}
+.compact-brand span{font-size:12px;font-weight:400;letter-spacing:0;color:var(--muted)}
+.compact-header nav{display:flex;gap:7px;flex-wrap:wrap}
+.compact-link{display:inline-flex;align-items:center;min-height:42px;padding:8px 12px;text-decoration:none;font-size:13px;border-radius:8px;color:var(--muted)}
+.compact-link:hover,.compact-link.active{background:var(--green-soft);color:var(--green)}
+.compact-layout .page-content{max-width:1240px;padding:30px 30px 0}
+.compact-layout .hero{gap:25px}
+.compact-layout .hero-actions{padding:0;gap:12px}
+.compact-layout .hero .button{white-space:nowrap;font-size:13px}
+.compact-layout .workspace{grid-template-columns:minmax(0,1fr) 310px;gap:26px;margin:28px 0}
+.compact-layout .catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.compact-layout .measure-card{min-width:0;padding:19px}
+.compact-layout .measure-card h3{min-height:0;font-size:15px;line-height:1.5}
+.compact-layout .measure-meta{margin:13px 0;gap:13px}
+.compact-layout .filters{flex-wrap:wrap;gap:7px;margin:20px 0 16px}
+.compact-layout .filter-count{display:none}
+.measure-details{font-size:12px;color:var(--muted);margin:0 0 16px}
+.measure-details summary,.explanation-details summary{cursor:pointer;padding:5px 0;font-size:12px;color:var(--green)}
+.measure-details .effect-chips{margin:10px 0}
+.measure-details p{font-size:11px;line-height:1.6}
+.compact-layout .scope-picker{margin:0 0 11px}
+.compact-layout .add-note{min-height:0;font-size:11px;margin-top:8px}
+.compact-layout .selected-list{min-height:0}
+.compact-layout .plan-panel{padding:22px;top:24px}
+.compact-layout .empty-plan{padding:26px 0;text-align:left}
+.compact-layout .empty-plan p{font-size:13px;line-height:1.7}
+.compact-layout #simulate-button{width:100%;font-size:13px}
+.compact-disclosure{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin:12px 0;min-width:0}
+.compact-disclosure>summary{cursor:pointer;padding:17px 20px;min-height:56px;display:flex;align-items:center;gap:12px;list-style:none;font-size:14px;font-weight:550}
+.compact-disclosure>summary::-webkit-details-marker{display:none}
+.compact-disclosure>summary::after{content:'+';margin-left:auto;font-size:19px;font-weight:400;line-height:1}
+.compact-disclosure[open]>summary::after{content:'−'}
+.compact-disclosure[open]>summary{border-bottom:1px solid var(--line)}
+.compact-hint{font-size:11px;color:var(--muted);font-weight:400}
+.compact-content{padding:20px;min-width:0}
+.compact-layout .map-section,.compact-layout .city-section{margin:12px 0}
+.compact-layout .map-section>.compact-content{padding:15px}
+.compact-layout .method-section{margin:0;border:0;border-radius:0;background:transparent}
+.compact-layout #comparison-panel{margin:0}
+.compact-layout .results-section{margin:28px 0}
+.compact-layout .explanation-details{margin-top:16px}
+.compact-layout .ai-columns{padding-top:15px}
+@media(max-width:850px){.compact-layout .workspace{grid-template-columns:1fr}.compact-layout .plan-panel{position:static;order:0;max-height:none}.compact-brand span{display:none}.compact-layout .hero .button{white-space:normal}}
+@media(max-width:560px){.compact-header{padding:17px 18px 12px;display:block}.compact-brand span{display:inline;font-size:11px}.compact-header nav{margin-top:11px;justify-content:space-between;gap:4px}.compact-link{font-size:12px;padding:7px 9px}.compact-layout .page-content{padding:22px 16px 0}.compact-layout .hero-actions{padding-top:16px}.compact-layout .catalog-grid{grid-template-columns:1fr}.compact-layout .section-heading{flex-wrap:wrap;gap:7px}.compact-layout .quiet-tag{max-width:none;text-align:left}.compact-layout .selected-list:has(.selected-item){display:block}.compact-layout .plan-panel{padding:20px}.compact-layout .plan-summary{grid-template-columns:1fr;gap:11px}.compact-layout .plan-summary>div{display:flex}.compact-layout .filter{min-height:40px}.compact-disclosure>summary{padding:16px;font-size:13px;gap:7px}.compact-hint{display:none}.compact-content{padding:13px}.compact-layout .map-section>.compact-content{padding:9px}.compact-layout .formula{flex-wrap:wrap}.compact-layout footer{flex-wrap:wrap;padding-bottom:26px}.compact-layout .table-scroll{max-width:100%}}
+@media print{.compact-header{display:none}}
