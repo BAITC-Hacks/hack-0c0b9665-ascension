@@ -28,7 +28,7 @@ const fallbackExplanation = {
 };
 
 async function startServer(t, options = {}) {
-  const server = createAppServer({ aiConfigured: () => false, explain: async () => fallbackExplanation, ...options });
+  const server = createAppServer({ env: {}, aiConfigured: () => false, explain: async () => fallbackExplanation, ...options });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(async () => {
@@ -346,4 +346,52 @@ test('HTTP static assets serve correct MIME types; secrets and traversal remain 
   }
   const malformed = await request(port, '/%ZZ');
   assert.equal(malformed.status, 400);
+});
+
+test('HTTP accepts the trusted public HTTPS origin behind a TLS proxy', async (t) => {
+  for (const options of [
+    { publicOrigin: 'https://ascension.onrender.com/' },
+    { env: { PUBLIC_ORIGIN: 'https://ascension.onrender.com' } },
+    { env: { RENDER_EXTERNAL_URL: 'https://ascension.onrender.com' } },
+  ]) {
+    const port = await startServer(t, options);
+    const proxyRequest = origin => request(port, '/api/simulate', {
+      method: 'POST', body: JSON.stringify(officialScenario), headers: {
+        Host: 'ascension.onrender.com', Origin: origin, 'Sec-Fetch-Site': 'same-origin',
+        'X-Forwarded-Proto': 'https', 'Content-Type': 'application/json',
+      },
+    });
+    const accepted = await proxyRequest('https://ascension.onrender.com');
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.json().totalCost, 95);
+    assert.equal((await proxyRequest('http://ascension.onrender.com')).status, 403);
+    assert.equal((await proxyRequest('https://attacker.example')).status, 403);
+  }
+});
+
+test('HTTP ignores forged forwarding headers and explicit origin overrides platform defaults', async (t) => {
+  const direct = await startServer(t);
+  const forged = await request(direct, '/api/simulate', { method: 'POST',
+    body: JSON.stringify(officialScenario), headers: {
+      'Content-Type': 'application/json', Origin: 'https://attacker.example',
+      'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'attacker.example',
+      Forwarded: 'host=attacker.example;proto=https', 'Sec-Fetch-Site': 'same-origin',
+    } });
+  assert.equal(forged.status, 403);
+  const configured = await startServer(t, { publicOrigin: 'https://city.example',
+    env: { PUBLIC_ORIGIN: 'https://environment.example', RENDER_EXTERNAL_URL: 'https://platform.onrender.com' } });
+  for (const [origin, expected] of [
+    ['https://city.example', 200], ['https://environment.example', 403], ['https://platform.onrender.com', 403],
+  ]) {
+    const response = await request(configured, '/api/simulate', { method: 'POST',
+      body: JSON.stringify(officialScenario), headers: { 'Content-Type': 'application/json', Origin: origin } });
+    assert.equal(response.status, expected);
+  }
+});
+
+test('HTTP refuses invalid public-origin configuration before serving requests', () => {
+  for (const publicOrigin of ['null', '*', 'file:///tmp', 'https://user:password@city.example',
+    'https://city.example/api', 'https://city.example/?token=private', 'https://city.example/#fragment']) {
+    assert.throws(() => createAppServer({ env: {}, publicOrigin }), /PUBLIC_ORIGIN/);
+  }
 });
