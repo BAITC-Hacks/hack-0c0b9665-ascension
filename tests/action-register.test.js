@@ -127,7 +127,7 @@ test('only an explicit action after a valid current calculation creates five man
   ui.button().click();
   assert.equal(ui.cards().length, 5);
   const saved = ui.saved();
-  assert.equal(saved.schemaVersion, 1);
+  assert.equal(saved.schemaVersion, 2);
   assert.equal(saved.registers.length, 1);
   const [register] = saved.registers;
   assert.deepEqual(register.source.scenario, scenario);
@@ -473,7 +473,7 @@ test('CSV keeps multiline manual text and quotes intact while neutralizing sprea
   }
   row.push(value); rows.push(row);
   assert.equal(rows.length, 6);
-  assert.ok(rows.every((item) => item.length === 11));
+  assert.ok(rows.every((item) => item.length === 25));
   assert.equal(rows[1][5], '\'=HYPERLINK("https://example.invalid","test")');
   assert.equal(rows[1][7], 'Первый пункт, с запятой\nВторой "пункт"');
   assert.equal(rows[1][9], "'@formula");

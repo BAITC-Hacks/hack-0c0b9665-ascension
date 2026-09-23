@@ -1,6 +1,7 @@
 // A browser-local manual register. No network, AI, or official workflow is invoked.
 export const ACTION_REGISTER_STORAGE_KEY = 'akim-action-register-v1';
 export const ACTION_REGISTER_LIMIT = 10;
+export const ACTION_REGISTER_SCHEMA_VERSION = 2;
 const MAX_STORAGE_CHARS = 500_000;
 const STATUS = { draft: 'Черновик', in_progress: 'В работе', completed: 'Выполнено', deferred: 'Отложено' };
 const FIELD_LIMITS = { owner: 160, dueDate: 10, criterion: 2000, evidence: 2000 };
@@ -9,6 +10,63 @@ const text = (value, max = 200) => typeof value === 'string' && value.length <= 
 const identifier = (value) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+const IMPLEMENTATION_FIELDS = [
+  ['siteAddress', 'site-address', 'Площадка / адрес', 'text', 400],
+  ['siteBasis', 'site-basis', 'Основание выбора площадки', 'textarea', 2000],
+  ['siteSourceUrl', 'site-source', 'Ссылка на источник площадки', 'url', 1000],
+  ['kpi.name', 'kpi-name', 'Физический KPI: название', 'text', 200],
+  ['kpi.unit', 'kpi-unit', 'Единица измерения KPI', 'text', 80],
+  ['kpi.baseline', 'kpi-baseline', 'Исходное значение KPI', 'number'],
+  ['kpi.target', 'kpi-target', 'Целевое значение KPI', 'number'],
+  ['kpi.source', 'kpi-source', 'Источник значений KPI', 'textarea', 1000],
+  ['budget.capexKzt', 'capex', 'CAPEX, тенге (разовые затраты)', 'money'],
+  ['budget.opexKzt', 'opex', 'OPEX, тенге (эксплуатация)', 'money'],
+  ['budget.estimateSource', 'estimate-source', 'Источник сметы и период OPEX', 'textarea', 1000],
+  ['budget.estimateDate', 'estimate-date', 'Дата сметы', 'date', 10],
+  ['prerequisites', 'prerequisites', 'Инфраструктурные предпосылки', 'textarea', 2000],
+  ['nextStep', 'next-step', 'Следующий шаг', 'textarea', 1000],
+];
+const getPath = (value, path) => path.split('.').reduce((item, key) => item?.[key], value);
+function setPath(value, path, content) {
+  const keys = path.split('.');
+  const last = keys.pop();
+  keys.reduce((item, key) => item[key], value)[last] = content;
+}
+export function emptyImplementation() {
+  return { siteAddress: '', siteBasis: '', siteSourceUrl: '',
+    kpi: { name: '', unit: '', baseline: null, target: null, source: '' },
+    budget: { capexKzt: null, opexKzt: null, estimateSource: '', estimateDate: '' },
+    prerequisites: '', nextStep: '' };
+}
+function validSourceUrl(value) {
+  if (value === '') return true;
+  try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
+}
+function validImplementationField(value, type, max) {
+  if (type === 'number' || type === 'money') return value === null
+    || (finite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER && (type !== 'money' || value >= 0));
+  return text(value, max) && (type !== 'date' || value === '' || validDate(value))
+    && (type !== 'url' || validSourceUrl(value));
+}
+function validImplementation(value) {
+  return record(value) && record(value.kpi) && record(value.budget)
+    && IMPLEMENTATION_FIELDS.every(([path, , , type, max]) => validImplementationField(getPath(value, path), type, max));
+}
+export function implementationGaps(action) {
+  const implementation = action.implementation ?? emptyImplementation();
+  const missing = [];
+  if (!action.owner.trim()) missing.push('Ответственный');
+  if (!validDate(action.dueDate)) missing.push('Срок');
+  if (!action.criterion.trim()) missing.push('Критерий проверки');
+  for (const [path, , label] of IMPLEMENTATION_FIELDS) {
+    if (path === 'siteSourceUrl') continue;
+    if (path === 'siteBasis' && implementation.siteSourceUrl.trim()) continue;
+    const value = getPath(implementation, path);
+    if (value === null || (typeof value === 'string' && !value.trim())) missing.push(label);
+  }
+  return missing;
+}
 
 export function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -89,7 +147,7 @@ function parseStore(raw) {
   if (raw === null) return [];
   if (raw.length > MAX_STORAGE_CHARS) throw new Error('corrupted');
   const data = JSON.parse(raw);
-  if (!record(data) || data.schemaVersion !== 1 || !Array.isArray(data.registers)
+  if (!record(data) || ![1, ACTION_REGISTER_SCHEMA_VERSION].includes(data.schemaVersion) || !Array.isArray(data.registers)
     || data.registers.length > ACTION_REGISTER_LIMIT) throw new Error('corrupted');
   const ids = new Set();
   const keys = new Set();
@@ -113,6 +171,8 @@ function parseStore(raw) {
         || !Object.entries(FIELD_LIMITS).every(([key, max]) => text(action[key], max))
         || (action.dueDate !== '' && !validDate(action.dueDate)) || statusError(action)) throw new Error('corrupted');
       actionIds.add(action.id);
+      if (data.schemaVersion === 1) action.implementation = emptyImplementation();
+      else if (!validImplementation(action.implementation)) throw new Error('corrupted');
     });
     ids.add(entry.id);
     keys.add(entry.sourceKey);
@@ -128,11 +188,11 @@ function csvCell(value) {
 }
 
 export function registerCsv(registers) {
-  const rows = [['Реестр', 'Создан', 'Город', 'Мера', 'Район', 'Ответственный', 'Срок', 'Критерий проверки', 'Статус', 'Подтверждение', 'Исходный сценарий']];
+  const rows = [['Реестр', 'Создан', 'Город', 'Мера', 'Район', 'Ответственный', 'Срок', 'Критерий проверки', 'Статус', 'Подтверждение', 'Исходный сценарий', ...IMPLEMENTATION_FIELDS.map(([, , label]) => label)]];
   for (const entry of registers) for (const action of entry.actions) {
     rows.push([entry.id, entry.createdAt, entry.source.city.name, action.measureName, action.districtName,
       action.owner, action.dueDate, action.criterion, STATUS[action.status], action.evidence,
-      JSON.stringify(entry.source.scenario)]);
+      JSON.stringify(entry.source.scenario), ...IMPLEMENTATION_FIELDS.map(([path]) => getPath(action.implementation, path))]);
   }
   return '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
@@ -176,7 +236,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
   const controls = node('div', 'action-register-controls');
   const create = button('action-register-create', 'Создать черновик поручений', generate);
   const exportJson = button('action-register-export-json', 'Экспорт JSON', () => download(JSON.stringify({
-    schemaVersion: 1, exportedAt: new Date().toISOString(), notice: notice.textContent, registers,
+    schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, exportedAt: new Date().toISOString(), notice: notice.textContent, registers,
   }, null, 2), 'json', 'application/json'));
   const exportCsv = button('action-register-export-csv', 'Экспорт CSV', () => download(registerCsv(registers), 'csv', 'text/csv;charset=utf-8'));
   const hint = node('p', 'action-register-hint');
@@ -218,7 +278,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
         blocked = 'conflict';
         storageState = 'Реестр изменился в другой вкладке. Ваши правки только в памяти: экспортируйте JSON перед перезагрузкой. Чужие изменения не перезаписаны.';
       } else {
-        const raw = JSON.stringify({ schemaVersion: 1, registers });
+        const raw = JSON.stringify({ schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, registers });
         if (raw.length > MAX_STORAGE_CHARS) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
         storage.setItem(ACTION_REGISTER_STORAGE_KEY, raw);
         persistedRaw = raw;
@@ -248,7 +308,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
     const key = sourceKey(source.city, source.scenario.decisions);
     if (registers.some((entry) => entry.sourceKey === key) || registers.length >= ACTION_REGISTER_LIMIT) return;
     const entry = { id: id(), sourceKey: key, createdAt: new Date().toISOString(), source,
-      actions: source.labels.map((label) => ({ id: id(), ...label, owner: '', dueDate: '', criterion: '', status: 'draft', evidence: '' })) };
+      actions: source.labels.map((label) => ({ id: id(), ...label, owner: '', dueDate: '', criterion: '', status: 'draft', evidence: '', implementation: emptyImplementation() })) };
     registers.push(entry);
     appendRegister(entry);
     persist();
@@ -315,6 +375,14 @@ export function mountActionRegister(container, { dataset = null, city = null } =
     const overdue = node('p', 'action-register-overdue');
     const validation = node('p', 'action-register-validation');
     validation.setAttribute('role', 'status');
+    const readiness = node('p', 'action-register-readiness');
+    const passportSummary = node('summary', 'action-register-implementation-toggle');
+    const updateReadiness = () => {
+      const missing = implementationGaps(action);
+      passportSummary.textContent = `Паспорт реализации · ${missing.length ? `нужно уточнить: ${missing.length}` : 'ручные поля заполнены'}`;
+      readiness.textContent = missing.length ? `Нужно уточнить перед реализацией: ${missing.join('; ')}.`
+        : 'Ручные поля заполнены. Источники, смета и реализуемость требуют проверки человеком; это не согласование и не подтверждение выполнения.';
+    };
     const updateOverdue = () => {
       overdue.textContent = isOverdue(action) ? `Просрочено: срок ${action.dueDate}` : '';
       preview.textContent = `${action.districtName} · ${STATUS[action.status]} · Ответственный: ${action.owner || 'нужно уточнить'} · Срок: ${action.dueDate || 'нужно уточнить'}${isOverdue(action) ? ' · Просрочено' : ''}`;
@@ -344,6 +412,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
         validation.textContent = '';
         persist();
         updateOverdue();
+        updateReadiness();
         refresh();
       };
       control.addEventListener('input', edit);
@@ -371,12 +440,54 @@ export function mountActionRegister(container, { dataset = null, city = null } =
       refresh();
     });
     statusLabel.append(node('span', '', 'Статус — задаётся вручную'), select);
+    const passport = node('details', 'action-register-implementation');
+    passport.append(passportSummary, node('p', 'action-register-help', 'Площадка: если неизвестна, оставьте поле пустым — она не определена. KPI указывается в физических единицах. CAPEX/OPEX — ручная реальная оценка в тенге, не стоимость модели в условных единицах. Пустое число означает «не определено», ноль — явно введённое значение.'));
+    for (const [path, className, labelText, type, max] of IMPLEMENTATION_FIELDS) {
+      const label = node('label', 'action-register-field');
+      const control = node(type === 'textarea' ? 'textarea' : 'input', `action-register-${className}`);
+      if (type !== 'textarea') control.type = type === 'money' ? 'number' : type;
+      control.value = String(getPath(action.implementation, path) ?? '');
+      control.placeholder = path === 'siteAddress' ? 'Не определена' : 'Нужно уточнить';
+      if (max) control.maxLength = max;
+      if (type === 'number' || type === 'money') {
+        control.step = 'any'; control.max = String(Number.MAX_SAFE_INTEGER);
+        control.min = type === 'money' ? '0' : String(-Number.MAX_SAFE_INTEGER);
+      }
+      if (type === 'date') { control.min = '0001-01-01'; control.max = '9999-12-31'; }
+      if (type === 'textarea') control.rows = 2;
+      control.setAttribute('aria-label', `${labelText}: ${action.measureName}, ${action.districtName}`);
+      const edit = (event) => {
+        if (disposed) return;
+        const value = type === 'number' || type === 'money'
+          ? control.value.trim() === '' ? null : Number(control.value) : control.value;
+        if (control.validity?.badInput || !validImplementationField(value, type, max)) {
+          // Preserve intermediate typing (e.g. "https:") until the user leaves the field.
+          if (event.type === 'change') control.value = String(getPath(action.implementation, path) ?? '');
+          validation.textContent = `${labelText}: ${type === 'url' ? 'нужна ссылка http:// или https://.'
+            : type === 'date' ? 'нужна существующая дата ГГГГ-ММ-ДД.'
+              : type === 'money' ? 'укажите неотрицательное конечное число или оставьте пустым.'
+                : type === 'number' ? 'укажите конечное число или оставьте пустым.' : 'слишком длинное значение.'}`;
+          return;
+        }
+        setPath(action.implementation, path, value);
+        validation.textContent = '';
+        updateReadiness();
+        persist();
+        refresh();
+      };
+      control.addEventListener('input', edit);
+      control.addEventListener('change', edit);
+      label.append(node('span', '', labelText), control);
+      passport.append(label);
+    }
+    passport.append(readiness, node('p', 'action-register-help', 'Паспорт можно сохранить незаполненным. «В работе» может означать сбор недостающих данных и не подтверждает готовность к реализации.'));
     toggle.append(title, preview);
     details.append(toggle, district, field('owner', 'Ответственный'), field('dueDate', 'Срок', 'date'),
       field('criterion', 'Критерий проверки', 'textarea'), statusLabel,
-      field('evidence', 'Подтверждение результата', 'textarea'), validation, overdue);
+      field('evidence', 'Подтверждение результата', 'textarea'), passport, validation, overdue);
     card.append(details);
     updateOverdue();
+    updateReadiness();
     return card;
   }
   listen('scenario:calculated', (event) => {
