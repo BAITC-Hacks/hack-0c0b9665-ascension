@@ -29,12 +29,23 @@ export function createPolicyOptionsFetcher({
     if (typeof body !== 'string') {
       throw clientError('INVALID_JSON', 'Передайте сценарий как строку JSON.');
     }
-    let scenario;
+    let payload;
     try {
-      scenario = JSON.parse(body);
+      payload = JSON.parse(body);
     } catch (cause) {
       throw clientError('INVALID_JSON', 'Не удалось прочитать сценарий: некорректный JSON.', cause);
     }
+    // Legacy bodies are scenarios. The panel uses an envelope only for constraints.
+    const isEnvelope = payload !== null && typeof payload === 'object' && !Array.isArray(payload) &&
+      (Object.hasOwn(payload, 'scenario') || Object.hasOwn(payload, 'constraints'));
+    if (isEnvelope && (!Object.hasOwn(payload, 'scenario') ||
+      Object.keys(payload).some(key => key !== 'scenario' && key !== 'constraints'))) {
+      throw clientError('INVALID_REQUEST', 'Ожидается сценарий или объект с полями scenario и constraints.');
+    }
+    const scenario = isEnvelope ? payload.scenario : payload;
+    // Preserve invalid values and unknown constraint fields for the core validator.
+    const constraintFields = isEnvelope && Object.hasOwn(payload, 'constraints')
+      ? { constraints: payload.constraints } : {};
     if (typeof WorkerClass !== 'function') {
       throw clientError('WORKER_UNAVAILABLE', 'В этом браузере недоступны фоновые расчёты. Откройте приложение в браузере с поддержкой Web Worker.');
     }
@@ -134,7 +145,7 @@ export function createPolicyOptionsFetcher({
         timer = setTimeout(() => {
           finish(clientError('WORKER_TIMEOUT', 'Расчёт рекомендаций занял слишком много времени. Повторите попытку.'));
         }, timeoutMs);
-        worker.postMessage({ requestId, scenario, limit: 6 });
+        worker.postMessage({ requestId, scenario, limit: 6, ...constraintFields });
       } catch (cause) {
         finish(clientError('WORKER_START_FAILED', 'Не удалось запустить фоновый расчёт рекомендаций. Повторите попытку.', cause));
       }
