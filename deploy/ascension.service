@@ -1,0 +1,24 @@
+[Unit]
+Description=Ascension web application
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ascension
+Group=ascension
+WorkingDirectory=/opt/ascension
+EnvironmentFile=/etc/ascension.env
+ExecStart=/usr/bin/node /opt/ascension/src/server.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=ascension
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

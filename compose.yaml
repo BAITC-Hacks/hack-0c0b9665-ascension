@@ -1,0 +1,42 @@
+services:
+  app:
+    build: .
+    image: ascension-local:latest
+    init: true
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      COMPLAINTS_FILE: /app/var/complaints.json
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in .env.local and use --env-file .env.local}
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - complaints:/app/var
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(3000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    stop_grace_period: 30s
+  bot:
+    image: ascension-local:latest
+    profiles: [telegram]
+    init: true
+    restart: unless-stopped
+    env_file: .env.local
+    environment:
+      BOT_SERVER_URL: http://127.0.0.1:3000
+    # The forwarder permits loopback HTTP; it does not accept http://app:3000.
+    network_mode: service:app
+    depends_on:
+      app:
+        condition: service_healthy
+        restart: true
+    command: [node, src/telegram-poll.js]
+    stop_grace_period: 45s
+
+volumes:
+  complaints:

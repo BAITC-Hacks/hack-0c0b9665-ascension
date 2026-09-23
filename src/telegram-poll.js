@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createTelegramTransport } from './complaints/telegram.js';
+import { createTelegramWebhookClient } from './telegram-webhook.js';
 
 export function createTelegramForwarder({ serverUrl = 'http://127.0.0.1:3000', webhookSecret, fetchImpl = globalThis.fetch }) {
   if (typeof webhookSecret !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/u.test(webhookSecret)) throw new Error('Задайте корректный TELEGRAM_WEBHOOK_SECRET.');
@@ -67,6 +68,13 @@ async function main() {
     const transport = createTelegramTransport({ token });
     const serverUrl = process.env.BOT_SERVER_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`;
     const forwardUpdate = createTelegramForwarder({ serverUrl, webhookSecret });
+    try {
+      await createTelegramWebhookClient({ token }).assertPollingAvailable();
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+      return;
+    }
     console.log('Telegram polling запущен: обновления передаются основному серверу. Используйте один процесс polling; исходящий webhook Telegram должен быть отключён.');
     await runTelegramPolling({ transport, forwardUpdate, signal: controller.signal, onError: () => console.error('Не удалось обработать обновление Telegram; повтор через 3 секунды.') });
   } finally {

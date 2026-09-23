@@ -75,13 +75,23 @@ export function formatTelegramStatusNotification(complaint) {
   return lines.join('\n');
 }
 
-export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '', supportUrl = '' }) {
+export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '', supportUrl = '', initialState, saveState }) {
   if (!store?.create || !store?.get || !store?.track) throw new TypeError('Нужно хранилище обращений.');
-  const drafts = new Map();
-  const updates = new Map();
+  const drafts = new Map(initialState?.drafts ?? []);
+  const updates = new Map(initialState?.updates ?? []);
   const chatQueues = new Map();
-  const screens = new Map();
+  const screens = new Map(initialState?.screens ?? []);
   const support = supportLink(supportUrl);
+
+  async function checkpoint() {
+    if (!saveState) return;
+    // Durable hosts instantiate one processor per private chat and persist only
+    // serializable replies, never in-flight promises or transport credentials.
+    const state = { drafts: [...drafts], screens: [...screens], updates: [...updates]
+      .filter(([, entry]) => entry.prepared)
+      .slice(-8).map(([id, entry]) => [id, { prepared: entry.prepared, complete: entry.complete === true }]) };
+    await saveState(structuredClone(state));
+  }
 
   function activeDraft(chatId) {
     const draft = drafts.get(chatId);
@@ -222,7 +232,12 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
       // recovers the original receipt if Telegram retries /send after a restart.
       let receipt;
       try {
-        receipt = await store.create({
+        receipt = await store.getTelegramReceipt?.(update.update_id, chatId);
+        if (!receipt && active) {
+          active.submittingUpdateId = update.update_id;
+          await checkpoint();
+        }
+        receipt ??= await store.create({
           text: active?.consent ? active.text : '',
           address: active?.address ?? '', location: active?.location,
           attachments: active?.attachments ?? [], consent: active?.consent ?? false,
@@ -238,8 +253,10 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
         throw error;
       }
       if (String(receipt.complaint.telegramChatId) !== chatId) return reply('Не удалось подтвердить это обращение. Начните новое: /start.');
-      if (!receipt.duplicateUpdate) drafts.delete(chatId);
-      if (!receipt.duplicateUpdate) screen.mode = 'menu';
+      if (!receipt.duplicateUpdate || active?.submittingUpdateId === update.update_id) {
+        drafts.delete(chatId);
+        screen.mode = 'menu';
+      }
       return reply(receiptReply(receipt), { submitted: true, complaintId: receipt.complaint.id, duplicateUpdate: !!receipt.duplicateUpdate });
     }
     if (command === 'review') {
@@ -318,8 +335,10 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     const previous = chatQueues.get(chatId) ?? Promise.resolve();
     const pending = previous.catch(() => {}).then(async () => {
       entry.prepared ??= await prepare(update, chatId);
+      await checkpoint();
       if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text, { replyMarkup: entry.prepared.markup });
       entry.complete = true;
+      await checkpoint();
       return entry.prepared.result;
     });
     entry.pending = pending;

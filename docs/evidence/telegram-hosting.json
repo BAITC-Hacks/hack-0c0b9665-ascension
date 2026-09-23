@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-23",
+  "baseRevision": "f3885a6",
+  "branch": "feat/h12-telegram-hosting",
+  "node": "v24.19.0",
+  "wrangler": "4.136.3",
+  "checks": {
+    "nodeTests": { "passed": 219, "failed": 0, "command": "node --test tests/*.test.js" },
+    "cleanSelfHost": { "passed": true, "command": "npm run test:self-host", "externalRequests": false,
+      "checks": ["three pages without credentials or npm install", "cost 95 and Score 56.54307", "explicit offline explanation", "web complaint and private receipt", "staff auth and resolution", "same receipt and resolution after real Node process restart"] },
+    "workerdLocal": { "passed": true, "checks": ["bundle dry-run with nodejs_compat", "actual SQLite Durable Object intake and admin auth", "receipt and resolution after stopping and restarting Wrangler", "Telegram draft before restart and submission after restart", "replayed send creates exactly one complaint"], "telegramTransport": "synthetic; no external messages", "data": "synthetic in ignored .wrangler directory" },
+    "restartRegressions": ["failed session checkpoint after committed complaint", "old update beyond recent session cache", "prepared reply retry after transport failure", "new draft preserved during old send recovery"],
+    "platformTemplates": { "docker": "not run: no Docker daemon", "systemd": "not run: Windows host", "caddy": "not run" }
+  },
+  "liveTelegram": "Webhook activation and real chat delivery verified separately after deployment. Automated checks do not establish live delivery.",
+  "secrets": "No credentials or real citizen records included."
+}

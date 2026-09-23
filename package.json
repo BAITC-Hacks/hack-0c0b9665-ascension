@@ -7,6 +7,9 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env.local src/server.js",
     "bot": "node --env-file-if-exists=.env.local src/telegram-poll.js",
+    "bot:setup": "node --env-file-if-exists=.env.local src/telegram-setup.js",
+    "bot:webhook": "node --env-file-if-exists=.env.local src/telegram-webhook.js",
+    "test:self-host": "node scripts/self-host-smoke.js",
     "test": "node --test tests/*.test.js"
   }
 }
