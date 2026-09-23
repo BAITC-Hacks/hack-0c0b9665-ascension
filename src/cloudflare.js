@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { AIBudgetState } from './ai-budget.js';
-import { createDurableComplaintStore } from './complaints/durable-store.js';
+import { createDurableComplaintStore, runWithComplaintStorageLock } from './complaints/durable-store.js';
+import { createComplaintMigrationHandler, createComplaintMigrationService } from './complaints/migration.js';
 import { createComplaintFetchHandler } from './complaints/worker-routes.js';
 import { cleanupTelegramUpdates } from './complaints/telegram.js';
 
@@ -22,6 +23,12 @@ export class Complaints extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.storage = ctx.storage;
+    this.migrate = createComplaintMigrationHandler({
+      migrate: createComplaintMigrationService({ storage: ctx.storage,
+        runExclusive: operation => runWithComplaintStorageLock(ctx.storage, operation) }),
+      adminToken: env.ADMIN_TOKEN ?? '',
+      migrationToken: env.COMPLAINTS_MIGRATION_TOKEN ?? '',
+    });
     this.handle = createComplaintFetchHandler({
       store: createDurableComplaintStore({ storage: ctx.storage }),
       sessionStorage: ctx.storage,
@@ -34,10 +41,10 @@ export class Complaints extends DurableObject {
     });
   }
 
-  fetch(request) {
+  async fetch(request) {
     // Body reads must not block unrelated requests. The store serializes its
     // mutations and the Telegram processor serializes each chat's session.
-    return this.handle(request);
+    return (await this.migrate(request)) ?? this.handle(request);
   }
 
   alarm() {
