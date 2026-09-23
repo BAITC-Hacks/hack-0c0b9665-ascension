@@ -156,6 +156,99 @@ test('HTTP real explanation module falls back without a key and after provider f
   }
 });
 
+test('HTTP public AI limits preserve calculated fallback, expire the rolling window, and cap process requests', async (t) => {
+  let calls = 0;
+  let time = 100_000;
+  const port = await startServer(t, { aiConfigured: () => true, now: () => time,
+    aiLimits: { maxRequests: 2, requestsPerMinute: 1, maxConcurrent: 1 },
+    explain: async () => { calls++; return { ...fallbackExplanation, mode: 'ai', available: true }; } });
+  // Invalid scenarios consume no allowance and never reach the provider.
+  assert.equal((await post(port, '/api/explain', overBudgetScenario)).status, 422);
+  assert.equal((await post(port, '/api/explain', officialScenario)).json().mode, 'ai');
+  const limited = await post(port, '/api/explain', officialScenario);
+  assert.equal(limited.status, 200);
+  assert.equal(limited.headers['retry-after'], '60');
+  assert.equal(limited.json().mode, 'deterministic');
+  assert.equal(limited.json().available, false);
+  assert.equal(limited.json().reason, 'server_rate_limited');
+  assert.match(limited.json().summary, /56\.54/);
+  assert.equal(calls, 1);
+  time += 60_000;
+  assert.equal((await post(port, '/api/explain', officialScenario)).json().mode, 'ai');
+  time += 60_000;
+  const capped = await post(port, '/api/explain', officialScenario);
+  assert.equal(capped.status, 200);
+  assert.equal(capped.json().reason, 'server_request_limit');
+  assert.equal(capped.headers['retry-after'], undefined);
+  assert.equal(calls, 2);
+  const simulation = await post(port, '/api/simulate', officialScenario);
+  assert.equal(simulation.status, 200);
+  assert.equal(simulation.json().totalCost, 95);
+});
+
+test('HTTP public AI concurrency releases its slot after success and provider exceptions', async (t) => {
+  let release;
+  let entered;
+  let calls = 0;
+  const started = new Promise(resolve => { entered = resolve; });
+  const held = new Promise(resolve => { release = resolve; });
+  const port = await startServer(t, { aiConfigured: () => true,
+    aiLimits: { maxRequests: 10, requestsPerMinute: 10, maxConcurrent: 1 },
+    explain: async () => {
+      calls++;
+      if (calls === 1) { entered(); await held; }
+      if (calls === 2) throw new Error('private-provider-failure');
+      return fallbackExplanation;
+    } });
+  const first = post(port, '/api/explain', officialScenario);
+  await started;
+  try {
+    const busy = await post(port, '/api/explain', officialScenario);
+    assert.equal(busy.status, 200);
+    assert.equal(busy.json().reason, 'server_busy');
+    assert.equal(busy.headers['retry-after'], '5');
+    assert.equal(calls, 1);
+  } finally {
+    release();
+  }
+  assert.equal((await first).status, 200);
+  const failed = await post(port, '/api/explain', officialScenario);
+  assert.equal(failed.status, 500);
+  assert.doesNotMatch(failed.text, /private-provider-failure/);
+  assert.equal((await post(port, '/api/explain', officialScenario)).status, 200);
+  assert.equal(calls, 3);
+});
+
+test('HTTP zero AI allowance disables provider dispatch without breaking deterministic explanations', async (t) => {
+  let calls = 0;
+  const port = await startServer(t, { aiConfigured: () => true, aiLimits: { maxRequests: 0 },
+    explain: async () => { calls++; return fallbackExplanation; } });
+  const response = await post(port, '/api/explain', officialScenario);
+  assert.equal(response.status, 200);
+  assert.equal(response.json().reason, 'server_request_limit');
+  assert.equal(response.json().mode, 'deterministic');
+  assert.equal(calls, 0);
+});
+
+test('HTTP security headers allow local map assets and only the selected map services', async (t) => {
+  const port = await startServer(t);
+  for (const path of ['/', '/api/health', '/api/missing']) {
+    const response = await request(port, path);
+    assert.equal(response.headers['x-frame-options'], 'DENY');
+    assert.equal(response.headers['referrer-policy'], 'no-referrer');
+    assert.equal(response.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
+    const directives = new Map(response.headers['content-security-policy'].split('; ').map(value => {
+      const [name, ...sources] = value.split(' ');
+      return [name, sources];
+    }));
+    assert.deepEqual(directives.get('script-src'), ["'self'"]);
+    assert.deepEqual(directives.get('worker-src'), ["'self'", 'blob:']);
+    assert.deepEqual(directives.get('connect-src'), ["'self'", 'https://tiles.openfreemap.org', 'https://photon.komoot.io']);
+    assert.deepEqual(directives.get('frame-ancestors'), ["'none'"]);
+    assert.deepEqual(directives.get('object-src'), ["'none'"]);
+  }
+});
+
 test('HTTP bad JSON and non-JSON content types produce safe JSON errors', async (t) => {
   const port = await startServer(t);
   const malformed = await request(port, '/api/simulate', { method: 'POST', body: '{"decisions":',
@@ -220,6 +313,7 @@ test('HTTP static assets serve correct MIME types; secrets and traversal remain 
   await Promise.all([
     writeFile(join(publicDir, 'index.html'), '<h1>Демо</h1>'),
     writeFile(join(publicDir, 'app.js'), 'console.log("demo");'),
+    writeFile(join(publicDir, 'districts.geojson'), '{"type":"FeatureCollection","features":[]}'),
     writeFile(join(publicDir, '.env.local'), 'private-token-example'),
     writeFile(join(publicDir, '.private', 'config.json'), '{"secret":"private-token-example"}'),
     writeFile(join(root, 'outside', 'secret.json'), '{"secret":"private-token-example"}'),
@@ -234,6 +328,10 @@ test('HTTP static assets serve correct MIME types; secrets and traversal remain 
   const script = await request(port, '/app.js?version=1');
   assert.equal(script.status, 200);
   assert.match(script.headers['content-type'], /^text\/javascript; charset=utf-8$/);
+  const geography = await request(port, '/districts.geojson');
+  assert.equal(geography.status, 200);
+  assert.equal(geography.headers['content-type'], 'application/geo+json; charset=utf-8');
+  assert.equal(geography.json().type, 'FeatureCollection');
   const head = await request(port, '/', { method: 'HEAD' });
   assert.equal(head.status, 200);
   assert.equal(head.text, '');

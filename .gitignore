@@ -3,5 +3,8 @@
 !.env.example
 .serena/
 node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
 coverage/
 *.log

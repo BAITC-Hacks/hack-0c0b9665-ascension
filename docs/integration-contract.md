@@ -4,6 +4,10 @@
 
 ## Владение файлами
 
+Дополнение 23.09, карта и публичный сервер: задача `01a0cdb6-6ded-7d40-8cfa-8cdf163256ad`, ветка `feat/h12-city-map`, worktree `worktrees/city-map`. Интегратор владеет `public/app.js`, `index.html`, `dashboard.css`, README и конфигурацией публикации. Карта — `map.js`, `map.css`, `places.js`, `vendor/`; HTTP/AI/Worker и постоянная квота — серверная группа этой задачи. `comparison.*` остаются зоной Алишера. Новые независимые библиотеки сценариев и альтернатив подключаются отдельной последующей интеграцией.
+
+`createCityMap({container,dataset,baseline,onDistrictSelect})` возвращает `setResult(result|null)`, `setCity('astana'|place)`, `focusDistrict(id)`, `ready`, `destroy()`. Событие `city:changed` несёт `{id,name,center,kind,hasScenarioData}`. Только модель Астаны имеет данные; все модельные панели имеют `.model-only` и скрываются для другой территории. События сценариев ниже сохранены.
+
 - Азамат / задача `01a0cd90-bb11-7f60-91e0-75595f57fe61`: интеграция, `package.json`, `.gitignore`, README, `src/ai/`, общие контракты. Git-операции выполняет интегратор.
 - Серверный субагент: `src/server.js`, `tests/server.test.js`.
 - UI-субагент интегратора: `public/index.html`, `public/app.js`, `public/styles.css`.

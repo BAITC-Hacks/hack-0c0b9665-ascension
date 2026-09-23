@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ascension-city-map
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm test
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+# Add OPENAI_API_KEY privately in the service Environment settings, if required.
+# Keep PORT unset: Render supplies the listening port.
