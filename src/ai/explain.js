@@ -125,7 +125,8 @@ export async function explainScenario(scenario, result, options = {}) {
     const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
       method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(options.timeoutMs ?? 25000),
-      body: JSON.stringify({ model, store: false, max_output_tokens: 1800,
+      body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
+        ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
         input: [
           { role: 'developer', content: 'Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. Объясни сильные стороны, риски, компромиссы и последствия. Не рассчитывай новые числа, не меняй бюджет, Score или формулу. Используй только готовые числа из JSON, округляя при показе до двух знаков. Не утверждай, что условные эффекты гарантированы в реальном городе. Объясни приоритет самого слабого района и штрафы строго ниже 40. Рекомендацию bestSingleReplacement, если она есть, назови проверенной заменой одного решения, никогда глобальным оптимумом. Не предлагай шестое решение или несовместимые меры. По 2–4 коротких пункта в каждом списке.' },
           { role: 'user', content: JSON.stringify(facts) },
