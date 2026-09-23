@@ -378,6 +378,7 @@ export function mountCityExplorer({ host, map, city, reducedMotion = false }) {
       el('.city-explorer-list').hidden = true;
       el('[data-action="objects"]').setAttribute('aria-expanded', 'false');
       clearSelection(); paintTraffic();
+      schedule();
       el('.city-explorer-city').textContent = nextCity.name;
       setStatus();
     },
