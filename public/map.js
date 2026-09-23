@@ -225,12 +225,12 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     updateSectors();
   }
 
-  function inspectDistrict() {
+  function inspectDistrict({ reveal = true } = {}) {
     const district = currentDistricts().find((item) => item.id === state.districtId);
     if (!district || !state.city.hasScenarioData) return;
     const values = district[state.phase];
     const weakest = dataset.indicators.reduce((min, item) => values[item.id] < values[min.id] ? item : min, dataset.indicators[0]);
-    explorer?.inspectDistrict({ name: district.name, metric: metricName(), value: districtValue(district), phase: state.phase === 'after' ? 'После решений' : 'До решений', weakest: `${weakest.name} · ${fmt(values[weakest.id])}` });
+    explorer?.inspectDistrict({ name: district.name, metric: metricName(), value: districtValue(district), phase: state.phase === 'after' ? 'После решений' : 'До решений', weakest: `${weakest.name} · ${fmt(values[weakest.id])}` }, { reveal });
   }
 
   function showTerritory() {
@@ -295,7 +295,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     state.result = result?.valid !== false && Array.isArray(result?.districts) ? result : null;
     state.phase = state.result ? 'after' : 'before';
     renderDistricts();
-    if (state.city.hasScenarioData) inspectDistrict();
+    if (state.city.hasScenarioData) inspectDistrict({ reveal: false });
   }
 
   function searchStatus(message) {
@@ -461,8 +461,8 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   for (const type of ['pointerleave', 'focusout']) el('.citymap-district-list').addEventListener(type, () => hoverDistrict(null));
   el('.citymap-sector-toggle').addEventListener('click', () => { state.sectorsVisible = !state.sectorsVisible; hoverDistrict(null); updateSectors(); });
   el('.citymap-show-all').addEventListener('click', showTerritory);
-  el('.citymap-metric').addEventListener('change', (event) => { state.metric = event.target.value; renderDistricts(); inspectDistrict(); });
-  all('[data-phase]').forEach((button) => button.addEventListener('click', () => { state.phase = button.dataset.phase; renderDistricts(); inspectDistrict(); }));
+  el('.citymap-metric').addEventListener('change', (event) => { state.metric = event.target.value; renderDistricts(); inspectDistrict({ reveal: false }); });
+  all('[data-phase]').forEach((button) => button.addEventListener('click', () => { state.phase = button.dataset.phase; renderDistricts(); inspectDistrict({ reveal: false }); }));
   all('[data-view]').forEach((button) => button.addEventListener('click', () => set3D(button.dataset.view === '3d')));
   el('.citymap-overview').addEventListener('click', showTerritory);
   el('.citymap-buildings').addEventListener('click', () => set3D(true, true));

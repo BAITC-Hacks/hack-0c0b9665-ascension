@@ -49,6 +49,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
           <button class="cc-primary cc-plan-submit" type="submit"><span aria-hidden="true">✦</span> Оценить мой план <span aria-hidden="true">↗</span></button>
         </form>
         <p class="cc-ai-status" role="status" aria-live="polite">AI предложит меры из каталога. Итог проверит расчётная модель.</p>
+        <div class="cc-recovery-actions" aria-label="Выбор плана без AI"><button type="button" data-panel="workspace">Собрать план вручную</button><button type="button" data-quick-action="demo">Открыть пример</button></div>
         <div class="cc-plan-preview" hidden></div>
         <button class="cc-primary cc-apply-plan" type="button" hidden disabled>Применить и показать <span aria-hidden="true">↗</span></button>
         <p class="cc-ai-footnote">Карта OpenStreetMap · учебные показатели.<br>Это сценарий по данным кейса, а не прогноз для Астаны.</p>
@@ -139,12 +140,22 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     button.append(element('strong', '', panel.title), element('span', '', panel.description));
     toolsPane.append(button);
   }
-  for (const [href, title, description] of [['/classic.html', 'Компактный симулятор', 'План и результаты на одной странице'], ['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Кабинет акимата', 'Работа с обращениями и поручениями']]) {
+  for (const [href, title, description] of [['/classic.html', 'Компактный симулятор', 'План и результаты на одной странице'], ['/mayor-overview.html', 'Рабочее пространство акима', 'Девять разделов: от обзора города до поручений'], ['/demo.html', 'Учебный маршрут', 'Пройдите пример решения за 90 секунд'], ['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Обращения в акимате', 'Работа с обращениями и ответственными']]) {
     const link = element('a', 'cc-tool-card'); link.href = href;
     link.append(element('strong', '', title), element('span', '', description)); toolsPane.append(link);
   }
   $('.cc-drawer-content').append(toolsPane);
   panes.set('tools', { pane: toolsPane, title: 'Все инструменты' });
+
+  const resultEmpty = element('div', 'cc-result-empty');
+  resultEmpty.append(element('h3', '', 'Сначала выберите пять решений'),
+    element('p', '', 'Соберите план в пределах 100 условных единиц и нажмите «Посмотреть результат». Здесь появятся Astana Quality of Life Score, сильные стороны, риски и последствия решений.'));
+  const resultStart = element('button', 'cc-primary', 'Выбрать решения');
+  resultStart.type = 'button'; resultStart.dataset.panel = 'workspace';
+  const resultDemo = element('button', 'cc-link-button', 'Открыть официальный пример');
+  resultDemo.type = 'button'; resultDemo.dataset.quickAction = 'demo';
+  resultEmpty.append(resultStart, resultDemo);
+  panes.get('results')?.pane.append(resultEmpty);
 
   let activePanel = null;
   let previousFocus = null;
@@ -166,7 +177,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     $('.cc-apply-plan').hidden = true;
     $('.cc-apply-plan').disabled = true;
     $('.cc-plan-submit').disabled = applying;
-    $('.cc-plan-submit').textContent = '✦ Оценить мой план ↗';
+    $('.cc-plan-submit').textContent = 'Оценить мой план';
     if (message) { $('.cc-ai-status').textContent = message; $('.cc-ai-status').dataset.tone = ''; }
   }
   listen($('#cc-plan-prompt'), 'input', () => clearProposal('Запрос изменён. Оцените обновлённый план.'));
@@ -319,12 +330,18 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   listen(window, 'scenario:calculated', (event) => {
     clearTrajectory();
     updateMetrics(event.detail?.result);
+    resultEmpty.hidden = true;
     if (applying) { applying = false; $('.cc-ai-status').textContent = 'План рассчитан. Посмотрите изменения на карте и запустите временную шкалу.'; $('.cc-apply-plan').disabled = false; closePanel(false); }
-    else if (activePanel === 'workspace') closePanel(false);
+    else {
+      clearProposal('Текущий сценарий рассчитан. Результат и объяснение доступны в разделе «Результат». Здесь можно предложить новую идею.');
+      if (activePanel === 'workspace') openPanel('results');
+    }
   });
   listen(window, 'scenario:invalidated', () => {
     clearTrajectory();
     updateMetrics(baseline);
+    resultEmpty.hidden = false;
+    if (!applying) clearProposal('Для текущего плана нужен расчёт. Нажмите «Посмотреть результат» после выбора пяти мер.');
   });
   listen(window, 'scenario:load', () => { clearTrajectory(); openPanel('workspace'); });
   listen(window, 'ascension:trajectory-status', (event) => {
@@ -365,7 +382,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   };
   listen($('.cc-prompt-examples'), 'click', (event) => {
     const button = event.target.closest('[data-example]');
-    if (button && !applying) { clearProposal(); $('#cc-plan-prompt').value = examples[button.dataset.example]; $('#cc-plan-prompt').focus(); }
+    if (button && !applying) { clearProposal('Запрос изменён. Оцените обновлённый план.'); $('#cc-plan-prompt').value = examples[button.dataset.example]; $('#cc-plan-prompt').focus(); }
   });
   function addNotes(parent, title, values) {
     const items = Array.isArray(values) ? values.map(readable).filter(Boolean) : typeof values === 'string' ? [values] : [];
@@ -430,7 +447,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
       $('.cc-ai-status').dataset.tone = 'error';
     } finally {
       clearTimeout(timeout);
-      if (version === requestVersion) { request = null; $('.cc-plan-submit').disabled = false; $('.cc-plan-submit').textContent = '✦ Оценить мой план ↗'; }
+      if (version === requestVersion) { request = null; $('.cc-plan-submit').disabled = false; $('.cc-plan-submit').textContent = 'Оценить мой план'; }
     }
   });
   listen($('.cc-apply-plan'), 'click', () => {

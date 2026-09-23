@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#153d35">
+  <title>Демо за 90 секунд · Ascension</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/demo.css">
+  <script type="module" src="/demo.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#demo-content">К демонстрации</a>
+  <header class="demo-header"><a class="brand" href="/classic.html">A / ASCENSION</a><nav aria-label="Разделы сайта"><a href="/classic.html">Симулятор</a><a href="/mayor.html">Обращения</a><a href="/citizens.html">Жителю</a></nav></header>
+  <main id="demo-content">
+    <section class="demo-intro" aria-labelledby="demo-title">
+      <div><p class="eyebrow">ГОРОДСКАЯ ЛАБОРАТОРИЯ / ДЕМОНСТРАЦИЯ</p><h1 id="demo-title">От обращения<br>к обратной связи.</h1><p class="lead">Пять шагов, чтобы увидеть, как решения акима связаны с жизнью жителя.</p></div>
+      <div class="duration"><strong>90<span>секунд</span></strong><p>Ориентир для выступления.<br>Вы управляете каждым шагом.</p></div>
+    </section>
+    <p class="demo-disclaimer"><strong>Учебная история.</strong> Обращение, поручение и ответы жителя вымышлены и хранятся только в памяти этой страницы. Расчёты получены сервером из синтетической модели города. Демо не создаёт записей в рабочем кабинете и не отправляет сообщения.</p>
+    <div id="demo-loading" role="status" class="load-state">Загружаем модель и рассчитываем два варианта…</div>
+    <div id="demo-error" role="alert" class="error-state" hidden><h2>Не удалось загрузить демонстрацию</h2><p id="demo-error-text"></p><button id="demo-retry" type="button">Повторить загрузку</button></div>
+    <div id="demo-workspace" hidden>
+      <div class="demo-pacing"><div><strong id="demo-clock">01:30</strong><span id="demo-clock-hint">Ориентир для выступления</span></div><progress id="demo-timer-progress" max="90" value="0" aria-label="Время демонстрации"></progress><button id="demo-timer" type="button">Запустить таймер</button></div>
+      <ol id="demo-progress" class="demo-progress" aria-label="Этапы демонстрации"></ol>
+      <section id="demo-stage" class="demo-stage" aria-labelledby="step-heading"></section>
+      <section id="demo-complete" class="demo-complete" hidden aria-labelledby="demo-complete-title"><p class="eyebrow">ДЕМОНСТРАЦИЯ ПРОЙДЕНА</p><h2 id="demo-complete-title">Вы замкнули путь обращения.</h2><p id="demo-complete-copy"></p><a href="/classic.html#workspace">Перейти к своему сценарию ↗</a></section>
+      <div class="demo-controls"><button id="demo-back" type="button">← Назад</button><span id="demo-position"></span><button id="demo-next" type="button" class="primary">Далее →</button></div>
+      <div class="demo-bottom"><button id="demo-restart" class="text-button" type="button">Начать заново</button><p>Переходы только вручную. После обновления страницы учебная история сбрасывается.</p></div>
+    </div>
+    <noscript><p class="error-state">Для интерактивной демонстрации включите JavaScript. <a href="/classic.html">Перейти к симулятору</a>.</p></noscript>
+    <footer><span>ASCENSION · СИНТЕТИЧЕСКАЯ МОДЕЛЬ</span><a href="/mayor.html">Открыть кабинет акима ↗</a></footer>
+  </main>
+  <div id="demo-announcer" class="sr-only" role="status" aria-live="polite"></div>
+</body>
+</html>

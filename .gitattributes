@@ -1,0 +1,2 @@
+start-local.sh text eol=lf
+START-WINDOWS.cmd text eol=crlf
