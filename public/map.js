@@ -1,4 +1,5 @@
 import { PLACES, DISTRICT_ANCHORS, findPreset } from './places.js';
+import { mountCityExplorer } from './city-explorer.js';
 
 const VERSION = '5.24.0';
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -31,13 +32,20 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   const host = typeof container === 'string' ? document.getElementById(container) : container;
   if (!host) throw new Error('A map container is required');
   const prefix = `citymap-${++componentNumber}`;
-  const state = { city: PLACES[0], result: null, districtId: 'nura', metric: 'score', phase: 'before', is3D: false, map: null, markers: [], loaded: false, destroyed: false, searchId: 0, lastSearchAt: 0, cache: new Map() };
+  const state = { city: PLACES[0], result: null, districtId: 'nura', metric: 'score', phase: 'before', is3D: true, map: null, markers: [], loaded: false, destroyed: false, searchId: 0, lastSearchAt: 0, cache: new Map() };
+  if (!document.querySelector('link[data-city-explorer]')) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = '/city-explorer.css';
+    stylesheet.dataset.cityExplorer = 'true';
+    document.head.append(stylesheet);
+  }
   host.classList.add('citymap');
   host.innerHTML = `
     <div class="citymap-toolbar">
       <label class="citymap-place-label" for="${prefix}-place"><span class="citymap-field-caption">ТЕРРИТОРИЯ</span><select id="${prefix}-place" class="citymap-place" aria-label="Выбрать город или регион"><optgroup label="Города Казахстана">${PLACES.filter((p) => p.kind === 'city').map((p) => `<option value="${p.id}">${p.name}${p.hasScenarioData ? ' · демо' : ''}</option>`).join('')}</optgroup><optgroup label="Регионы и страна">${PLACES.filter((p) => p.kind !== 'city').map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup></select></label>
       <form class="citymap-search" role="search"><label class="citymap-field-caption" for="${prefix}-search">НАЙТИ НА КАРТЕ</label><div class="citymap-search-row"><span aria-hidden="true">⌕</span><input id="${prefix}-search" type="search" maxlength="120" autocomplete="off" placeholder="Любой город или регион" aria-describedby="${prefix}-search-status"><button type="submit" aria-label="Найти город или регион">Найти <span aria-hidden="true">↗</span></button></div><div class="citymap-search-results" hidden></div></form>
-      <div class="citymap-mode" aria-label="Вид карты"><button type="button" data-view="2d" aria-pressed="true">2D</button><button type="button" data-view="3d" aria-pressed="false">3D <span aria-hidden="true">◇</span></button></div>
+      <div class="citymap-mode" aria-label="Вид карты"><button type="button" data-view="2d" aria-pressed="false">Обзор 2D</button><button type="button" data-view="3d" aria-pressed="true">Город 3D <span aria-hidden="true">◇</span></button></div>
     </div>
     <p class="citymap-search-status" id="${prefix}-search-status" role="status" hidden></p>
     <div class="citymap-stage">
@@ -61,6 +69,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   let loadingTimer;
   let searchController;
   let resizeObserver;
+  let explorer;
   const currentDistricts = () => (state.result || baseline).districts;
   const metricName = () => state.metric === 'score' ? 'Оценка района' : dataset.indicators.find((i) => i.id === state.metric)?.name || state.metric;
   const districtValue = (district) => state.metric === 'score' ? district[state.phase === 'after' ? 'afterScore' : 'beforeScore'] : district[state.phase][state.metric];
@@ -129,8 +138,17 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     if (!state.city.hasScenarioData || !currentDistricts().some((district) => district.id === id)) return;
     state.districtId = id;
     renderDistricts();
+    inspectDistrict();
     if (move && state.loaded) state.map.easeTo({ center: DISTRICT_ANCHORS[id], zoom: Math.max(state.map.getZoom(), 12.2), duration: reducedMotion ? 0 : 750 });
     if (typeof onDistrictSelect === 'function') onDistrictSelect(id);
+  }
+
+  function inspectDistrict() {
+    const district = currentDistricts().find((item) => item.id === state.districtId);
+    if (!district || !state.city.hasScenarioData) return;
+    const values = district[state.phase];
+    const weakest = dataset.indicators.reduce((min, item) => values[item.id] < values[min.id] ? item : min, dataset.indicators[0]);
+    explorer?.inspectDistrict({ name: district.name, metric: metricName(), value: districtValue(district), phase: state.phase === 'after' ? 'После решений' : 'До решений', weakest: `${weakest.name} · ${fmt(values[weakest.id])}` });
   }
 
   function showTerritory() {
@@ -144,6 +162,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   function updateViewButtons() {
     all('[data-view]').forEach((button) => button.setAttribute('aria-pressed', String((button.dataset.view === '3d') === state.is3D)));
     if (state.loaded && state.map.getLayer('citymap-buildings-3d')) state.map.setLayoutProperty('citymap-buildings-3d', 'visibility', state.is3D ? 'visible' : 'none');
+    explorer?.setEnabled(state.is3D);
   }
 
   function set3D(enabled, close = false) {
@@ -162,6 +181,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     el('.citymap-search button[type="submit"]').disabled = false;
     // Dataset identity is explicit; searched places never inherit Astana metrics.
     state.city = { ...next, hasScenarioData: next.id === 'astana' && next.hasScenarioData === true };
+    explorer?.setCity(state.city);
     el('.citymap-city-name').textContent = state.city.name;
     el('.citymap-city-caption').textContent = state.city.hasScenarioData ? 'Демонстрационный сценарий · 5 районов' : 'Географический обзор · местные данные не подключены';
     const select = el('.citymap-place');
@@ -177,7 +197,8 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     select.value = next.id;
     el('.citymap-search-results').hidden = true;
     renderDistricts();
-    showTerritory();
+    if (state.is3D && state.city.kind === 'city' && state.loaded) state.map.flyTo({ center: state.city.hasScenarioData ? [71.4304, 51.1282] : state.city.center, zoom: 15, pitch: 58, bearing: -18, duration: reducedMotion ? 0 : 1000 });
+    else showTerritory();
     window.dispatchEvent(new CustomEvent('city:changed', { detail: { id: state.city.id, name: state.city.name, center: [...state.city.center], kind: state.city.kind, hasScenarioData: state.city.hasScenarioData } }));
     return true;
   }
@@ -186,6 +207,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     state.result = result?.valid !== false && Array.isArray(result?.districts) ? result : null;
     state.phase = state.result ? 'after' : 'before';
     renderDistricts();
+    if (state.city.hasScenarioData) inspectDistrict();
   }
 
   function searchStatus(message) {
@@ -265,6 +287,8 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   function failMap() {
     clearTimeout(loadingTimer);
     state.loaded = false;
+    explorer?.destroy();
+    explorer = null;
     el('.citymap-loading').hidden = true;
     el('.citymap-fallback').hidden = false;
     host.classList.add('citymap-is-unavailable');
@@ -280,9 +304,11 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     try {
       const lib = await loadMapLibrary();
       if (state.destroyed) return;
+      explorer?.destroy();
+      explorer = null;
       state.map?.remove();
       state.loaded = false;
-      state.map = new lib.Map({ container: el('.citymap-canvas'), style: STYLE_URL, center: state.city.center, zoom: state.city.zoom ?? 11.5, maxZoom: 19, pitch: 0, maxPitch: 65, attributionControl: false, cooperativeGestures: true, locale: { 'NavigationControl.ZoomIn': 'Приблизить', 'NavigationControl.ZoomOut': 'Отдалить', 'NavigationControl.ResetBearing': 'На север', 'AttributionControl.ToggleAttribution': 'Источники карты', 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MacHelpText': '⌘ + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MobileHelpText': 'Перемещайте карту двумя пальцами' } });
+      state.map = new lib.Map({ container: el('.citymap-canvas'), style: STYLE_URL, center: state.is3D && state.city.hasScenarioData ? [71.4304, 51.1282] : state.city.center, zoom: state.is3D ? 15 : state.city.zoom ?? 11.5, maxZoom: 19, pitch: state.is3D ? 58 : 0, bearing: state.is3D ? -18 : 0, maxPitch: 65, attributionControl: false, cooperativeGestures: true, locale: { 'NavigationControl.ZoomIn': 'Приблизить', 'NavigationControl.ZoomOut': 'Отдалить', 'NavigationControl.ResetBearing': 'На север', 'AttributionControl.ToggleAttribution': 'Источники карты', 'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MacHelpText': '⌘ + прокрутка — масштаб карты', 'CooperativeGesturesHandler.MobileHelpText': 'Перемещайте карту двумя пальцами' } });
       const map = state.map;
       map.addControl(new lib.NavigationControl({ visualizePitch: true }), 'top-right');
       map.addControl(new lib.AttributionControl({ compact: false }), 'bottom-right');
@@ -295,7 +321,11 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
         el('.citymap-fallback').hidden = true;
         host.classList.remove('citymap-is-unavailable');
         const firstLabel = map.getStyle().layers.find((layer) => layer.type === 'symbol' && layer.layout?.['text-field'])?.id;
-        map.addLayer({ id: 'citymap-buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13, filter: ['!=', ['get', 'hide_3d'], true], layout: { visibility: state.is3D ? 'visible' : 'none' }, paint: { 'fill-extrusion-color': '#a9c1cc', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 3], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.88 } }, firstLabel);
+        map.addLayer({ id: 'citymap-buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13, filter: ['!=', ['get', 'hide_3d'], true], layout: { visibility: state.is3D ? 'visible' : 'none' }, paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 3], 0, '#dce4d8', 20, '#b6cdc2', 70, '#7daba5', 160, '#477a7d'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 3], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.96 } }, firstLabel);
+        map.setLight({ anchor: 'viewport', color: '#fff4de', intensity: .38, position: [1.5, 210, 35] });
+        explorer = mountCityExplorer({ host, map, city: state.city, reducedMotion });
+        explorer.setCity(state.city);
+        explorer.setEnabled(state.is3D);
         updateMarkers();
         if (state.city.bounds) showTerritory();
       });
@@ -323,13 +353,13 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   el('.citymap-search').addEventListener('submit', search);
   el('input[type="search"]').addEventListener('keydown', (event) => { if (event.key === 'Escape') el('.citymap-search-results').hidden = true; });
   el('.citymap-district-list').addEventListener('click', (event) => { const button = event.target.closest('[data-district]'); if (button) focusDistrict(button.dataset.district); });
-  el('.citymap-metric').addEventListener('change', (event) => { state.metric = event.target.value; renderDistricts(); });
-  all('[data-phase]').forEach((button) => button.addEventListener('click', () => { state.phase = button.dataset.phase; renderDistricts(); }));
+  el('.citymap-metric').addEventListener('change', (event) => { state.metric = event.target.value; renderDistricts(); inspectDistrict(); });
+  all('[data-phase]').forEach((button) => button.addEventListener('click', () => { state.phase = button.dataset.phase; renderDistricts(); inspectDistrict(); }));
   all('[data-view]').forEach((button) => button.addEventListener('click', () => set3D(button.dataset.view === '3d')));
   el('.citymap-overview').addEventListener('click', showTerritory);
   el('.citymap-buildings').addEventListener('click', () => set3D(true, true));
   el('.citymap-retry').addEventListener('click', () => { libraryPromise = undefined; void initialize(); });
   renderDistricts();
   const ready = initialize();
-  return { setResult, setCity, focusDistrict, ready, destroy() { state.destroyed = true; clearTimeout(loadingTimer); searchController?.abort(); resizeObserver?.disconnect(); state.markers.forEach((marker) => marker.remove()); state.map?.remove(); host.replaceChildren(); } };
+  return { setResult, setCity, focusDistrict, ready, destroy() { state.destroyed = true; clearTimeout(loadingTimer); searchController?.abort(); resizeObserver?.disconnect(); explorer?.destroy(); state.markers.forEach((marker) => marker.remove()); state.map?.remove(); host.replaceChildren(); } };
 }
