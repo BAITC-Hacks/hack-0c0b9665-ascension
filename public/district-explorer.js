@@ -33,7 +33,7 @@ export function districtRecommendations(dataset, district, limit = 3) {
 
 export function districtCsv(dataset, result, options = {}) {
   const { districts, indicators } = selectDistrictIndicators(dataset, result, options);
-  const safe = value => `"${String(value ?? '').replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`;
+  const safe = value => `"${(typeof value === 'string' ? value.replace(/^[=+@-]/, "'$&") : String(value ?? '')).replaceAll('"', '""')}"`;
   const rows = [['Данные', 'Район', 'Код', 'Показатель', 'Вес', 'До', 'После', 'Изменение', 'Критический после (<40)']];
   for (const indicator of indicators) for (const district of districts) {
     rows.push([options.mode === 'comparison' ? 'Учебный сценарий' : 'Учебная исходная картина', district.name, indicator.id, indicator.name, indicator.weight,

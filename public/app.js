@@ -348,7 +348,7 @@ window.addEventListener('constructor:focus', event => {
   const card = document.querySelector(`[data-measure="${measure.id}"]`);
   card.classList.add('measure-highlight');
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  card.querySelector('button')?.focus({ preventScroll: true });
+  card.querySelector('select:not(:disabled),button:not(:disabled)')?.focus({ preventScroll: true });
   announce(`Выбрана инициатива «${measure.name}». Проверьте район и добавьте её в план.`);
 });
 

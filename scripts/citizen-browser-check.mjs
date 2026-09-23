@@ -98,6 +98,8 @@ try {
   await resident.locator('input[value=confirmed]').check();
   await resident.locator('#submit-feedback').click();
   await resident.locator('#feedback-history').getByText('Вы подтвердили решение',{exact:true}).waitFor();
+  assert.match(await resident.locator('#next-step').innerText(),/Вы подтвердили, что проблема решена/);
+  assert.equal(await resident.locator('#feedback-form').isHidden(),true);
   item = await api(`/api/desk/complaints/${item.id}`);
   assert.equal(item.residentFeedback.outcome,'confirmed');
   assert.equal((await api('/api/public/results')).items.length,0,'New resolution requires republishing');
@@ -126,9 +128,10 @@ try {
   await residentContext.setOffline(false);
   await resident.locator('#retry-load').click(); await resident.locator('#complaint-content:not([hidden])').waitFor();
   await publicPage.goto(origin+'/results.html?districtId=unknown');
-  await publicPage.locator('#results-error:not([hidden])').waitFor();
-  await publicPage.locator('#reset-results-filter').click();
+  await publicPage.locator('#filter-notice:not([hidden])').waitFor();
   await publicPage.locator('#results-empty:not([hidden])').waitFor();
+  assert.equal(await publicPage.locator('#district-filter').inputValue(),'');
+  assert.equal(new URL(publicPage.url()).searchParams.has('districtId'),false);
   assert.equal(await publicPage.locator('#district-filter').isEnabled(),true);
 
   const beforeDemo = (await api('/api/desk/complaints')).total;

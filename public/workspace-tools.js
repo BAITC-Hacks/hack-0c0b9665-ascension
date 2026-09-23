@@ -1,5 +1,6 @@
+import { createLibraryRepository, captureCalculated, MAX_ENTRIES, MODEL_ID, STORAGE_KEY } from './scenario-library.js';
+
 const DRAFT_KEY = 'ascension.workspace.draft.v1';
-const LIBRARY_KEY = 'ascension.workspace.library.v1';
 const $ = id => document.getElementById(id);
 const number = value => Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 3 });
 
@@ -9,7 +10,7 @@ export function cleanScenario(input) {
   const ids = new Set();
   for (const item of input.decisions) {
     if (!item || !/^M(?:[1-9]|1[0-4])$/.test(item.measureId) || ids.has(item.measureId)) return null;
-    if (item.districtId !== undefined && !['esil', 'almaty', 'saryarka', 'baik onur'.replace(' ', ''), 'nura'].includes(item.districtId)) return null;
+    if (item.districtId !== undefined && !['esil', 'almaty', 'saryarka', 'baikonur', 'nura'].includes(item.districtId)) return null;
     ids.add(item.measureId);
   }
   return { decisions: input.decisions.map(({ measureId, districtId }) => districtId === undefined ? { measureId } : { measureId, districtId }) };
@@ -21,7 +22,7 @@ export function readDraft() {
 
 export function csvCell(value) {
   let text = String(value ?? '');
-  if (/^[=+@\-\t\r]/.test(text)) text = `'${text}`;
+  if (typeof value !== 'number' && /^[=+@\-\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 
@@ -46,16 +47,13 @@ export function initializeWorkspaceTools() {
   if (initialized) return;
   initialized = true;
   let current = { decisions: [] }, latest = null, library = [];
-  try {
-    const stored = JSON.parse(localStorage.getItem(LIBRARY_KEY));
-    if (Array.isArray(stored)) library = stored.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string'
-      && cleanScenario(item.scenario) && item.scenario.decisions.length).slice(0, 12)
-      .map(item => ({ id: item.id, name: item.name.slice(0, 80), scenario: cleanScenario(item.scenario) }));
-  } catch { /* A damaged browser store must not prevent calculation. */ }
+  const repository = createLibraryRepository(() => localStorage);
+  try { library = repository.read(); }
+  catch { $('library-status').textContent = 'Библиотека недоступна или повреждена. Существующие записи сохранены; расчёт продолжает работать.'; }
 
-  function saveLibrary(next) {
-    try { localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); library = next; renderLibrary(); return true; }
-    catch { $('library-status').textContent = 'Браузер не разрешил сохранение. Освободите место или разрешите хранение данных.'; return false; }
+  function updateLibrary(action) {
+    try { library = action(); renderLibrary(); return true; }
+    catch (error) { $('library-status').textContent = `Не удалось изменить библиотеку: ${error.message}`; return false; }
   }
   function renderLibrary() {
     $('local-scenarios').replaceChildren();
@@ -76,7 +74,7 @@ export function initializeWorkspaceTools() {
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'retry-button'; remove.textContent = 'Удалить';
       remove.setAttribute('aria-label', `Удалить сценарий ${item.name}`);
       remove.addEventListener('click', () => {
-        if (saveLibrary(library.filter(entry => entry.id !== item.id))) $('library-status').textContent = `Вариант «${item.name}» удалён. Текущий план сохранён.`;
+        if (updateLibrary(() => repository.remove(item.id))) $('library-status').textContent = `Вариант «${item.name}» удалён. Текущий план сохранён.`;
       });
       row.append(info, load, remove); $('local-scenarios').append(row);
     }
@@ -85,8 +83,14 @@ export function initializeWorkspaceTools() {
     event.preventDefault();
     const name = $('local-scenario-name').value.trim();
     if (!name || !current.decisions.length) { $('library-status').textContent = 'Введите название и добавьте хотя бы одну инициативу.'; return; }
-    if (library.length >= 12) { $('library-status').textContent = 'Сохранено 12 вариантов. Удалите ненужный, чтобы добавить новый.'; return; }
-    if (saveLibrary([...library, { id: crypto.randomUUID(), name, scenario: structuredClone(current) }])) $('library-status').textContent = `Вариант «${name}» сохранён в этом браузере.`;
+    if (library.length >= MAX_ENTRIES) { $('library-status').textContent = `Сохранено ${MAX_ENTRIES} вариантов. Удалите ненужный, чтобы добавить новый.`; return; }
+    const calculated = latest && captureCalculated(latest);
+    const entry = { id: crypto.randomUUID(), name, createdAt: new Date().toISOString(), modelId: MODEL_ID,
+      source: calculated ? 'calculated' : 'imported', scenario: structuredClone(current), snapshot: calculated?.snapshot ?? null };
+    if (updateLibrary(() => repository.add([entry]))) $('library-status').textContent = `Вариант «${name}» сохранён в этом браузере.`;
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === STORAGE_KEY || event.key === null) updateLibrary(() => repository.read());
   });
   window.addEventListener('scenario:changed', event => {
     current = cleanScenario(event.detail?.scenario) || { decisions: [] };

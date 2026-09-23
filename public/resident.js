@@ -87,6 +87,9 @@ function render(data) {
     return item;
   });
   const feedback = Array.isArray(data.feedback) ? data.feedback : [];
+  if (!data.canRespond && data.status === 'resolved' && feedback.at(-1)?.outcome === 'confirmed') {
+    byId('next-step').textContent = 'Вы подтвердили, что проблема решена. Ваш ответ передан команде. История обращения и выполненных работ сохранена ниже.';
+  }
   byId('feedback-history-panel').hidden = feedback.length === 0;
   renderEntries('feedback-history', feedback, (entry) => {
     const item = node('li');
