@@ -11,7 +11,7 @@ export const SECURITY_HEADERS = Object.freeze({
     "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://tiles.openfreemap.org",
     "font-src 'self' https://tiles.openfreemap.org",
-    "connect-src 'self' https://tiles.openfreemap.org https://photon.komoot.io",
+    "connect-src 'self' https://tiles.openfreemap.org https://photon.komoot.io https://overpass-api.de",
     "worker-src 'self' blob:", "object-src 'none'", "base-uri 'self'",
     "frame-ancestors 'none'", "form-action 'self'",
   ].join('; '),
