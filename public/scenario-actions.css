@@ -1,0 +1,23 @@
+.hero-actions #reset-button { min-height: 44px; }
+.hero-actions .scenario-action-hint,
+.hero-actions .scenario-action-status {
+  width: 100%;
+  max-width: 260px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+  white-space: normal;
+}
+.hero-actions .scenario-action-status {
+  color: var(--green);
+}
+@media (max-width: 560px) {
+  .hero-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .hero-actions #reset-button { align-self: flex-start; }
+  .hero-actions .scenario-action-hint,
+  .hero-actions .scenario-action-status {
+    max-width: none;
+    text-align: left;
+  }
+}

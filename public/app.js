@@ -29,7 +29,8 @@ const demo = [
 ];
 const state = {
   dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'all', picks: {}, focusedDistrict: 'nura', hasScenarioData: true,
-  result: null, busy: false, simulating: false, version: 0, mutationId: 0, simulationId: 0, explanationId: 0,
+  result: null, busy: false, simulating: false, demoRunning: false, demoRunId: 0,
+  version: 0, mutationId: 0, simulationId: 0, explanationId: 0,
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const number = (value, digits = 2) => Number(value).toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -62,6 +63,10 @@ async function api(path, body) {
 }
 
 function announce(message) { $('announcer').textContent = message; }
+function setActionStatus(message) {
+  $('scenario-action-status').textContent = message;
+  $('scenario-action-status').hidden = !message;
+}
 function showErrors(errors) {
   const messages = errors.map((error) => typeof error === 'string' ? error : error.message);
   $('error-box').innerHTML = `<strong>Изменение не применено</strong><ul>${messages.map((message) => `<li>${escapeHtml(message)}</li>`).join('')}</ul>`;
@@ -90,7 +95,7 @@ function renderCatalog() {
     const selected = state.decisions.some((decision) => decision.measureId === measure.id);
     const full = state.decisions.length >= 5;
     const needsDistrict = measure.scope === 'district' && !state.picks[measure.id];
-    const disabled = selected || full || needsDistrict || state.busy;
+    const disabled = selected || full || needsDistrict || state.busy || state.demoRunning;
     const direction = directions[measure.direction];
     const note = selected ? 'Уже в вашем плане' : full ? 'В плане уже 5 решений' : needsDistrict ? 'Сначала выберите район' : `Эффекты до учёта задержки ${measure.lag} кв.`;
     return `<article class="measure-card${selected ? ' is-selected' : ''}" data-measure="${measure.id}">
@@ -98,7 +103,7 @@ function renderCatalog() {
       <h3>${escapeHtml(measure.name)}</h3>
       <div class="measure-meta"><span class="measure-cost">${measure.cost}<small>у. е.</small></span><span class="measure-lag">Задержка эффекта: ${measure.lag} кв.</span><span class="measure-lag">${measure.scope === 'city' ? 'Весь город' : 'Один район'}</span></div>
       <div class="effect-chips">${Object.entries(measure.effects).map(([id, effect]) => `<span class="effect-chip${effect < 0 ? ' negative' : ''}" title="${escapeHtml(indicatorName(id))}">${escapeHtml(shortIndicatorNames[id] || indicatorName(id))} ${signed(effect, 0)}</span>`).join('')}</div>
-      <div class="scope-picker">${measure.scope === 'district' ? `<label class="field-label" for="district-${measure.id}">Район реализации</label><select id="district-${measure.id}" data-pick="${measure.id}"${state.busy || selected ? ' disabled' : ''}>${districtOptions(state.picks[measure.id], true)}</select>` : '<span class="field-label">Масштаб реализации</span><div class="city-scope"><span aria-hidden="true">◎</span> Все 5 районов</div>'}</div>
+      <div class="scope-picker">${measure.scope === 'district' ? `<label class="field-label" for="district-${measure.id}">Район реализации</label><select id="district-${measure.id}" data-pick="${measure.id}"${state.busy || state.demoRunning || selected ? ' disabled' : ''}>${districtOptions(state.picks[measure.id], true)}</select>` : '<span class="field-label">Масштаб реализации</span><div class="city-scope"><span aria-hidden="true">◎</span> Все 5 районов</div>'}</div>
       <button class="add-button${selected ? ' is-added' : ''}" data-add="${measure.id}" aria-label="${selected ? 'Добавлено' : 'Добавить'}: ${escapeHtml(measure.name)}" aria-describedby="note-${measure.id}"${disabled ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : '+'}</span>${selected ? 'В сценарии' : 'Добавить в план'}</button>
       <p class="add-note" id="note-${measure.id}">${note}</p>
     </article>`;
@@ -110,7 +115,7 @@ function renderPlan() {
     ? '<div class="empty-plan"><span class="empty-plan-icon" aria-hidden="true">+</span><div><h3>Всё начинается с первого шага</h3><p>Добавьте инициативы из каталога<br>или загрузите демо-сценарий.</p></div></div>'
     : state.decisions.map((decision, index) => {
       const measure = measureById(decision.measureId);
-      return `<article class="selected-item"><span class="selected-number">${index + 1}</span><div class="selected-info"><h3>${measure.id} · ${escapeHtml(measure.name)}</h3>${measure.scope === 'district' ? `<label class="sr-only" for="selected-${measure.id}">Район для ${escapeHtml(measure.name)}</label><select id="selected-${measure.id}" data-change="${measure.id}"${state.busy ? ' disabled' : ''}>${districtOptions(decision.districtId)}</select>` : '<span class="selected-cost">Весь город · все 5 районов</span>'}<p class="selected-cost">${measure.cost} у. е.</p></div><button class="remove-button" data-remove="${measure.id}" aria-label="Удалить: ${escapeHtml(measure.name)}"${state.busy ? ' disabled' : ''}>×</button></article>`;
+      return `<article class="selected-item"><span class="selected-number">${index + 1}</span><div class="selected-info"><h3>${measure.id} · ${escapeHtml(measure.name)}</h3>${measure.scope === 'district' ? `<label class="sr-only" for="selected-${measure.id}">Район для ${escapeHtml(measure.name)}</label><select id="selected-${measure.id}" data-change="${measure.id}"${state.busy || state.demoRunning ? ' disabled' : ''}>${districtOptions(decision.districtId)}</select>` : '<span class="selected-cost">Весь город · все 5 районов</span>'}<p class="selected-cost">${measure.cost} у. е.</p></div><button class="remove-button" data-remove="${measure.id}" aria-label="Удалить: ${escapeHtml(measure.name)}"${state.busy || state.demoRunning ? ' disabled' : ''}>×</button></article>`;
     }).join('');
   const left = state.dataset.budget - state.totalCost;
   $('budget-left').textContent = left;
@@ -120,14 +125,17 @@ function renderPlan() {
   $('budget-bar').style.width = `${Math.min(100, state.totalCost / state.dataset.budget * 100)}%`;
   $('plan-total').textContent = state.totalCost;
   $('plan-left').textContent = left;
-  $('simulate-button').disabled = state.busy || state.simulating || state.decisions.length !== 5;
+  $('simulate-button').disabled = state.busy || state.simulating || state.demoRunning || state.decisions.length !== 5;
   $('simulate-button').innerHTML = state.simulating ? 'Рассчитываем…' : 'Рассчитать сценарий <span aria-hidden="true">↗</span>';
   $('simulate-hint').textContent = state.busy ? 'Проверяем совместимость решений…' : state.simulating ? 'Проверяем влияние на все районы' : state.decisions.length < 5 ? `Выберите ещё ${5 - state.decisions.length} ${5 - state.decisions.length === 1 ? 'решение' : 5 - state.decisions.length < 5 ? 'решения' : 'решений'}` : 'Пять решений готовы к расчёту';
-  $('demo-button').disabled = state.busy;
-  $('reset-button').disabled = state.busy || state.decisions.length === 0;
+  $('demo-button').disabled = state.busy || state.simulating || state.demoRunning;
+  $('demo-button').innerHTML = state.demoRunning ? 'Запускаем демо…' : '<span aria-hidden="true">▷</span> Запустить демо';
+  // Reset also cancels pending requests and clears an unfinished draft.
+  $('reset-button').disabled = false;
 }
 
 function invalidateResult() {
+  setActionStatus('');
   window.dispatchEvent(new CustomEvent('scenario:invalidated'));
   state.version += 1;
   state.simulationId += 1;
@@ -144,10 +152,11 @@ function invalidateResult() {
 }
 
 async function applyDecisions(decisions, message) {
-  if (state.busy) return false;
+  if (state.busy || !state.dataset || !state.hasScenarioData) return false;
   const requestId = ++state.mutationId;
   state.busy = true;
   clearErrors();
+  if (!state.demoRunning) setActionStatus('');
   renderPlan();
   renderCatalog();
   try {
@@ -229,9 +238,11 @@ async function calculate() {
     state.result = result;
     renderResult(result);
     window.dispatchEvent(new CustomEvent('scenario:calculated', { detail: structuredClone({ scenario: input, result }) }));
+    $('result-heading').focus?.({ preventScroll: true });
     $('results').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
     announce(`Сценарий рассчитан. Score ${number(result.score)}, изменение ${signed(result.deltaScore)}.`);
     void explain(input, version);
+    return true;
   } catch (error) {
     if (state.version === version && requestId === state.simulationId) showErrors([error.message]);
   } finally {
@@ -300,10 +311,61 @@ $('selected-list').addEventListener('change', (event) => {
   const updated = state.decisions.map((decision) => decision.measureId === select.dataset.change ? { ...decision, districtId: select.value } : { ...decision });
   void applyDecisions(updated, 'Район реализации изменён.');
 });
-$('demo-button').addEventListener('click', () => void applyDecisions(demo, 'Загружен официальный демо-сценарий.'));
-$('reset-button').addEventListener('click', async () => {
-  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'all'; renderFilters(); renderCatalog(); }
-});
+async function runDemo() {
+  if (!state.dataset || !state.hasScenarioData || state.busy || state.simulating || state.demoRunning) return;
+  const requestId = ++state.demoRunId;
+  state.demoRunning = true;
+  setActionStatus('Загружаем пять решений демо-сценария…');
+  try {
+    const applied = await applyDecisions(demo, 'Загружен официальный демо-сценарий.');
+    if (requestId !== state.demoRunId || !state.hasScenarioData) return;
+    if (!applied) {
+      setActionStatus('Не удалось загрузить демо. Повторите попытку.');
+      return;
+    }
+    state.filter = 'all';
+    renderFilters();
+    renderCatalog();
+    setActionStatus('Пять решений загружены. Рассчитываем их влияние на город…');
+    const calculated = await calculate();
+    if (requestId !== state.demoRunId || !state.hasScenarioData) return;
+    setActionStatus(calculated
+      ? `Демо рассчитано. Score ${number(state.result.score)} · использовано ${state.totalCost} из ${state.dataset.budget} у. е.`
+      : 'Демо-план загружен, но расчёт не завершён. Нажмите «Рассчитать сценарий», чтобы повторить.');
+  } finally {
+    if (requestId === state.demoRunId) { state.demoRunning = false; renderPlan(); renderCatalog(); }
+  }
+}
+
+function resetScenario() {
+  if (!state.dataset || !state.hasScenarioData) return;
+  // Empty plans need no server validation. Invalidate pending work first so
+  // late validation, calculation and AI responses cannot restore the old plan.
+  state.mutationId += 1;
+  state.demoRunId += 1;
+  state.busy = false;
+  state.demoRunning = false;
+  state.decisions = [];
+  state.totalCost = 0;
+  state.filter = 'all';
+  state.focusedDistrict = 'nura';
+  clearErrors();
+  invalidateResult();
+  cityMap?.focusDistrict('nura', false);
+  state.picks = {};
+  $('planning-district').textContent = '14 мер · 5 направлений';
+  renderFilters();
+  renderCatalog();
+  renderPlan();
+  const message = `План очищен. Доступно ${state.dataset.budget} у. е. Выберите пять новых решений.`;
+  setActionStatus(message);
+  announce(message);
+  $('workspace').focus({ preventScroll: true });
+  $('workspace').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+}
+
+$('demo-button').addEventListener('click', () => void runDemo());
+$('reset-button').addEventListener('click', resetScenario);
 $('simulate-button').addEventListener('click', () => void calculate());
 $('district-focus').addEventListener('click', (event) => {
   const button = event.target.closest('#focus-measures');
@@ -321,8 +383,13 @@ window.addEventListener('city:changed', (event) => {
   currentCity = city;
   state.hasScenarioData = city.hasScenarioData === true;
   if (!state.hasScenarioData) {
+    state.mutationId += 1;
+    state.demoRunId += 1;
+    state.busy = false;
+    state.demoRunning = false;
     invalidateResult();
     renderPlan();
+    renderCatalog();
   }
   document.querySelectorAll('.model-only').forEach((element) => { element.hidden = !state.hasScenarioData; });
   $('geography-notice').hidden = state.hasScenarioData;
@@ -342,6 +409,15 @@ window.addEventListener('scenario:load', (event) => {
   if (!input || !Array.isArray(input.decisions)) {
     showErrors(['Сохранённый сценарий должен содержать список решений.']);
     return;
+  }
+  // Loading a saved plan takes over immediately, even if a demo request is
+  // still pending. Its late response must neither lock nor overwrite this plan.
+  if (state.demoRunning) {
+    state.demoRunId += 1;
+    state.demoRunning = false;
+    state.mutationId += 1;
+    state.busy = false;
+    invalidateResult();
   }
   void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.').then((applied) => {
     if (applied) $('workspace').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
