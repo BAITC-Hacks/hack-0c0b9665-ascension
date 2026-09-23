@@ -13,12 +13,14 @@
   "durable_objects": {
     "bindings": [
       { "name": "AI_BUDGET", "class_name": "AIBudget" },
-      { "name": "COMPLAINTS", "class_name": "Complaints" }
+      { "name": "COMPLAINTS", "class_name": "Complaints" },
+      { "name": "TEAM_WORKSPACE", "class_name": "TeamWorkspaceDurableObject" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["AIBudget"] },
-    { "tag": "v2-complaints", "new_sqlite_classes": ["Complaints"] }
+    { "tag": "v2-complaints", "new_sqlite_classes": ["Complaints"] },
+    { "tag": "v3-team-workspace", "new_sqlite_classes": ["TeamWorkspaceDurableObject"] }
   ],
   "ratelimits": [
     {

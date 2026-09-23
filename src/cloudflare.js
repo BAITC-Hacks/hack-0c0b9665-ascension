@@ -5,6 +5,7 @@ import { createComplaintFetchHandler } from './complaints/worker-routes.js';
 import { cleanupTelegramUpdates } from './complaints/telegram.js';
 
 export { default } from './worker.js';
+export { TeamWorkspaceDurableObject } from './workspace/cloudflare.js';
 
 export class AIBudget extends DurableObject {
   constructor(ctx, env) {

@@ -5,6 +5,8 @@ import { createWorkerExplanation } from './runtime/worker-explanation.js';
 import { readWorkerJson } from './runtime/worker-json.js';
 import { createWorkerAIAdmission } from './runtime/ai-admission.js';
 import { createPlanning } from './runtime/planning.js';
+import { isWorkspacePath } from './http/workspace.js';
+import { handleWorkerWorkspace } from './runtime/worker-workspace.js';
 
 function json({ body, status = 200, headers = {} }) {
   return Response.json(body, { status, headers: {
@@ -22,6 +24,7 @@ export function createWorker(options = {}) {
       try {
         const url = new URL(request.url);
         const pathname = getPath(url.pathname + url.search);
+        if (isWorkspacePath(pathname)) return await handleWorkerWorkspace(request, env);
         if (pathname === '/api/citizen/config' || pathname === '/api/telegram/webhook'
           || pathname === '/api/complaints' || pathname.startsWith('/api/complaints/')) {
           if (typeof env.COMPLAINTS?.getByName !== 'function') {

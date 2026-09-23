@@ -5,12 +5,14 @@ import { createComplaintRoutes } from './complaints/http.js';
 import { handleApiRequest } from './http/api.js';
 import { errorResult } from './http/errors.js';
 import { getPath, requireMethod, SECURITY_HEADERS } from './http/policy.js';
+import { isWorkspacePath } from './http/workspace.js';
 import { createNodeExplanation } from './runtime/node-explanation.js';
 import { readNodeJson } from './runtime/node-json.js';
 import { configuredPublicOrigin } from './runtime/node-origin.js';
 import { sendNodeStatic } from './runtime/node-static.js';
 import { createNodeAIAdmission } from './runtime/ai-admission.js';
 import { createPlanning } from './runtime/planning.js';
+import { createNodeWorkspace } from './runtime/node-workspace.js';
 
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -35,10 +37,12 @@ export function createRequestHandler({ aiConfigured,
   const admission = createNodeAIAdmission({ ...options, aiConfigured: configured, env });
   const explain = createNodeExplanation({ ...options, aiConfigured: configured, env, admission });
   const plan = createPlanning({ admission, plan: options.plan });
-  return async (request, response) => {
+  const workspace = createNodeWorkspace({ env, dbPath: options.workspaceDbPath, publicDir: staticRoot });
+  const handler = async (request, response) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);
     try {
       const pathname = getPath(request.url);
+      if (isWorkspacePath(pathname)) return await workspace.handle(request, response);
       const headers = { get: name => request.headers[name.toLowerCase()] ?? null };
       const protocol = request.socket.encrypted ? 'https' : 'http';
       // Forwarded headers are client-controlled unless a trusted proxy policy is configured.
@@ -65,11 +69,16 @@ export function createRequestHandler({ aiConfigured,
       sendJson(response, errorResult(error));
     }
   };
+  handler.close = () => workspace.close();
+  return handler;
 }
 
 /** Returns an unbound Node HTTP server. Options are forwarded to createRequestHandler. */
 export function createAppServer(options = {}) {
-  return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, createRequestHandler(options));
+  const handler = createRequestHandler(options);
+  const server = createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, handler);
+  server.once('close', () => handler.close());
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
