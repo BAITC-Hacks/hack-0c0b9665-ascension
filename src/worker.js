@@ -10,7 +10,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self)',
   'Content-Security-Policy': [
     "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://tiles.openfreemap.org",
@@ -37,7 +37,7 @@ function bounded(value, fallback, max) {
     ? number : fallback;
 }
 
-async function readJson(request) {
+export async function readJson(request) {
   const mediaType = (request.headers.get('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
   const encoding = request.headers.get('Content-Encoding');
   if (mediaType !== 'application/json' || (encoding && encoding !== 'identity')) {
@@ -86,6 +86,16 @@ export function createWorker({ explain = explainScenario, now = Date.now } = {})
         catch { throw new RequestError(400, 'INVALID_PATH', 'Некорректный адрес запроса.'); }
         if (/[\\:\u0000-\u001f\u007f]/u.test(path) || path.split('/').some(part => part.startsWith('.'))) {
           throw new RequestError(404, 'NOT_FOUND', 'Ресурс не найден.');
+        }
+        if (path === '/api/citizen/config' || path === '/api/telegram/webhook'
+          || path === '/api/complaints' || path.startsWith('/api/complaints/')) {
+          if (typeof env.COMPLAINTS?.getByName !== 'function') throw new RequestError(503, 'COMPLAINTS_UNAVAILABLE', 'Хранилище обращений не подключено.');
+          const complaints = env.COMPLAINTS.getByName('city');
+          if (typeof complaints?.fetch !== 'function') throw new RequestError(503, 'COMPLAINTS_UNAVAILABLE', 'Хранилище обращений не подключено.');
+          const result = await complaints.fetch(request);
+          const headers = new Headers(result.headers);
+          for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+          return new Response(result.body, { status: result.status, headers });
         }
         const expected = API_METHODS.get(path);
         if (!expected) {

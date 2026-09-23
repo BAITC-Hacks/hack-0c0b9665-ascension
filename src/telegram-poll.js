@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createTelegramTransport } from './complaints/telegram.js';
+import { assertTelegramPollingAllowed, createTelegramModeApi } from './telegram-mode.js';
 
 export function createTelegramForwarder({ serverUrl = 'http://127.0.0.1:3000', webhookSecret, fetchImpl = globalThis.fetch }) {
   if (typeof webhookSecret !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/u.test(webhookSecret)) throw new Error('Задайте корректный TELEGRAM_WEBHOOK_SECRET.');
@@ -51,24 +52,24 @@ export async function runTelegramPolling({ transport, forwardUpdate, signal, onE
   }
 }
 
-async function main() {
-  const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
+export async function startTelegramPolling({ env = process.env, fetchImpl = globalThis.fetch,
+  log = console.log, logError = console.error } = {}) {
+  const token = env.TELEGRAM_BOT_TOKEN ?? '';
+  const webhookSecret = env.TELEGRAM_WEBHOOK_SECRET ?? '';
   if (!token || !webhookSecret) {
-    console.error('Polling не запущен: задайте TELEGRAM_BOT_TOKEN и TELEGRAM_WEBHOOK_SECRET в локальном окружении и запустите основной сервер.');
-    process.exitCode = 1;
-    return;
+    throw Object.assign(new Error('Polling не запущен: задайте TELEGRAM_BOT_TOKEN и TELEGRAM_WEBHOOK_SECRET в локальном окружении и запустите основной сервер.'), { code: 'TELEGRAM_MODE_CONFIG' });
   }
+  const transport = createTelegramTransport({ token, fetchImpl });
+  const serverUrl = env.BOT_SERVER_URL || `http://127.0.0.1:${env.PORT || 3000}`;
+  const forwardUpdate = createTelegramForwarder({ serverUrl, webhookSecret, fetchImpl });
+  await assertTelegramPollingAllowed(createTelegramModeApi({ token, fetchImpl }));
   const controller = new AbortController();
   const stop = () => controller.abort();
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
   try {
-    const transport = createTelegramTransport({ token });
-    const serverUrl = process.env.BOT_SERVER_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`;
-    const forwardUpdate = createTelegramForwarder({ serverUrl, webhookSecret });
-    console.log('Telegram polling запущен: обновления передаются основному серверу. Используйте один процесс polling; исходящий webhook Telegram должен быть отключён.');
-    await runTelegramPolling({ transport, forwardUpdate, signal: controller.signal, onError: () => console.error('Не удалось обработать обновление Telegram; повтор через 3 секунды.') });
+    log('Telegram polling запущен: обновления передаются основному серверу. Используйте один процесс polling. Для хостинга остановите polling и выполните npm run bot:hosted.');
+    await runTelegramPolling({ transport, forwardUpdate, signal: controller.signal, onError: () => logError('Не удалось обработать обновление Telegram; повтор через 3 секунды.') });
   } finally {
     process.removeListener('SIGINT', stop);
     process.removeListener('SIGTERM', stop);
@@ -76,8 +77,9 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch(() => {
-    console.error('Не удалось запустить Telegram polling. Проверьте локальные настройки и доступ к хранилищу.');
+  startTelegramPolling().catch(error => {
+    console.error(error?.code?.startsWith('TELEGRAM_MODE_') || error?.code === 'TELEGRAM_WEBHOOK_ACTIVE'
+      ? error.message : 'Не удалось запустить Telegram polling. Проверьте локальные настройки и доступ к хранилищу.');
     process.exitCode = 1;
   });
 }
