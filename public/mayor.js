@@ -1,10 +1,11 @@
-import { api, labels, escapeHTML as esc, formatDate, labelFor, badge, renderTimeline } from './citizen.js';
+import { api, labels, escapeHTML as esc, formatDate, labelFor, badge, renderTimeline, getComplaintConfig, COMPLAINTS_UNAVAILABLE } from './citizen.js';
 
 const $ = id => document.getElementById(id);
 let adminToken = '';
 let complaints = [];
 let selectedId = null;
 let requestVersion = 0;
+let serviceAvailable = false;
 const drafts = new Map();
 const pendingSaves = new Set();
 const photoUrls = new Set();
@@ -31,6 +32,7 @@ function filteredQuery() {
 }
 
 async function loadComplaints() {
+  if (!serviceAvailable) { setError(COMPLAINTS_UNAVAILABLE); return; }
   const version = ++requestVersion;
   $('complaints-list').setAttribute('aria-busy', 'true');
   $('refresh-button').disabled = true;
@@ -89,7 +91,7 @@ function currentFields(complaint) {
 }
 
 function setEditorBusy(form, busy) {
-  form.querySelectorAll('input, select, textarea, button').forEach(control => { control.disabled = busy; });
+  form.querySelectorAll('input, select, textarea, button').forEach(control => { control.disabled = busy || !serviceAvailable; });
   form.setAttribute('aria-busy', String(busy));
   if (busy) form.querySelector('#save-button').textContent = 'Сохраняем…';
 }
@@ -152,6 +154,7 @@ function renderDetail() {
 
 async function saveComplaint(event, complaint) {
   event.preventDefault();
+  if (!serviceAvailable) { setError(COMPLAINTS_UNAVAILABLE); return; }
   if (pendingSaves.has(complaint.id)) return;
   const editForm = event.currentTarget;
   const formValues = Object.fromEntries(new FormData(editForm));
@@ -216,6 +219,7 @@ async function saveComplaint(event, complaint) {
 }
 
 async function loadPhoto(button, id) {
+  if (!serviceAvailable) { button.disabled = true; button.textContent = 'Фото недоступно на этом сервере'; return; }
   button.disabled = true;
   button.textContent = 'Загружаем фото…';
   try {
@@ -276,9 +280,10 @@ function renderMap() {
 $('filter-form').addEventListener('submit', event => { event.preventDefault(); loadComplaints(); });
 $('filter-form').querySelectorAll('select').forEach(select => select.addEventListener('change', loadComplaints));
 $('reset-filters').addEventListener('click', () => { $('filter-form').reset(); loadComplaints(); });
-$('refresh-button').addEventListener('click', loadComplaints);
+$('refresh-button').addEventListener('click', () => serviceAvailable ? loadComplaints() : checkAvailability());
 $('access-form').addEventListener('submit', event => {
   event.preventDefault();
+  if (!serviceAvailable) { setError(COMPLAINTS_UNAVAILABLE); return; }
   adminToken = $('admin-token').value.trim();
   $('admin-token').value = '';
   complaints = [];
@@ -302,7 +307,28 @@ $('clear-token').addEventListener('click', () => {
   loadComplaints();
 });
 window.addEventListener('pagehide', releasePhotos);
-api('/api/citizen/config').then(config => {
-  $('admin-mode').textContent = config.adminConfigured ? 'Защищённая панель · введите токен администратора для доступа.' : config.demoMode ? 'Локальное демо · доступ без токена разрешён только с этого компьютера.' : 'Для удалённого доступа требуется настроенный токен администратора.';
-}).catch(() => { $('admin-mode').textContent = 'Не удалось определить режим доступа. При запросе авторизации введите токен администратора.'; });
-loadComplaints();
+async function checkAvailability() {
+  serviceAvailable = false;
+  $('refresh-button').disabled = true;
+  $('admin-mode').textContent = 'Проверяем доступность приёма обращений…';
+  const accessControls = $('access-form').querySelectorAll('input, button[type="submit"]');
+  accessControls.forEach(control => { control.disabled = true; });
+  try {
+    const config = await getComplaintConfig();
+    serviceAvailable = true;
+    accessControls.forEach(control => { control.disabled = false; });
+    $('admin-mode').textContent = config.adminConfigured ? 'Защищённая панель · введите токен администратора для доступа.' : config.demoMode ? 'Локальное демо · доступ без токена разрешён только с этого компьютера.' : 'Для удалённого доступа требуется настроенный токен администратора.';
+    $('refresh-button').textContent = 'Обновить ↻';
+    await loadComplaints();
+  } catch {
+    $('admin-mode').textContent = COMPLAINTS_UNAVAILABLE;
+    setError(COMPLAINTS_UNAVAILABLE);
+    $('results-count').textContent = 'Приём недоступен';
+    $('complaints-list').innerHTML = '<div class="empty-state"><h3>Приём обращений ещё недоступен</h3><p>Подключение и изменение обращений заблокированы. Нажмите «Проверить доступность» для повторной проверки.</p></div>';
+    $('refresh-button').textContent = 'Проверить доступность';
+  } finally {
+    $('complaints-list').setAttribute('aria-busy', 'false');
+    $('refresh-button').disabled = false;
+  }
+}
+checkAvailability();
