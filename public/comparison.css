@@ -33,8 +33,15 @@
 .comparison-decrease { color: #a22e25; font-weight: 700; }
 .comparison-status { margin: 16px 0 0; color: #4c5f75; font-size: .9rem; }
 .comparison-status:empty { margin: 0; }
+.comparison-export { margin-top: 20px; }
+.comparison-export-button { min-height: 44px; padding: 10px 16px; border: 1px solid #214f80; border-radius: 8px; font: inherit; font-weight: 600; color: #fff; background: #214f80; cursor: pointer; }
+.comparison-export-button:hover:not(:disabled) { background: #173d66; }
+.comparison-export-button:focus-visible { outline: 3px solid #b25400; outline-offset: 3px; }
+.comparison-export-button:disabled { color: #526277; background: #e9eef4; border-color: #cbd5e1; cursor: not-allowed; }
+.comparison-export-hint { margin: 6px 0 0; color: #4c5f75; font-size: .9rem; }
 @media (max-width: 560px) {
   .comparison-slots { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .comparison-slot { padding: 12px; }
   .comparison-cell { padding: 8px 3px; font-size: .85rem; }
+  .comparison-export-button { width: 100%; }
 }
