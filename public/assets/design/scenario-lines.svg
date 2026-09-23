@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160" fill="none" role="img" aria-labelledby="scenario-lines-title scenario-lines-desc">
+  <title id="scenario-lines-title">Два варианта решения</title>
+  <desc id="scenario-lines-desc">Две декоративные ветвящиеся линии с разными узлами от одной отправной точки. Без шкалы, числовых значений и результатов сценариев.</desc>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 35h192M64 125h192" stroke="#AABFAF" stroke-width="1" stroke-dasharray="2 6"/>
+    <path d="M34 80h29c33 0 41-38 75-38h35c33 0 40 13 64 13h35" stroke="#3E806B" stroke-width="2.4"/>
+    <path d="M63 80c33 0 41 38 75 38h35c33 0 40-13 64-13h35" stroke="#6F9470" stroke-width="2.4" stroke-dasharray="5 5"/>
+    <path d="M169 56v45" stroke="#B2C8BB" stroke-width="1.2" stroke-dasharray="2 5"/>
+    <circle cx="34" cy="80" r="12" fill="#E3EEE4" stroke="#5D8974" stroke-width="1.5"/>
+    <circle cx="34" cy="80" r="4" fill="#3E806B"/>
+    <circle cx="106" cy="55" r="5" fill="#E3EEE4" stroke="#3E806B" stroke-width="2"/>
+    <circle cx="169" cy="42" r="9" fill="#C2E2D3" stroke="#3E806B" stroke-width="2"/>
+    <circle cx="169" cy="42" r="2.5" fill="#3E806B"/>
+    <circle cx="237" cy="55" r="5" fill="#E3EEE4" stroke="#3E806B" stroke-width="2"/>
+    <rect x="102" y="101" width="8" height="8" rx="1.5" fill="#E3EEE4" stroke="#6F9470" stroke-width="2"/>
+    <rect x="161" y="110" width="16" height="16" rx="3" fill="#DEE9CE" stroke="#6F9470" stroke-width="2"/>
+    <rect x="166.5" y="115.5" width="5" height="5" rx="1" fill="#6F9470"/>
+    <rect x="233" y="101" width="8" height="8" rx="1.5" fill="#E3EEE4" stroke="#6F9470" stroke-width="2"/>
+    <circle cx="278" cy="55" r="8" fill="#C2E2D3" stroke="#3E806B" stroke-width="2"/>
+    <rect x="271" y="98" width="14" height="14" rx="3" fill="#DEE9CE" stroke="#6F9470" stroke-width="2"/>
+    <path d="M290 74v10m-5-5h10M77 109v6m-3-3h6" stroke="#89AD98" stroke-width="1.2"/>
+    <circle cx="243" cy="80" r="2" fill="#89AD98"/>
+  </g>
+</svg>

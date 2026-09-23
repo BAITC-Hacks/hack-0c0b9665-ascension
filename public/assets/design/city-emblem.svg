@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none" role="img" aria-labelledby="city-emblem-title city-emblem-desc">
+  <title id="city-emblem-title">Городская лаборатория</title>
+  <desc id="city-emblem-desc">Абстрактный городской силуэт: сфера над раскрытыми опорами, два здания и линии реки. Декоративная эмблема, не официальный городской знак.</desc>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 55V32l12-7m46 0 12 7v23" stroke="#88BCA5" stroke-width="1.5"/>
+    <path d="m17 68 31 17 31-17" stroke="#88BCA5" stroke-width="1.5"/>
+    <path d="M21 59V44l12-6v24m42-3V44l-12-6v24" stroke="#BCE5CC" stroke-width="2.4"/>
+    <path d="M27 46v5m42-5v5" stroke="#A3D6BC" stroke-width="2"/>
+    <path d="M42 62c0-9-1-17-6-24m18 24c0-9 1-17 6-24" stroke="#E1F2DA" stroke-width="2.8"/>
+    <path d="M48 42v20" stroke="#A3D6BC" stroke-width="2"/>
+    <circle cx="48" cy="28" r="11" fill="#B7DEB3" fill-opacity=".14" stroke="#E1F2DA" stroke-width="2.8"/>
+    <path d="M42 25a7 7 0 0 1 7-4" stroke="#A3D6BC" stroke-width="1.7"/>
+    <path d="M17 67c10-7 20-7 31 0s21 7 31 0" stroke="#C6EDDB" stroke-width="2.5"/>
+    <path d="M24 74c8-3 16-1 24 3s16 5 24 2" stroke="#88BCA5" stroke-width="1.5"/>
+    <circle cx="48" cy="10" r="1.8" fill="#E1F2DA"/>
+  </g>
+</svg>
