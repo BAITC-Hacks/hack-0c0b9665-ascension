@@ -126,8 +126,8 @@ function renderPlan() {
   $('simulate-button').innerHTML = state.simulating ? 'Рассчитываем…' : 'Посмотреть результат';
   $('simulate-hint').textContent = state.busy ? 'Проверяем совместимость решений…' : state.simulating ? 'Проверяем влияние на все районы' : state.decisions.length < 5 ? `Выберите ещё ${5 - state.decisions.length} ${5 - state.decisions.length === 1 ? 'решение' : 5 - state.decisions.length < 5 ? 'решения' : 'решений'}` : 'Пять решений готовы к расчёту';
   $('demo-button').disabled = state.busy;
-  $('reset-button').disabled = state.busy || state.decisions.length === 0;
-  $('reset-button').hidden = state.decisions.length === 0;
+  $('reset-button').disabled = state.decisions.length === 0 && !state.busy;
+  $('reset-button').hidden = state.decisions.length === 0 && !state.busy;
 }
 
 function invalidateResult() {
@@ -343,8 +343,19 @@ $('selected-list').addEventListener('change', (event) => {
   void applyDecisions(updated, 'Район реализации изменён.');
 });
 $('demo-button').addEventListener('click', () => void applyDecisions(demo, 'Загружен официальный демо-сценарий.'));
-$('reset-button').addEventListener('click', async () => {
-  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'transport'; renderFilters(); renderCatalog(); }
+$('reset-button').addEventListener('click', () => {
+  state.mutationId += 1;
+  state.busy = false;
+  state.decisions = [];
+  state.totalCost = 0;
+  state.picks = {};
+  state.filter = 'transport';
+  clearErrors();
+  invalidateResult();
+  renderFilters();
+  renderPlan();
+  renderCatalog();
+  announce(`Создан новый сценарий. Выбрано 0 из 5. Осталось ${state.dataset.budget} условных единиц.`);
 });
 $('simulate-button').addEventListener('click', () => void calculate());
 $('district-focus').addEventListener('click', (event) => {
