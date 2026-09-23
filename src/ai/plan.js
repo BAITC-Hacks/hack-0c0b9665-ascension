@@ -127,20 +127,32 @@ function evaluatePlan(plan) {
     validation.valid = false;
     validation.errors.push({ code: 'UNSUPPORTED_REQUEST', message: 'Часть запроса нельзя рассчитать без уточнения. Проверьте ограничения плана.' });
   }
-  const decisionOrigins = plan.decisions.map(({ source, rationale }, decisionIndex) => ({ decisionIndex, source, rationale }));
+  const decisionOrigins = plan.decisions.map(({ source, rationale }, decisionIndex) => ({
+    decisionIndex, source,
+    rationale: source === 'requested'
+      ? 'Модель сопоставила меру с запросом пользователя; проверьте соответствие.'
+      : 'Дополнение, предложенное моделью; проверьте необходимость.',
+    modelRationale: `Непроверенная интерпретация Ascension AI: ${rationale}`,
+  }));
   const additions = plan.decisions.filter(decision => decision.source === 'suggested').map(decision => {
     const measure = measures.get(decision.measureId);
     const target = decision.districtId === null ? (measure.scope === 'city' ? 'весь город' : 'район не выбран')
       : districts.get(decision.districtId).name;
-    return `Дополнение Ascension AI: ${measure.name} — ${target}. ${decision.rationale}`;
+    return `Дополнение Ascension AI: ${measure.name} — ${target}.`;
   });
+  const result = validation.valid ? simulate({ decisions }) : undefined;
   return {
     mode: 'ai', available: true, ...(validation.valid ? {} : { reason: 'invalid_plan' }),
-    summary: plan.summary, decisions, decisionOrigins, unsupported: plan.unsupported,
-    assumptions: [...additions, ...plan.assumptions,
+    summary: validation.valid
+      ? `План проверен, учебная симуляция рассчитана. Стоимость ${validation.totalCost} из ${dataset.budget}.`
+      : 'План требует уточнения или нарушает ограничения. Учебная симуляция не выполнена.',
+    modelComment: { label: 'Непроверенный комментарий Ascension AI', text: plan.summary },
+    decisions, decisionOrigins,
+    unsupported: plan.unsupported.map(text => `Непроверенная интерпретация Ascension AI: ${text}`),
+    assumptions: [...additions, ...plan.assumptions.map(text => `Допущение Ascension AI, требует проверки: ${text}`),
       'Модель использует синтетический набор данных. Это учебный сценарий, а не прогноз для реальной Астаны.'],
     valid: validation.valid, validation,
-    ...(validation.valid ? { result: simulate({ decisions }) } : {}),
+    ...(result ? { result } : {}),
   };
 }
 
@@ -187,8 +199,12 @@ export async function proposePlan(input, options = {}) {
           text: { format: { type: 'json_schema', name: 'ascension_city_plan', strict: true, schema } },
         }),
       });
-      if (response.redirected || !response.ok) return unavailable(response.status === 429 ? 'rate_limited' : 'provider_error',
-        'Ascension AI временно недоступен. План не был рассчитан; попробуйте позже или соберите его вручную.');
+      if (response.redirected || !response.ok) {
+        controller.abort();
+        try { await response.body?.cancel?.(); } catch { /* Abort may already have closed the stream. */ }
+        return unavailable(response.status === 429 ? 'rate_limited' : 'provider_error',
+          'Ascension AI временно недоступен. План не был рассчитан; попробуйте позже или соберите его вручную.');
+      }
       return evaluatePlan(parsePlan(await readProviderResponse(response, Boolean(options.fetchImpl))));
     };
     return await Promise.race([request(), deadline]);
@@ -199,6 +215,7 @@ export async function proposePlan(input, options = {}) {
       ? 'Ascension AI не успел ответить. План не был рассчитан; попробуйте ещё раз.'
       : 'Ascension AI не смог подготовить проверяемый план. Уточните меры и районы или соберите план вручную.');
   } finally {
+    controller.abort();
     clearTimeout(timer);
   }
 }

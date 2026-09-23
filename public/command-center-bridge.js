@@ -5,6 +5,7 @@ export function mountCommandCenterBridge({ dataset, baseline, map, applyDecision
   getContext, fetcher = globalThis.fetch, eventTarget = window, mount = mountCommandCenter }) {
   const ui = mount({ dataset, baseline, map });
   let epoch = 0;
+  let cityEpoch = 0;
   let controller;
   let applying = false;
   let destroyed = false;
@@ -26,7 +27,7 @@ export function mountCommandCenterBridge({ dataset, baseline, map, applyDecision
 
   listen('scenario:invalidated', invalidate);
   listen('scenario:load', invalidate);
-  listen('city:changed', invalidate);
+  listen('city:changed', () => { cityEpoch++; invalidate(); });
   listen('ascension:apply-plan', async (event) => {
     if (destroyed || applying) return;
     if (!activeCity()) {
@@ -39,10 +40,11 @@ export function mountCommandCenterBridge({ dataset, baseline, map, applyDecision
       return;
     }
     applying = true;
+    const requestedCityEpoch = cityEpoch;
     try {
       const applied = await applyDecisions(structuredClone(decisions), 'План Ascension AI принят.');
       if (destroyed) return;
-      if (!applied || !activeCity()) {
+      if (!applied || !activeCity() || cityEpoch !== requestedCityEpoch) {
         emit('ascension:plan-applied', { applied: false, message: 'План не применён. Проверьте ограничения в конструкторе.' });
         return;
       }

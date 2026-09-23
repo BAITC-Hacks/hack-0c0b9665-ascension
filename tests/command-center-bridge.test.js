@@ -104,3 +104,19 @@ test('bridge disposal cancels pending work and removes all handlers', async () =
   await tick();
   assert.deepEqual(harness.context.decisions, []);
 });
+
+test('bridge does not auto-calculate when a city changes away and back during validation', async () => {
+  let resolveValidation;
+  let calculated = 0;
+  const harness = setup({ applyDecisions: () => new Promise(resolve => { resolveValidation = resolve; }),
+    calculate: async () => { calculated++; } });
+  harness.emit('ascension:apply-plan', scenario);
+  harness.context.hasScenarioData = false;
+  harness.emit('city:changed', { id: 'almaty', hasScenarioData: false });
+  harness.context.hasScenarioData = true;
+  harness.emit('city:changed', { id: 'astana', hasScenarioData: true });
+  resolveValidation(true);
+  await tick();
+  assert.equal(calculated, 0);
+  harness.bridge.destroy();
+});

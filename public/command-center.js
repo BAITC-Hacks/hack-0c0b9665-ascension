@@ -140,6 +140,17 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   let proposal = null;
   let applying = false;
 
+  function clearProposal(message = '') {
+    requestVersion++; request?.abort(); request = null; proposal = null;
+    $('.cc-plan-preview').hidden = true;
+    $('.cc-apply-plan').hidden = true;
+    $('.cc-apply-plan').disabled = true;
+    $('.cc-plan-submit').disabled = applying;
+    $('.cc-plan-submit').textContent = '✦ Оценить мой план ↗';
+    if (message) { $('.cc-ai-status').textContent = message; $('.cc-ai-status').dataset.tone = ''; }
+  }
+  listen($('#cc-plan-prompt'), 'input', () => clearProposal('Запрос изменён. Оцените обновлённый план.'));
+
   function setAI(open) {
     aiOpen = open;
     root.classList.toggle('cc-ai-collapsed', !open);
@@ -178,6 +189,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     $('.cc-close').focus({ preventScroll: true });
   }
   listen(root, 'click', (event) => {
+    if (event.target.closest('#focus-measures')) openPanel('workspace');
     const quickAction = event.target.closest('[data-quick-action]');
     if (quickAction) {
       document.getElementById(`${quickAction.dataset.quickAction}-button`)?.click();
@@ -212,9 +224,19 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     $('.cc-score').textContent = number(result.score);
     $('.cc-score-delta').textContent = result.deltaScore ? signed(result.deltaScore) : 'из 100';
     $('.cc-score-delta').classList.toggle('cc-negative', result.deltaScore < 0);
-    $('.cc-budget').textContent = `${number(result.totalCost || 0, 0)} / ${dataset.budget}`;
+    updateBudget();
     $('.cc-critical').textContent = number(result.criticalCount, 0);
     $('.cc-kpi-phase').textContent = quarter !== undefined ? quarter === 0 ? 'До решений' : `Квартал ${quarter}` : result === baseline ? 'До решений' : 'После решений';
+  }
+  function updateBudget() {
+    const selectedCost = Number(document.getElementById('plan-total')?.textContent?.replace(/\s/g, '') || 0);
+    $('.cc-budget').textContent = `${number(selectedCost, 0)} / ${dataset.budget}`;
+  }
+  const budgetNode = document.getElementById('plan-total');
+  if (budgetNode) {
+    const budgetObserver = new MutationObserver(updateBudget);
+    budgetObserver.observe(budgetNode, { childList: true, characterData: true, subtree: true });
+    listeners.push(() => budgetObserver.disconnect());
   }
   updateMetrics(baseline);
   function stopPlayback() {
@@ -275,7 +297,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     clearTrajectory();
     updateMetrics(baseline);
   });
-  listen(window, 'scenario:load', clearTrajectory);
+  listen(window, 'scenario:load', () => { clearTrajectory(); openPanel('workspace'); });
   listen(window, 'ascension:trajectory-status', (event) => {
     if (event.detail?.loading) $('.cc-timeline-state').textContent = 'Рассчитываем кварталы…';
     else if (event.detail?.message) $('.cc-timeline-state').textContent = event.detail.message;
@@ -302,8 +324,8 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     $('.cc-kpis').hidden = !modelAvailable;
     $('.cc-timeline').hidden = !modelAvailable;
     if (!modelAvailable) {
-      requestVersion += 1; request?.abort(); request = null; applying = false;
-      $('.cc-plan-submit').disabled = false; $('.cc-plan-submit').textContent = '✦ Оценить мой план ↗';
+      applying = false;
+      clearProposal('Вернитесь к Астане и заново оцените план.');
       closePanel(false);
     }
   });
@@ -314,7 +336,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   };
   listen($('.cc-prompt-examples'), 'click', (event) => {
     const button = event.target.closest('[data-example]');
-    if (button) { $('#cc-plan-prompt').value = examples[button.dataset.example]; $('#cc-plan-prompt').focus(); }
+    if (button && !applying) { clearProposal(); $('#cc-plan-prompt').value = examples[button.dataset.example]; $('#cc-plan-prompt').focus(); }
   });
   function addNotes(parent, title, values) {
     const items = Array.isArray(values) ? values.map(readable).filter(Boolean) : typeof values === 'string' ? [values] : [];
@@ -326,12 +348,17 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   function showProposal(response) {
     const preview = $('.cc-plan-preview'); preview.replaceChildren(); preview.hidden = false;
     preview.append(element('span', 'cc-kicker', 'ПРЕДЛОЖЕННЫЙ ПЛАН'), element('p', 'cc-plan-summary', response.summary || 'Проверьте предложенные меры перед применением.'));
+    if (response.modelComment?.text) {
+      const comment = element('div', 'cc-model-comment');
+      comment.append(element('strong', '', 'Комментарий AI · требует проверки'), element('p', '', response.modelComment.text));
+      preview.append(comment);
+    }
     const list = element('ol', 'cc-proposed-measures');
     for (const [decisionIndex, decision] of (response.decisions || []).entries()) {
       const measure = dataset.measures.find((entry) => entry.id === decision.measureId);
       const district = dataset.districts.find((entry) => entry.id === decision.districtId);
       const item = element('li');
-      item.append(element('strong', '', measure?.name || decision.measureId), element('span', '', `${district?.name || 'Весь город'}${measure ? ` · ${measure.cost} у. е. · задержка ${measure.lag} кв.` : ''}`));
+      item.append(element('strong', '', measure?.name || decision.measureId), element('span', '', `${district?.name || (measure?.scope === 'city' ? 'Весь город' : 'Район не указан')}${measure ? ` · ${measure.cost} у. е. · задержка ${measure.lag} кв.` : ''}`));
       const origin = response.decisionOrigins?.find((entry) => entry.decisionIndex === decisionIndex);
       if (origin?.source === 'suggested') item.append(element('span', 'cc-ai-addition', 'Дополнение AI'));
       if (origin?.rationale) item.append(element('span', 'cc-plan-rationale', origin.rationale));
@@ -350,7 +377,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   listen($('.cc-ai-form'), 'submit', async (event) => {
     event.preventDefault();
     const prompt = $('#cc-plan-prompt').value.trim();
-    if (!prompt || !modelAvailable) return;
+    if (!prompt || !modelAvailable || applying) return;
     request?.abort(); request = new AbortController();
     const controller = request;
     const version = ++requestVersion;
@@ -364,7 +391,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
       const body = await response.json().catch(() => ({}));
       if (version !== requestVersion) return;
       if (!response.ok || body.mode !== 'ai' || body.available !== true) {
-        const reason = readable(body.error) || readable(body.errors?.[0]) || body.reason || body.message;
+        const reason = body.summary || readable(body.error) || readable(body.errors?.[0]) || body.message;
         throw new Error(reason || 'Ascension AI сейчас недоступен. Можно собрать и рассчитать план в конструкторе.');
       }
       showProposal(body);
