@@ -13,6 +13,7 @@ import { sendNodeStatic } from './runtime/node-static.js';
 import { createNodeAIAdmission } from './runtime/ai-admission.js';
 import { createPlanning } from './runtime/planning.js';
 import { createNodeWorkspace } from './runtime/node-workspace.js';
+import { resolveAIConfiguration } from './ai/provider.js';
 
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -31,7 +32,7 @@ function sendJson(response, { status, body: value, headers = {} }) {
 export function createRequestHandler({ aiConfigured,
   publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, complaints = {}, ...options } = {}) {
   const staticRoot = resolve(publicDir);
-  const configured = aiConfigured ?? (() => Boolean(env.OPENAI_API_KEY?.trim()));
+  const configured = aiConfigured ?? (() => resolveAIConfiguration({}, env).configured);
   const handleComplaints = createComplaintRoutes(complaints);
   const trustedOrigin = configuredPublicOrigin(publicOrigin, env);
   const admission = createNodeAIAdmission({ ...options, aiConfigured: configured, env });

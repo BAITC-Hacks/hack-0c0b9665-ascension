@@ -1,4 +1,5 @@
 import { getDataset, simulate, validateScenario } from '../core/simulator.js';
+import { createProviderRequest, normalizeProviderResponse, requestProvider, resolveAIConfiguration } from './provider.js';
 
 const dataset = getDataset();
 const measures = new Map(dataset.measures.map(measure => [measure.id, measure]));
@@ -167,13 +168,10 @@ export async function proposePlan(input, options = {}) {
     || input.prompt.length > MAX_PLAN_PROMPT_CHARS) {
     return unavailable('invalid_input', `Опишите план текстом длиной от 1 до ${MAX_PLAN_PROMPT_CHARS} символов.`, 'INVALID_PROMPT');
   }
-  const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  const configuration = resolveAIConfiguration(options);
+  const { model, provider } = configuration;
+  if (!configuration.configured) {
     return unavailable('not_configured', 'Ascension AI недоступен: серверный ключ не настроен. План можно собрать вручную.');
-  }
-  const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? 'gpt-6-astra';
-  if (typeof model !== 'string' || !model.trim() || model.length > 120) {
-    return unavailable('not_configured', 'Ascension AI недоступен: модель не настроена.');
   }
   const timeoutMs = Number.isFinite(options.timeoutMs)
     ? Math.max(1, Math.min(MAX_TIMEOUT_MS, Math.floor(options.timeoutMs))) : MAX_TIMEOUT_MS;
@@ -189,11 +187,7 @@ export async function proposePlan(input, options = {}) {
       }, timeoutMs);
     });
     const request = async () => {
-      const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
-        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        redirect: 'manual',
-        signal: controller.signal,
-        body: JSON.stringify({
+      const providerRequest = createProviderRequest(configuration, {
           model, store: false, max_output_tokens: 3000,
           ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
           input: [
@@ -202,15 +196,19 @@ export async function proposePlan(input, options = {}) {
             { role: 'user', content: input.prompt.trim() },
           ],
           text: { format: { type: 'json_schema', name: 'ascension_city_plan', strict: true, schema } },
-        }),
       });
+      const response = await requestProvider(configuration, providerRequest,
+        { fetchImpl: options.fetchImpl, signal: controller.signal });
       if (response.redirected || !response.ok) {
         controller.abort();
         try { await response.body?.cancel?.(); } catch { /* Abort may already have closed the stream. */ }
         return unavailable(response.status === 429 ? 'rate_limited' : 'provider_error',
           'Ascension AI временно недоступен. План не был рассчитан; попробуйте позже или соберите его вручную.');
       }
-      return evaluatePlan(parsePlan(await readProviderResponse(response, Boolean(options.fetchImpl))));
+      const envelope = normalizeProviderResponse(await readProviderResponse(response, Boolean(options.fetchImpl)), provider);
+      const value = evaluatePlan(parsePlan(envelope));
+      return provider === 'nvidia' ? { ...value, provider, model,
+        ...(configuration.backend ? { backend: configuration.backend } : {}) } : value;
     };
     return await Promise.race([request(), deadline]);
   } catch (error) {

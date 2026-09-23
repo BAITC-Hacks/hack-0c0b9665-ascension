@@ -1,4 +1,5 @@
 import { getDataset, simulate } from '../core/simulator.js';
+import { createProviderRequest, normalizeProviderResponse, requestProvider, resolveAIConfiguration } from './provider.js';
 
 const data = getDataset();
 const fmt = (number) => number.toFixed(2);
@@ -20,7 +21,7 @@ const schema = {
 };
 
 export function isAIConfigured() {
-  return Boolean(globalThis.process?.env?.OPENAI_API_KEY?.trim());
+  return resolveAIConfiguration().configured;
 }
 
 function bestReplacement(scenario, result) {
@@ -198,16 +199,13 @@ function parseAnalysis(response) {
 export async function explainScenario(scenario, result, options = {}) {
   const facts = buildExplanationFacts(scenario, result, options);
   const catalog = recommendationCatalog(facts);
-  const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
-  if (typeof apiKey !== 'string' || !apiKey.trim()) return deterministic(facts, 'not_configured');
-  const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? 'gpt-6-astra';
-  if (typeof model !== 'string' || !model.trim() || model.length > 120) {
-    return deterministic(facts, 'not_configured');
-  }
-  const cacheKey = JSON.stringify(['evidence-contract-v1', model, facts.replacementSearchPerformed,
+  const configuration = resolveAIConfiguration(options);
+  const { model, provider } = configuration;
+  if (!configuration.configured) return deterministic(facts, 'not_configured');
+  const cacheKey = JSON.stringify(['evidence-contract-v1', provider, configuration.backend, model, facts.replacementSearchPerformed,
     [...scenario.decisions].sort((a,b) => a.measureId.localeCompare(b.measureId))]);
   // Injectable transports never share live-response cache with production.
-  const useCache = !options.fetchImpl && !options.apiKey;
+  const useCache = !options.fetchImpl && !options.apiKey && !options.aiBinding;
   const cached = useCache && cache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return structuredClone(cached.value);
   const timeoutMs = Number.isFinite(options.timeoutMs)
@@ -224,27 +222,27 @@ export async function explainScenario(scenario, result, options = {}) {
       }, timeoutMs);
     });
     const request = async () => {
-      const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
-        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        redirect: 'manual', signal: controller.signal,
-        body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
+      const providerRequest = createProviderRequest(configuration, { model, store: false, max_output_tokens: 3000,
           ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
           input: [
             { role: 'developer', content: `Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. В summary, strengths, risks объясни качественно сильные стороны, риски и компромиссы, без цифр, числовых значений, процентов и кодов мер/показателей. Не рассчитывай новые числа и не записывай числа словами: числовую сводку и точные значения добавит сервер. Называй меры и районы словами. Не используй утверждения о гарантии, подтверждённом прогнозе или глобальном оптимуме; сервер добавит оговорку о синтетике. Не предлагай добавление, удаление или замену мер в свободной прозе. Объясни приоритет самого слабого района и оставшиеся дефициты. recommendations — только выбранные коды из списка ${Object.keys(catalog).join(', ')}; это не свободный текст. Если подходящего совета нет, верни пустой массив. Код VERIFIED_SINGLE_REPLACEMENT допустим только если он есть в списке. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По два–четыре коротких пункта strengths и risks.` },
             { role: 'user', content: JSON.stringify(facts) },
           ],
           text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema: analysisSchema(catalog) } },
-        }),
       });
+      const response = await requestProvider(configuration, providerRequest,
+        { fetchImpl: options.fetchImpl, signal: controller.signal });
       if (response.redirected || !response.ok) {
         controller.abort();
         try { await response.body?.cancel?.(); } catch { /* Abort may have closed the stream. */ }
         return deterministic(facts, response.status === 429 ? 'rate_limited' : 'provider_error');
       }
-      const analysis = groundAnalysis(parseAnalysis(await readProviderResponse(response, Boolean(options.fetchImpl))), facts, catalog);
+      const envelope = normalizeProviderResponse(await readProviderResponse(response, Boolean(options.fetchImpl)), provider);
+      const analysis = groundAnalysis(parseAnalysis(envelope), facts, catalog);
       // A transport that ignores abort must never populate the shared cache after timeout.
       if (controller.signal.aborted) throw controller.signal.reason;
-      const value = { mode: 'ai', available: true, model, ...analysis };
+      const value = { mode: 'ai', available: true, model, ...(provider === 'nvidia'
+        ? { provider, ...(configuration.backend ? { backend: configuration.backend } : {}) } : {}), ...analysis };
       if (useCache) {
         if (cache.size >= 100) cache.delete(cache.keys().next().value);
         cache.set(cacheKey, { expires: Date.now() + 600000, value });

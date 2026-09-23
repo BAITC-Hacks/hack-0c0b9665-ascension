@@ -27,6 +27,7 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
 // This shortcut is for a local review. npm start and Compose support server hosting.
 const host = '127.0.0.1';
 process.env.HOST = host;
+const { resolveAIConfiguration } = await import('../src/ai/provider.js');
 const { createAppServer } = await import('../src/server.js');
 const server = createAppServer();
 server.once('error', error => {
@@ -43,7 +44,7 @@ server.listen(port, host, () => {
   console.log(`Mayor panel:        ${base}/mayor.html`);
   console.log(`Health:             ${base}/api/health`);
   console.log('Keep this window open. Press Ctrl+C to stop.');
-  if (!process.env.OPENAI_API_KEY?.trim()) {
+  if (!resolveAIConfiguration({}, process.env).configured) {
     console.log('No AI key configured: calculations and requests work; explanations use the calculation rules.');
   }
   if (process.argv.includes('--no-open')) return;

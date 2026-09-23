@@ -1,23 +1,27 @@
 import { createLocalAIGuard } from './local-ai-guard.js';
+import { resolveAIConfiguration } from '../ai/provider.js';
 
 const limitsFor = (env = {}, overrides = {}) => ({
   maxRequests: overrides.maxRequests ?? env.AI_MAX_REQUESTS,
   requestsPerMinute: overrides.requestsPerMinute ?? env.AI_REQUESTS_PER_MINUTE,
   maxConcurrent: overrides.maxConcurrent ?? env.AI_MAX_CONCURRENT,
 });
-const providerOptions = env => ({ apiKey: env.OPENAI_API_KEY ?? '', model: env.OPENAI_MODEL });
+const providerOptions = env => {
+  const { configured, ...options } = resolveAIConfiguration({}, env);
+  return options;
+};
 function retryHeaders({ reason, retryAfter }) {
   const retry = Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter
     : reason === 'server_request_limit' ? undefined : reason === 'server_busy' ? 5 : 60;
   return retry ? { 'Retry-After': String(retry) } : {};
 }
 async function declined(fallback, options, denial = {}, headers = {}) {
-  return { body: await fallback({ reason: denial.reason, options: { ...options, apiKey: '' } }), headers };
+  return { body: await fallback({ reason: denial.reason, options: { ...options, apiKey: '', aiBinding: undefined } }), headers };
 }
 
 /** One instance per Node server; every paid operation shares these counters. */
 export function createNodeAIAdmission({ now = Date.now, env = globalThis.process?.env ?? {},
-  aiLimits = {}, aiConfigured = () => Boolean(env.OPENAI_API_KEY?.trim()) } = {}) {
+  aiLimits = {}, aiConfigured = () => resolveAIConfiguration({}, env).configured } = {}) {
   const guard = createLocalAIGuard({ now });
   const limits = limitsFor(env, aiLimits);
   return async function run({ operation, fallback }) {
@@ -57,7 +61,7 @@ export function createWorkerAIAdmission({ now = Date.now } = {}) {
   const guard = createLocalAIGuard({ now });
   return async function run({ operation, fallback }, env) {
     const options = providerOptions(env);
-    if (!options.apiKey.trim()) return declined(fallback, options, { reason: 'missing_api_key' });
+    if (!resolveAIConfiguration({}, env).configured) return declined(fallback, options, { reason: 'missing_api_key' });
     const limits = limitsFor(env);
     const localDenial = guard.check(limits);
     const denial = localDenial.reason ? localDenial : await platformDenial(env);
