@@ -100,7 +100,8 @@ function groundAnalysis(analysis, facts, catalog) {
   // This is deliberately not a proof of all qualitative natural-language claims.
   const unsupportedCertainty = /(?:гарантир|подтвержд[её]нн.{0,25}прогноз|глобальн.{0,15}оптим|(?<!\p{L})шест\p{L}*)/iu;
   const normalizedProse = prose.map(text => text.normalize('NFKC').replace(/\p{Cf}/gu, '').replace(/\s+/gu, ' '));
-  if (normalizedProse.some(text => /\p{N}/u.test(text) || unsupportedCertainty.test(text))
+  if (prose.some(text => /\p{N}/u.test(text))
+    || normalizedProse.some(text => unsupportedCertainty.test(text))
     || analysis.recommendations.some(code => !Object.hasOwn(catalog, code))) {
     throw new InvalidModelAnalysis('Model output violated the evidence contract');
   }
