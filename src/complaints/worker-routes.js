@@ -1,5 +1,5 @@
 import { createComplaintRouteCore } from './route-core.js';
-import { readJson } from '../worker.js';
+import { readWorkerJson } from '../runtime/worker-json.js';
 
 /** Fetch adapter keeps validation and access rules identical to the Node server. */
 export function createComplaintFetchHandler(options) {
@@ -26,7 +26,7 @@ export function createComplaintFetchHandler(options) {
       resume() {},
     };
     const recognized = await route(incoming, response, decodeURIComponent(url.pathname), {
-      readJson: () => readJson(request),
+      readJson: () => readWorkerJson(request),
       sendJson(res, code, value) {
         res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(value));
