@@ -6,6 +6,7 @@ import { createPolicyOptionsFetcher } from './policy-options-client.js';
 import { mountActionRegister } from './action-register.js';
 import { mountDecisionBrief } from './decision-brief.js';
 import { mountEvidenceRegister } from './evidence-register.js';
+import { mountTeamWorkspace } from './team-workspace.js';
 
 const $ = (id) => document.getElementById(id);
 const preferredScrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
@@ -438,6 +439,14 @@ async function initialize() {
     panelDisposers.push(() => actionRegister.dispose());
     panelDisposers.push(mountDecisionBrief($('decision-brief'), { dataset, city: currentCity }));
     panelDisposers.push(mountEvidenceRegister($('evidence-register'), { dataset, city: currentCity }));
+    const teamContainer = $('team-workspace-panel');
+    if (teamContainer) {
+      const sharedWorkspace = mountTeamWorkspace(teamContainer, {
+        getDocument: () => actionRegister.getDocument(),
+        applyDocument: (document) => actionRegister.applyDocument(document),
+      });
+      panelDisposers.push(() => sharedWorkspace.dispose());
+    }
     panelsReady = true;
     if (!commandMode) revealHashTarget();
     ensureMap();
