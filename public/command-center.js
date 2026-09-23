@@ -8,6 +8,9 @@ const labels = {
   'policy-options-panel': ['Альтернативы решений', 'Найдите другой набор при том же бюджете'],
   'comparison-panel': ['Сравнение сценариев', 'Сопоставьте два рассчитанных плана'],
   'scenario-library': ['Мои сценарии', 'Сохраните и загрузите ваши планы'],
+  'decision-brief': ['Записка по решению', 'Обоснование рассчитанного плана'],
+  'action-register-panel': ['Поручения и исполнение', 'Ответственные, сроки и состояние исполнения'],
+  'evidence-register': ['Паспорта данных', 'Источники и ограничения показателей'],
   method: ['Как устроена модель', 'Формула, ограничения и источники данных'],
 };
 
@@ -48,7 +51,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
         <p class="cc-ai-status" role="status" aria-live="polite">AI предложит меры из каталога. Итог проверит расчётная модель.</p>
         <div class="cc-plan-preview" hidden></div>
         <button class="cc-primary cc-apply-plan" type="button" hidden disabled>Применить и показать <span aria-hidden="true">↗</span></button>
-        <p class="cc-ai-footnote">Реальные здания · учебные показатели.<br>Это сценарий по данным кейса, а не прогноз для Астаны.</p>
+        <p class="cc-ai-footnote">Карта OpenStreetMap · учебные показатели.<br>Это сценарий по данным кейса, а не прогноз для Астаны.</p>
       </div>
     </section>
     <section class="cc-kpis cc-glass" aria-label="Ключевые показатели города">
@@ -109,7 +112,8 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     const nodes = id === 'results' ? [document.querySelector('.overview-grid'), node] : id === 'city' ? [document.getElementById('district-focus'), node] : [node];
     addPane(id, nodes.filter(Boolean), title, description);
   }
-  // Optional integration modules remain available, using their own headings.
+  // Known module hosts are found by ID even inside compact <details> wrappers.
+  // Keep a fallback for additional top-level modules from the full layout.
   for (const node of [...document.querySelectorAll('#app > section')]) {
     if (!node.id || node.id === 'map-section' || panes.has(node.id)) continue;
     addPane(node.id, [node], node.querySelector('h2, h3')?.textContent || 'Дополнительный модуль', 'Открыть инструмент');
@@ -132,7 +136,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     button.append(element('strong', '', panel.title), element('span', '', panel.description));
     toolsPane.append(button);
   }
-  for (const [href, title, description] of [['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Кабинет акимата', 'Работа с обращениями и поручениями']]) {
+  for (const [href, title, description] of [['/classic.html', 'Компактный симулятор', 'План и результаты на одной странице'], ['/citizens.html', 'Обращение жителя', 'Сообщите о городской проблеме'], ['/mayor.html', 'Кабинет акимата', 'Работа с обращениями и поручениями']]) {
     const link = element('a', 'cc-tool-card'); link.href = href;
     link.append(element('strong', '', title), element('span', '', description)); toolsPane.append(link);
   }
@@ -151,6 +155,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   let requestVersion = 0;
   let proposal = null;
   let applying = false;
+  const openedDisclosures = new WeakSet();
 
   function clearProposal(message = '') {
     requestVersion++; request?.abort(); request = null; proposal = null;
@@ -188,9 +193,17 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
     if (id === 'map-section' || id === 'top') { closePanel(); return; }
     const panel = panes.get(id);
     if (!panel) return;
-    if (!modelAvailable && !['tools', 'transit'].includes(id)) map?.setCity?.('astana');
+    if (!modelAvailable && !['tools', 'transit', 'action-register-panel', 'evidence-register', 'team-workspace-panel'].includes(id)) map?.setCity?.('astana');
     if (!activePanel) previousFocus = document.activeElement;
     activePanel = id;
+    for (const disclosure of panel.pane.querySelectorAll(':scope > details')) {
+      if (!openedDisclosures.has(disclosure)) {
+        const initiallyOpen = disclosure.open;
+        restore.push(() => { disclosure.open = initiallyOpen; });
+        openedDisclosures.add(disclosure);
+      }
+      disclosure.open = true;
+    }
     if (id === 'transit' && transitPanel) transitPanel.open = true;
     setLayers(false);
     panes.forEach(({ pane }, key) => { pane.hidden = key !== id; });

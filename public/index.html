@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153d35">
   <meta name="description" content="Аким на 5 часов — симулятор городских решений на синтетических данных. Пять решений, единый бюджет и измеримый результат.">
-  <title>Аким на 5 часов · Ascension</title>
+  <title>Ascension AI · 3D-симулятор Астаны</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/comparison.css">
   <link rel="stylesheet" href="/scenario-library.css">
@@ -13,16 +13,18 @@
   <link rel="stylesheet" href="/map.css">
   <link rel="stylesheet" href="/city-explorer.css" data-city-explorer>
   <link rel="stylesheet" href="/action-register.css">
+  <link rel="stylesheet" href="/team-workspace.css">
   <link rel="stylesheet" href="/decision-brief.css">
   <link rel="stylesheet" href="/evidence-register.css">
   <link rel="stylesheet" href="/dashboard.css">
   <link rel="stylesheet" href="/visual-design.css">
   <link rel="stylesheet" href="/motion.css">
+  <link rel="stylesheet" href="/command-center.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/comparison.js"></script>
   <script type="module" src="/motion.js"></script>
 </head>
-<body class="compact-layout">
+<body class="compact-layout" data-command-center="true">
   <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
   <header class="compact-header">
     <a class="compact-brand" href="#top" aria-label="Аким на 5 часов — начало">ASCENSION<span>Аким на 5 часов</span></a>
@@ -82,6 +84,7 @@
           <details id="decision-brief-details" class="compact-disclosure" hidden><summary>Записка по решению</summary><div id="decision-brief" class="compact-content"></div></details>
           <details id="saved-scenarios" class="compact-disclosure"><summary>Мои сценарии</summary><div id="scenario-library" class="compact-content"></div></details>
         </div>
+        <section id="team-workspace-panel" aria-label="Общий реестр поручений"></section>
         <details id="action-register-details" class="compact-disclosure"><summary>Поручения и исполнение</summary><div id="action-register-panel" class="compact-content"></div></details>
 
         <details id="city" class="compact-disclosure city-section model-only">

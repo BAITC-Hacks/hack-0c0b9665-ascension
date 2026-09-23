@@ -1,6 +1,6 @@
 /* Full-viewport city workspace. All rules are scoped to the mounted shell. */
 body.cc-active { --cc-ink:#173d34; --cc-green:#17694e; --cc-mint:#d4e9df; --cc-muted:#64776e; --cc-line:#173d341b; margin:0; overflow:hidden; background:#e6ece5; }
-body.cc-active > main, body.cc-active > .sidebar { display:none; }
+body.cc-active > main, body.cc-active > .sidebar, body.cc-active > .compact-header { display:none; }
 body.cc-active .skip-link { z-index:1100; }
 .cc-shell { position:fixed; inset:0; height:100dvh; color:var(--cc-ink); font-family:Inter,Arial,sans-serif; line-height:1.45; isolation:isolate; }
 .cc-shell *, .cc-shell *::before, .cc-shell *::after { box-sizing:border-box; }
