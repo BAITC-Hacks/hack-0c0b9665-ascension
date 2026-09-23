@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153d35">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Опубликованные результаты городских работ: что сделано, в каком районе и подтверждён ли результат жителем.">
+  <title>Что изменилось в городе · Ascension</title>
+  <link rel="stylesheet" href="/resident.css">
+  <link rel="stylesheet" href="/results.css">
+  <script type="module" src="/results.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Перейти к содержимому</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Ascension — главная"><span class="brand-mark" aria-hidden="true">A</span><span>ASCENSION<small>городская лаборатория</small></span></a>
+    <nav aria-label="Основная навигация"><a href="/">Главная</a><a href="/resident.html">Моё обращение</a><span aria-current="page">Изменения в городе</span><a href="/demo.html">Демо за 90 секунд</a></nav>
+  </header>
+  <main id="content" tabindex="-1">
+    <section class="page-intro" aria-labelledby="page-title"><div><p class="eyebrow">ГОРОД И ЖИТЕЛИ / ВИДИМЫЙ РЕЗУЛЬТАТ</p><h1 id="page-title">Что изменилось<br><span>в вашем городе.</span></h1><p class="intro-copy">Завершённые работы, сроки и обратная связь жителей.<br class="desktop-only"> За каждым результатом — конкретный городской вопрос.</p></div><div class="intro-note"><span class="note-icon" aria-hidden="true">✓</span><p>От обращения<br><strong>к изменениям рядом.</strong></p></div></section>
+    <aside class="privacy-note"><span aria-hidden="true">◈</span><p>Здесь публикуются отобранные описания результатов и одобренные фотографии. Личные данные жителей и внутренняя переписка остаются в обращении. Учебные примеры отмечены отдельно.</p></aside>
+    <section aria-labelledby="results-title">
+      <div class="results-toolbar"><div><p class="section-label">ВЫПОЛНЕННЫЕ РАБОТЫ</p><h2 id="results-title">Город меняется по шагам</h2><p id="results-count" class="muted" role="status" aria-live="polite"></p></div><button id="refresh-results" class="button" type="button">Обновить результаты</button></div>
+      <div id="results-stats" class="results-stats" hidden><div><strong id="stat-total">0</strong><span>опубликовано</span></div><div><strong id="stat-confirmed">0</strong><span>подтверждено жителями</span></div><div><strong id="stat-duration">—</strong><span>среднее время решения</span></div></div>
+      <form id="results-filters" class="results-filters" role="search"><label class="search-label" for="result-search">Поиск по результатам<input id="result-search" type="search" maxlength="160" placeholder="Например, освещение или детский сад" autocomplete="off"></label><label for="district-filter">Район<select id="district-filter" disabled><option value="">Все районы</option></select></label><label for="confirmation-filter">Подтверждение<select id="confirmation-filter"><option value="">Все результаты</option><option value="confirmed">Житель подтвердил</option><option value="pending">Ожидают подтверждения</option></select></label><label for="source-filter">Данные<select id="source-filter"><option value="">Все публикации</option><option value="real">Рабочие обращения</option><option value="demo">Учебные примеры</option></select></label><label for="result-sort">Порядок<select id="result-sort"><option value="newest">Сначала новые</option><option value="oldest">Сначала ранние</option><option value="fastest">Сначала быстрые решения</option></select></label><button id="reset-filters" class="button" type="button" hidden>Сбросить фильтры</button></form>
+      <p id="filter-notice" class="inline-notice" role="status" hidden></p>
+      <div id="results-loading" class="state-panel" role="status"><span class="spinner" aria-hidden="true"></span>Загружаем опубликованные результаты…</div>
+      <section id="results-error" class="state-panel error-panel" role="alert" hidden><h2>Не удалось загрузить результаты</h2><p id="results-error-copy"></p><button id="retry-results" class="button" type="button">Повторить попытку</button> <button id="reset-results-filter" class="button" type="button" hidden>Сбросить фильтр</button></section>
+      <section id="results-empty" class="state-panel access-panel" hidden><span class="state-symbol" aria-hidden="true">◫</span><h2 id="empty-title">Первые результаты ещё впереди</h2><p id="empty-copy">Когда команда опубликует завершённые работы, они появятся здесь.</p><button id="clear-filter" class="button" type="button" hidden>Сбросить фильтры</button><a id="empty-demo-link" class="button" href="/demo.html">Посмотреть демонстрацию</a></section>
+      <div id="results-grid" class="results-grid" aria-busy="true"></div>
+    </section>
+    <section class="results-closing"><div><p class="section-label">СВОЁ ОБРАЩЕНИЕ — ПОД КОНТРОЛЕМ</p><h2>Важен не только отчёт,<br>но и ваше подтверждение.</h2><p>По персональной ссылке можно узнать статус обращения<br class="desktop-only"> и сообщить, решена ли проблема на самом деле.</p></div><a class="button primary" href="/resident.html">Моё обращение <span aria-hidden="true">↗</span></a></section>
+    <noscript><p class="state-panel">Для просмотра опубликованных результатов включите JavaScript в браузере.</p></noscript>
+  </main>
+  <footer class="site-footer"><span>ASCENSION <span aria-hidden="true">/</span> Город начинается с диалога</span><a href="/demo.html">Как работает сервис</a></footer>
+</body>
+</html>

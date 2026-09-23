@@ -1,11 +1,12 @@
+import { createDesk } from './desk/api.js';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isAIConfigured } from './ai/explain.js';
 import { createComplaintRoutes } from './complaints/http.js';
 import { handleApiRequest } from './http/api.js';
-import { errorResult } from './http/errors.js';
-import { getPath, requireMethod, SECURITY_HEADERS } from './http/policy.js';
+import { RequestError, errorResult } from './http/errors.js';
+import { getPath, requireMethod, SECURITY_HEADERS, MAX_JSON_BYTES } from './http/policy.js';
 import { createNodeExplanation } from './runtime/node-explanation.js';
 import { readNodeJson } from './runtime/node-json.js';
 import { configuredPublicOrigin } from './runtime/node-origin.js';
@@ -24,14 +25,56 @@ function sendJson(response, { status, body: value, headers = {} }) {
   response.end(body);
 }
 
+/** Photo endpoints opt into a larger bound; the shared simulator contract stays at 32 KiB. */
+function readDeskJson(request, maxBytes = MAX_JSON_BYTES) {
+  const headers = { get: name => request.headers[name.toLowerCase()] ?? null };
+  if (maxBytes === MAX_JSON_BYTES) return readNodeJson(request, headers);
+  const mediaType = (headers.get('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
+  const encoding = headers.get('Content-Encoding');
+  if (mediaType !== 'application/json' || (encoding && encoding !== 'identity')) {
+    request.resume();
+    throw new RequestError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Ожидается тело application/json без сжатия.');
+  }
+  const tooLarge = () => new RequestError(413, 'BODY_TOO_LARGE', 'Превышен допустимый размер запроса.');
+  if (Number(headers.get('Content-Length')) > maxBytes) {
+    request.resume();
+    throw tooLarge();
+  }
+  return new Promise((resolveBody, reject) => {
+    let bytes = 0;
+    let failed = false;
+    const chunks = [];
+    function fail(error) {
+      if (failed) return;
+      failed = true;
+      chunks.length = 0;
+      reject(error);
+    }
+    request.on('data', chunk => {
+      if (failed) return;
+      bytes += chunk.byteLength;
+      if (bytes > maxBytes) return fail(tooLarge());
+      chunks.push(chunk);
+    });
+    request.once('end', () => {
+      if (failed) return;
+      try { resolveBody(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)))); }
+      catch { fail(new RequestError(400, 'INVALID_JSON', 'Не удалось прочитать JSON запроса.')); }
+    });
+    request.once('error', () => fail(new RequestError(400, 'INVALID_BODY', 'Не удалось прочитать тело запроса.')));
+    request.once('aborted', () => fail(new RequestError(400, 'INVALID_BODY', 'Передача запроса прервана.')));
+  });
+}
+
 /** Node composition root. Construct once so admission counters survive across requests. */
 export function createRequestHandler({ aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, complaints = {}, ...options } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, publicOrigin, env = process.env, complaints = {}, deskOptions = {}, ...options } = {}) {
+  const desk = createDesk(deskOptions);
   const staticRoot = resolve(publicDir);
   const handleComplaints = createComplaintRoutes(complaints);
   const trustedOrigin = configuredPublicOrigin(publicOrigin, env);
   const explain = createNodeExplanation({ ...options, aiConfigured, env });
-  return async (request, response) => {
+  const handler = async (request, response) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);
     try {
       const pathname = getPath(request.url);
@@ -39,12 +82,17 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
       const protocol = request.socket.encrypted ? 'https' : 'http';
       // Forwarded headers are client-controlled unless a trusted proxy policy is configured.
       const origin = trustedOrigin ?? `${protocol}://${request.headers.host}`;
-      // Citizen intake is a Node-only extension with its own storage and authentication.
-      // Adapt its existing transport helpers without changing the shared simulator API.
+      // Real citizen intake keeps its authoritative store and existing authentication.
       if (await handleComplaints(request, response, pathname, {
         readJson: () => readNodeJson(request, headers),
         sendJson: (target, status, body) => sendJson(target, { status, body }),
       })) {
+        request.resume();
+        return;
+      }
+      // Demo workspaces own separate routes and never replace real citizen intake.
+      if (await desk.handle(request, response, pathname, readDeskJson,
+        (target, status, body) => sendJson(target, { status, body }))) {
         request.resume();
         return;
       }
@@ -61,11 +109,16 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
       sendJson(response, errorResult(error));
     }
   };
+  handler.close = () => desk.close();
+  return handler;
 }
 
 /** Returns an unbound Node HTTP server. Options are forwarded to createRequestHandler. */
 export function createAppServer(options = {}) {
-  return createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, createRequestHandler(options));
+  const handler = createRequestHandler(options);
+  const server = createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, handler);
+  server.once('close', () => handler.close());
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

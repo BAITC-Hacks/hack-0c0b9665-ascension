@@ -146,18 +146,20 @@ export function mountScenarioLibrary(container, { city } = {}) {
   const repo = createLibraryRepository(() => win.localStorage);
   const root = el('div', 'root');
   const heading = el('h2', 'title', 'Мои сценарии');
-  const intro = el('p', 'intro', 'Сохраните удачный расчёт, чтобы вернуться к нему. До 20 сценариев хранятся только в этом браузере на этом адресе сайта.');
+  const intro = el('p', 'intro', 'Сохраните план или рассчитанный сценарий, чтобы вернуться к нему. До 20 сценариев хранятся только в этом браузере на этом адресе сайта.');
   const notice = el('p', 'notice', 'Астана · синтетическая учебная модель. Сохранённые оценки — снимки, а не прогноз. После загрузки нужен новый расчёт.');
   const cityNotice = el('p', 'notice', 'Библиотека относится к официальной модели Астаны. Выберите Астану, чтобы сохранять, импортировать и загружать сценарии.');
   const body = el('div', 'body');
   const saveForm = el('form', 'save-form');
+  saveForm.id = 'local-scenario-form';
   const nameLabel = el('label', 'label', 'Название сценария');
   const nameInput = el('input', 'input');
+  nameInput.id = 'local-scenario-name';
   nameInput.type = 'text'; nameInput.maxLength = 80; nameInput.required = true;
   nameInput.placeholder = 'Например, школы и медицина Нуры';
   nameLabel.append(nameInput);
   const save = button('Сохранить расчёт', () => {});
-  save.type = 'submit'; save.disabled = true;
+  save.type = 'submit'; save.disabled = true; save.id = 'save-local-scenario';
   const current = el('p', 'hint', 'Сначала рассчитайте сценарий. Сохранение происходит только по вашей кнопке.');
   saveForm.append(nameLabel, save, current);
   const importArea = el('div', 'import-area');
@@ -173,18 +175,21 @@ export function mountScenarioLibrary(container, { city } = {}) {
   const reset = button('Сбросить библиотеку…', () => confirmReset(), 'danger');
   storageNotice.append(storageText, retry, reset);
   const count = el('p', 'count');
-  const list = el('div', 'list');
-  const status = el('p', 'status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
+  const list = el('div', 'list'); list.id = 'local-scenarios';
+  const status = el('p', 'status'); status.id = 'library-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
   body.append(saveForm, importArea, storageNotice, count, list, status);
   root.append(heading, intro, notice, cityNotice, body); container.append(root);
-  let entries = [], candidate = null, pending = [], pendingNames = [], storageReady = false;
+  let entries = [], candidate = null, currentPlan = null, pending = [], pendingNames = [], storageReady = false;
   let astana = city?.hasScenarioData === true, disposed = false, importRevision = 0;
   body.hidden = !astana; notice.hidden = !astana; cityNotice.hidden = astana;
   const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
   const date = (value) => new Date(value).toLocaleString('ru-RU');
   const summary = (scenario) => scenario.decisions.map((d) => `${d.measureId}${d.districtId ? ` → ${own(districtNames, d.districtId) ? districtNames[d.districtId] : d.districtId}` : ' → город'}`).join(' · ');
   const announce = (text) => { status.textContent = text; };
-  const sync = () => { save.disabled = !candidate || !storageReady || !astana || entries.length >= MAX_ENTRIES; };
+  const sync = () => {
+    save.disabled = (!candidate && !currentPlan) || !storageReady || !astana || entries.length >= MAX_ENTRIES;
+    save.textContent = candidate ? 'Сохранить расчёт' : 'Сохранить план без расчёта';
+  };
   function storageError(error) {
     storageReady = false; storageNotice.hidden = false;
     storageText.textContent = error?.name === 'QuotaExceededError'
@@ -197,9 +202,9 @@ export function mountScenarioLibrary(container, { city } = {}) {
     list.replaceChildren();
     if (!entries.length) list.append(el('p', 'empty', 'Здесь появятся ваши сохранённые сценарии.'));
     for (const entry of entries) {
-      const card = el('article', 'card');
+      const card = el('article', 'card'); card.classList.add('library-item');
       const title = el('h3', 'card-title', entry.name);
-      const meta = el('p', 'meta', `${date(entry.createdAt)} · Астана · ${entry.source === 'imported' ? 'Импорт' : 'Сохранённый расчёт'}`);
+      const meta = el('p', 'meta', `${date(entry.createdAt)} · Астана · ${entry.snapshot ? 'Сохранённый расчёт' : 'План без расчёта'}`);
       const decisions = el('p', 'decisions', summary(entry.scenario));
       const snapshot = el('p', 'snapshot', entry.snapshot
         ? `Снимок: Score ${number.format(entry.snapshot.score)} · бюджет ${number.format(entry.snapshot.totalCost)} · критических ${entry.snapshot.criticalCount}`
@@ -247,9 +252,11 @@ export function mountScenarioLibrary(container, { city } = {}) {
   }
   saveForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!candidate || !astana || !storageReady) return;
+    if ((!candidate && !currentPlan) || !astana || !storageReady) return;
     let entry;
-    try { entry = newEntry(nameInput.value, candidate.scenario, candidate.snapshot, 'calculated'); }
+    try { entry = candidate
+      ? newEntry(nameInput.value, candidate.scenario, candidate.snapshot, 'calculated')
+      : newEntry(nameInput.value, currentPlan, null, 'imported'); }
     catch (error) { announce(error.message); nameInput.focus(); return; }
     try { entries = repo.add([entry]); renderList(); announce(`«${entry.name}» сохранён в этом браузере.`); }
     catch (error) { storageError(error); }
@@ -302,24 +309,32 @@ export function mountScenarioLibrary(container, { city } = {}) {
     current.textContent = `Последний успешный расчёт: Score ${number.format(candidate.snapshot.score)}. ${summary(candidate.scenario)}`;
     sync();
   };
+  const onChanged = (event) => {
+    try { currentPlan = normalizeScenario(event.detail?.scenario); } catch { currentPlan = null; }
+    candidate = null;
+    current.textContent = currentPlan ? 'План можно сохранить без оценки. Для сохранения результата рассчитайте его.' : 'Добавьте хотя бы одну инициативу для сохранения плана.';
+    sync();
+  };
   const onCity = (event) => {
     astana = event.detail?.hasScenarioData === true;
     body.hidden = !astana; notice.hidden = !astana; cityNotice.hidden = astana;
     candidate = null; pending = []; preview.hidden = true; ++importRevision;
-    current.textContent = 'Рассчитайте сценарий Астаны, чтобы сохранить его.'; sync();
+    current.textContent = currentPlan ? 'План сохранён в конструкторе. Можно сохранить его без оценки; для результата нужен новый расчёт.' : 'Рассчитайте сценарий Астаны или соберите план для сохранения.'; sync();
   };
   const onInvalidated = () => {
     candidate = null;
-    current.textContent = 'План изменён. Рассчитайте его заново перед сохранением.';
+    current.textContent = 'Расчёт больше не актуален. План можно сохранить без оценки или рассчитать заново.';
     sync();
   };
   const onStorage = (event) => { if (event.key === STORAGE_KEY || event.key === null) refresh(); };
+  win.addEventListener('scenario:changed', onChanged);
   win.addEventListener('scenario:calculated', onCalculated);
   win.addEventListener('scenario:invalidated', onInvalidated);
   win.addEventListener('city:changed', onCity);
   win.addEventListener('storage', onStorage);
   const dispose = () => {
     disposed = true; ++importRevision;
+    win.removeEventListener('scenario:changed', onChanged);
     win.removeEventListener('scenario:calculated', onCalculated); win.removeEventListener('scenario:invalidated', onInvalidated);
     win.removeEventListener('city:changed', onCity); win.removeEventListener('storage', onStorage);
     root.remove(); mounted.delete(container);

@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      COOKIE_SECURE: "true"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-6-astra}"
+    volumes:
+      - desk-data:/app/var
+      - desk-backups:/app/backups
+volumes:
+  desk-data:
+  desk-backups:

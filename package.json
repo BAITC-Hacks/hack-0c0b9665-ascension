@@ -11,7 +11,10 @@
     "bot": "node --env-file-if-exists=.env.local src/telegram-poll.js",
     "test": "node --test tests/*.test.js",
     "build:policy-worker": "node scripts/build-policy-worker.mjs",
-    "check:policy-worker": "node scripts/build-policy-worker.mjs --check"
+    "check:policy-worker": "node scripts/build-policy-worker.mjs --check",
+    "desk:user": "node --env-file-if-exists=.env.local scripts/desk-user.js",
+    "desk:backup": "node --env-file-if-exists=.env.local scripts/desk-backup.js",
+    "check:release": "node scripts/check-release-surface.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153d35">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Статус вашего обращения, ответы исполнителя и подтверждение результата.">
+  <title>Моё обращение · Ascension</title>
+  <link rel="stylesheet" href="/resident.css">
+  <script type="module" src="/resident.js"></script>
+</head>
+<body>
+  <button class="skip" id="skip-content" type="button">Перейти к содержимому</button>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Ascension — главная"><span class="brand-mark" aria-hidden="true">A</span><span>ASCENSION<small>городская лаборатория</small></span></a>
+    <nav aria-label="Основная навигация"><a href="/">Главная</a><span aria-current="page">Моё обращение</span><a href="/results.html">Изменения в городе</a><a href="/demo.html">Демо за 90 секунд</a></nav>
+  </header>
+  <main id="content" tabindex="-1">
+    <section class="page-intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">ГОРОД И ЖИТЕЛИ / НА СВЯЗИ</p><h1 id="page-title">Ваш вопрос.<br><span>Понятный путь к решению.</span></h1><p class="intro-copy">Следите за обращением, читайте ответы<br class="desktop-only"> и сообщите, помогли ли выполненные работы.</p></div>
+      <div class="intro-note"><span class="note-icon" aria-hidden="true">↗</span><p>Результат работы<br><strong>подтверждаете вы.</strong></p></div>
+    </section>
+    <aside class="privacy-note"><span aria-hidden="true">◈</span><p>Это персональная ссылка. Любой, у кого она есть, может увидеть обращение и оставить ответ от вашего имени. Не публикуйте её.</p></aside>
+    <div id="loading" class="state-panel" role="status"><span class="spinner" aria-hidden="true"></span>Загружаем ваше обращение…</div>
+    <section id="access-state" class="state-panel access-panel" hidden aria-labelledby="access-title"><span class="state-symbol" aria-hidden="true">↗</span><h2 id="access-title">Откройте персональную ссылку</h2><p id="access-copy">Персональную ссылку выдаёт команда, которая приняла обращение. Вход в аккаунт не требуется.</p><form id="access-form" class="access-form" novalidate><label class="field-label" for="access-link">Персональная ссылка или код доступа</label><input id="access-link" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="2048" placeholder="Вставьте ссылку из сообщения" aria-describedby="access-help access-error" required><p id="access-help" class="field-hint">Вставьте полную ссылку или код из 64 символов после #. Номер обращения не является кодом доступа.</p><p id="access-error" class="inline-notice error" role="alert" hidden></p><button class="button primary full-width" type="submit">Открыть моё обращение ↗</button></form><details class="access-help"><summary>Где получить персональную ссылку?</summary><p>Обратитесь в команду, которая зарегистрировала ваш вопрос, и попросите ссылку для отслеживания. Она открывает только ваше обращение и не требует регистрации. Если ссылка перестала работать, команда может выдать новую.</p></details><a class="text-button" href="/demo.html">Сначала посмотреть демонстрацию</a></section>
+    <section id="load-error" class="state-panel error-panel" role="alert" hidden><h2>Не удалось загрузить обращение</h2><p id="load-error-copy"></p><button id="retry-load" class="button" type="button">Повторить попытку</button></section>
+    <div id="complaint-content" hidden>
+      <section class="complaint-heading" aria-label="Состояние обращения"><div><div class="tag-row"><span id="complaint-id" class="eyebrow"></span><span id="demo-label" class="tag demo-tag" hidden>Демонстрационные данные</span></div><h2>Моё обращение</h2></div><div class="status-actions"><span id="complaint-status" class="tag status-tag"></span><button id="refresh" class="button subtle" type="button">Обновить статус</button><button id="close-complaint" class="button subtle" type="button">Закрыть обращение</button></div></section>
+      <p id="next-step" class="resident-next-step" role="status"></p><div id="refresh-notice" class="inline-notice" role="status" hidden></div>
+      <div class="resident-layout">
+        <div class="content-column">
+          <section class="panel" aria-labelledby="detail-title"><div class="section-label">01 / ОБРАЩЕНИЕ</div><h2 id="detail-title">С чем вы обратились</h2><p id="complaint-text" class="long-text"></p><dl id="complaint-meta" class="metadata"></dl></section>
+          <section class="panel" aria-labelledby="timeline-title"><div class="section-label">02 / ДВИЖЕНИЕ ВОПРОСА</div><h2 id="timeline-title">Что уже произошло</h2><ol id="timeline" class="timeline"></ol><p id="timeline-empty" class="muted" hidden>События появятся после обработки обращения.</p></section>
+          <section class="panel" aria-labelledby="tasks-title"><div class="section-label">03 / ВЫПОЛНЕНИЕ</div><h2 id="tasks-title">Работы и сроки</h2><ul id="tasks" class="entry-list"></ul><p id="tasks-empty" class="muted" hidden>Исполнитель ещё не назначил работы. Их сроки появятся здесь.</p></section>
+          <section class="panel" aria-labelledby="replies-title"><div class="section-label">04 / ОБРАТНАЯ СВЯЗЬ</div><h2 id="replies-title">Ответы по обращению</h2><ul id="replies" class="entry-list"></ul><p id="replies-empty" class="muted" hidden>Ответов пока нет. Вы можете вернуться к этой ссылке позже.</p></section>
+        </div>
+        <aside class="response-column">
+          <section class="panel response-panel" aria-labelledby="feedback-title"><div class="section-label">ВАШЕ МНЕНИЕ ВАЖНО</div><h2 id="feedback-title">Проблема решена?</h2><p id="response-unavailable" class="muted">Здесь можно будет подтвердить результат, когда исполнитель сообщит о завершении работ.</p>
+            <form id="feedback-form" hidden>
+              <fieldset id="feedback-fields"><legend class="sr-only">Подтверждение результата</legend>
+                <div class="outcome-options"><label class="outcome-option"><input type="radio" name="outcome" value="confirmed" required><span><strong>Проблема решена</strong><small>Подтверждаю результат</small></span><span aria-hidden="true">✓</span></label><label class="outcome-option"><input type="radio" name="outcome" value="unresolved" required><span><strong>Проблема осталась</strong><small>Нужна дополнительная работа</small></span><span aria-hidden="true">↻</span></label></div>
+                <label class="field-label" for="comment">Комментарий <span id="comment-requirement">· необязательно</span></label><textarea id="comment" name="comment" maxlength="2000" rows="4" placeholder="Что изменилось?" aria-describedby="comment-count"></textarea><p id="comment-count" class="field-hint">0 / 2000</p>
+                <label class="field-label" for="photo">Фото результата <span>· необязательно</span></label><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="photo-help photo-status"><p id="photo-help" class="field-hint">JPG, PNG или WebP · до 2 МБ</p><p id="photo-status" class="field-hint" role="status"></p><button id="remove-photo" type="button" class="text-button" hidden>Убрать фото</button>
+                <p class="form-privacy">Комментарий и фото получит команда, работающая с обращением. Они не публикуются на странице города автоматически.</p><button id="submit-feedback" class="button primary full-width" type="submit">Отправить ответ <span aria-hidden="true">↗</span></button>
+              </fieldset>
+            </form>
+            <div id="feedback-notice" class="inline-notice" role="status" tabindex="-1" hidden></div><button id="refresh-version" class="button full-width" type="button" hidden>Обновить данные обращения</button>
+          </section>
+          <section id="feedback-history-panel" class="panel" aria-labelledby="history-title" hidden><div class="section-label">ВЫ УЖЕ СООБЩИЛИ</div><h2 id="history-title">Ваши ответы</h2><ul id="feedback-history" class="entry-list"></ul></section>
+          <a class="public-link" href="/results.html"><span>Какие ещё вопросы<br><strong>решаются в городе?</strong></span><span aria-hidden="true">↗</span></a>
+        </aside>
+      </div>
+    </div>
+    <noscript><p class="state-panel">Для просмотра статуса обращения включите JavaScript в браузере.</p></noscript>
+  </main>
+  <footer class="site-footer"><span>ASCENSION <span aria-hidden="true">/</span> Город начинается с диалога</span><a href="/demo.html">Как работает сервис</a></footer>
+</body>
+</html>

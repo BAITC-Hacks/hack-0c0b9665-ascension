@@ -24,7 +24,7 @@ test('leaving Astana during a pending calculation restores the button and ignore
   };
   const state = { dataset: getDataset(), baseline: getBaseline(), decisions, totalCost: 95,
     hasScenarioData: true, busy: false, simulating: false, version: 0, simulationId: 0,
-    explanationId: 0, result: null };
+    explanationId: 0, mutationId: 0, result: null, history: [] };
   const requests = [];
   const listeners = new Map();
   const events = [];
@@ -33,6 +33,10 @@ test('leaving Astana during a pending calculation restores the button and ignore
   let explained = 0;
   const context = {
     state, $: element, currentCity: { id: 'astana', hasScenarioData: true },
+    deskSnapshot: null,
+    location: { pathname: '/', search: '', hash: '' },
+    history: { replaceState() {} },
+    HashChangeEvent: class { constructor(type) { this.type = type; } },
     document: { querySelectorAll: () => [modelPanel] },
     window: {
       addEventListener: (name, handler) => listeners.set(name, handler),
@@ -40,7 +44,7 @@ test('leaving Astana during a pending calculation restores the button and ignore
     },
     CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
     structuredClone, preferredScrollBehavior: () => 'instant',
-    cityMap: { setResult() {} }, renderDistricts() {}, renderDistrictFocus() {},
+    cityMap: { setResult() {} }, renderDistricts() {}, renderDistrictFocus() {}, renderCatalog() {},
     clearErrors() {}, showErrors: errors => assert.fail(JSON.stringify(errors)), announce() {},
     measureById: id => state.dataset.measures.find(measure => measure.id === id),
     districtOptions: () => '', escapeHtml: String, number: value => String(value), signed: value => String(value),
