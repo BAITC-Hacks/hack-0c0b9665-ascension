@@ -1,0 +1,46 @@
+{
+  "startedAt": "2026-09-23T12:10:12.082Z",
+  "bundle": ".wrangler/workspace-dry-run/cloudflare.js",
+  "checks": [
+    {
+      "name": "disabled production entrypoint returns private503 before JSON parsing; HEAD has no body",
+      "passed": true
+    },
+    {
+      "name": "real TEAM_WORKSPACE login issues Secure HttpOnly cookie; actual Origin/query and auth-before-body survive routing",
+      "passed": true
+    },
+    {
+      "name": "direct production binding performs atomic200/409 writes with exactly one attributed audit entry; HEAD keeps Allow",
+      "passed": true
+    },
+    {
+      "name": "full workerd restart retains SQLite revision, register, audit, and valid session",
+      "passed": true
+    },
+    {
+      "name": "viewer can read but receives403 before write-body parsing and cannot alter revision",
+      "passed": true
+    },
+    {
+      "name": "DO login limiter uses overwritten platform metadata; forged internal/XFF values cannot split bucket; Retry-After retained",
+      "passed": true
+    }
+  ],
+  "instrumentation": "None: exact compiled production bundle executes directly, without an entrypoint wrapper.",
+  "blockedOutboundRequests": 0,
+  "realExternalRequests": 0,
+  "limitations": [
+    "Local workerd and SQLite validate runtime composition, not a live Cloudflare deployment.",
+    "Empty valid register document tests revision/audit persistence; detailed document schema cases remain covered by unit tests.",
+    "CF-Connecting-IP is supplied by the local platform harness; Cloudflare edge header provenance is not simulated.",
+    "Windows SQLite path length required short local worker/persistence names; no production source change was needed."
+  ],
+  "bundleSha256": "c39fb90124b71f3ae1220a6337ee563b3f56f7043b48893391f3d1884814d0b6",
+  "bundleBytes": 264773,
+  "bundleOnDiskSha256AtFinish": "c39fb90124b71f3ae1220a6337ee563b3f56f7043b48893391f3d1884814d0b6",
+  "bundleUnchangedDuringSmoke": true,
+  "passed": true,
+  "finishedAt": "2026-09-23T12:10:13.842Z",
+  "sourceCommit": "99cd1729d9d70fc26ceaa1a022df6ed4fabfd36b"
+}
