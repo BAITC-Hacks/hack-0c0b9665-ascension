@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 const preferredScrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
 let cityMap;
 let panelDisposers = [];
+let initializationId = 0;
 let currentCity = PLACES.find(({ id }) => id === 'astana');
 const directions = {
   transport: { name: 'Транспорт', icon: '↔' },
@@ -353,12 +354,21 @@ window.addEventListener('scenario:load', (event) => {
   });
 });
 
+function disposeInterface() {
+  // The command shell moves existing panels: restore them before disposing roots.
+  for (const dispose of panelDisposers.splice(0).reverse()) {
+    try { dispose(); } catch { console.warn('Не удалось полностью освободить панель интерфейса.'); }
+  }
+  try { cityMap?.destroy(); } catch { console.warn('Не удалось полностью освободить карту.'); }
+  cityMap = null;
+}
+
 async function initialize() {
+  const requestId = ++initializationId;
   try {
-    for (const dispose of panelDisposers.splice(0)) dispose();
-    cityMap?.destroy();
-    cityMap = null;
+    disposeInterface();
     const [dataset, baseline] = await Promise.all([api('/api/dataset'), api('/api/baseline')]);
+    if (requestId !== initializationId) return;
     if (!dataset.measures?.length || !dataset.districts?.length || !baseline.valid) throw new Error('Не удалось получить исходные данные города.');
     state.dataset = dataset;
     state.baseline = baseline;
@@ -381,9 +391,27 @@ async function initialize() {
     panelDisposers.push(() => actionRegister.dispose());
     panelDisposers.push(mountDecisionBrief($('decision-brief'), { dataset, city: currentCity }));
     panelDisposers.push(mountEvidenceRegister($('evidence-register'), { dataset, city: currentCity }));
+    if (document.body.dataset.commandCenter === 'true') {
+      const { mountCommandCenterBridge } = await import('./command-center-bridge.js');
+      if (requestId !== initializationId) return;
+      const commandCenter = mountCommandCenterBridge({
+        dataset, baseline, map: cityMap, applyDecisions, calculate,
+        getContext: () => ({
+          hasScenarioData: state.hasScenarioData,
+          version: state.version,
+          city: currentCity,
+          resultValid: state.result?.valid === true,
+          decisions: state.decisions.map((decision) => ({ ...decision })),
+        }),
+      });
+      panelDisposers.push(() => commandCenter.destroy());
+    }
     void api('/api/health').then((health) => { $('service-status').textContent = health.aiConfigured ? 'AI настроен · модель кейса' : 'Расчётная модель · AI не подключён'; }).catch(() => {});
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
   } catch (error) {
+    if (requestId !== initializationId) return;
+    disposeInterface();
+    $('app').hidden = true;
     $('loading').hidden = true;
     $('fatal-error').hidden = false;
     $('fatal-error').innerHTML = `<strong>Не удалось загрузить симулятор.</strong><p>${escapeHtml(error.message)}</p><button class="retry-button" id="retry-load">Повторить загрузку</button>`;
