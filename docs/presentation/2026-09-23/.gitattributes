@@ -1,0 +1,4 @@
+# Preserve published SHA-256 checksums, including original line endings.
+* -text
+*.pdf binary
+*.pptx binary
