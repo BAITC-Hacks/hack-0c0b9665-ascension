@@ -1,0 +1,481 @@
+/* ASCENSION ancillary widgets. Load after the original component styles.
+   Presentation only: retain existing controls, state, [hidden] and event contracts. */
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel, .comparison-root, .city-explorer) {
+  --widget-paper: var(--brand-surface, #fcfbf7);
+  --widget-canvas: var(--brand-paper, #f4f2eb);
+  --widget-ink: var(--ink, #17232d);
+  --widget-muted: var(--muted, #58636c);
+  --widget-line: var(--line, #d8dcd8);
+  --widget-cobalt: var(--brand-blue, #2454d8);
+  --widget-lime: var(--brand-lime, #dfff83);
+  --widget-clay: var(--brand-clay, #b85836);
+  --widget-blue-wash: #edf1fc;
+  --widget-warning-wash: #fbf0e9;
+  color: var(--widget-ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .location-map-panel, .comparison-root) {
+  margin-block: 24px;
+  padding: clamp(20px, 3vw, 32px);
+  border: 1px solid var(--widget-line);
+  border-radius: 8px;
+  background: var(--widget-paper);
+  box-shadow: none;
+}
+
+body.ascension-design :is(.team-workspace, .transit-panel) {
+  margin-block: 24px;
+  border: 1px solid var(--widget-line);
+  border-radius: 8px;
+  background: var(--widget-paper);
+  box-shadow: none;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel, .city-explorer) :is(button, input, textarea, select) {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  accent-color: var(--widget-cobalt);
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) button {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 11px 16px;
+  border: 1px solid var(--widget-line);
+  border-radius: 8px;
+  background: var(--widget-paper);
+  color: var(--widget-ink);
+  box-shadow: none;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: normal;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) button:hover:not(:disabled) {
+  border-color: var(--widget-cobalt);
+  background: var(--widget-blue-wash);
+  color: var(--widget-cobalt);
+  filter: none;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) button:disabled {
+  background: var(--widget-canvas);
+  border-color: var(--widget-line);
+  color: var(--widget-muted);
+  opacity: .7;
+  cursor: not-allowed;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: 1px solid #a9b0b4;
+  border-radius: 8px;
+  color: var(--widget-ink);
+  background: var(--widget-paper);
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel, .city-explorer) :focus-visible {
+  outline: 3px solid var(--widget-cobalt);
+  outline-offset: 3px;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel) :is(a, a:visited) {
+  color: var(--widget-cobalt);
+  text-underline-offset: .2em;
+}
+
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel) summary {
+  min-height: 44px;
+  padding-block: 11px;
+  color: var(--widget-ink);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+body.ascension-design :is(.scenario-library-title, .policy-options-title, .action-register-title,
+  .decision-brief-heading, .team-workspace-title),
+body.ascension-design .evidence-register h2 {
+  margin-block: 0 12px;
+  color: var(--widget-ink);
+  font-size: clamp(23px, 2.25vw, 30px);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+
+body.ascension-design :is(.scenario-library-intro, .scenario-library-notice, .scenario-library-hint,
+  .scenario-library-meta, .scenario-library-decisions, .scenario-library-snapshot,
+  .scenario-library-status, .scenario-library-count, .scenario-library-empty,
+  .policy-options-intro, .policy-options-verification, .policy-options-status,
+  .policy-options-coverage, .policy-options-explanation, .policy-options-limit,
+  .policy-options-constraint-help, .policy-options-constraint-summary,
+  .policy-options-applied-constraints, .policy-options-worsened-list,
+  .decision-brief-hint, .decision-brief-meta, .decision-brief-source,
+  .transit-intro, .transit-provenance, .transit-credit, .location-map-credit) {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--widget-muted);
+}
+
+body.ascension-design :is(.scenario-library-label, .policy-options-priority-label,
+  .policy-options-locks legend, .action-register-field, .evidence-field,
+  .decision-brief-label, .team-workspace-field, .transit-search-label) {
+  gap: 8px;
+  color: var(--widget-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+body.ascension-design :is(.scenario-library-notice, .scenario-library-preview,
+  .policy-options-status, .policy-options-baseline, .action-register-notice,
+  .evidence-notice, .evidence-model, .decision-brief-status, .team-workspace-message) {
+  padding: 16px;
+  border: 1px solid var(--widget-line);
+  border-radius: 8px;
+  color: var(--widget-ink);
+  background: var(--widget-canvas);
+  font-weight: 400;
+}
+
+body.ascension-design :is(.scenario-library-confirmation, .scenario-library-storage-notice,
+  .policy-options-error, .action-register-delete-panel, .action-register-readiness,
+  .decision-brief-notice, .team-workspace-error, .team-workspace-warning,
+  .team-workspace-confirmation) {
+  border: 1px solid #dcbaa8;
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--widget-warning-wash);
+  color: #853d25;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+body.ascension-design :is(.action-register-validation, .action-register-overdue,
+  .action-register-storage, .evidence-error, .evidence-gaps, .policy-options-worse,
+  .policy-options-worsened) {
+  color: #963f25;
+}
+
+/* Scenario library: a quiet index of distinct, locally saved scenarios. */
+body.ascension-design .scenario-library-save-form { gap: 16px; margin-block: 24px; }
+body.ascension-design .scenario-library-import-area { padding-block: 20px; border-color: var(--widget-line); }
+body.ascension-design .scenario-library-list { gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+body.ascension-design .scenario-library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 24px;
+  border-color: var(--widget-line);
+  border-radius: 8px;
+  background: var(--widget-paper);
+}
+body.ascension-design .scenario-library-card-title { font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
+body.ascension-design .scenario-library-snapshot { color: var(--widget-cobalt); font-size: 15px; font-variant-numeric: tabular-nums; }
+body.ascension-design .scenario-library-actions { gap: 8px; padding-top: 16px; margin-top: auto; }
+body.ascension-design .scenario-library-button.scenario-library-danger { color: #963f25; background: transparent; }
+body.ascension-design .scenario-library-file { color: var(--widget-muted); font-size: 14px; padding-block: 4px; }
+body.ascension-design .scenario-library-file::file-selector-button,
+body.ascension-design .evidence-actions input::file-selector-button {
+  min-height: 44px;
+  margin-right: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--widget-line);
+  border-radius: 8px;
+  color: var(--widget-ink);
+  background: var(--widget-paper);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Alternatives: the selected baseline, constraints and proposals stay distinct. */
+body.ascension-design .policy-options-heading { align-items: flex-start; gap: 24px; }
+body.ascension-design .policy-options-eyebrow { color: var(--widget-cobalt); font-size: 11px; letter-spacing: .12em; }
+body.ascension-design .policy-options-baseline { padding: 24px; margin-top: 24px; }
+body.ascension-design .policy-options-baseline-label { color: var(--widget-ink); font-size: 14px; margin-bottom: 16px; }
+body.ascension-design .policy-options-label { color: var(--widget-muted); font-size: 13px; }
+body.ascension-design .policy-options-value { color: var(--widget-ink); font-size: 32px; font-weight: 650; line-height: 1.2; letter-spacing: -.045em; }
+body.ascension-design .policy-options-baseline .policy-options-value { font-size: 26px; }
+body.ascension-design .policy-options-district,
+body.ascension-design .policy-options-delta { color: var(--widget-muted); font-size: 13px; line-height: 1.55; }
+body.ascension-design .policy-options-improved { color: var(--widget-cobalt); font-weight: 600; }
+body.ascension-design .policy-options-delta.policy-options-worse { color: #963f25; font-weight: 600; }
+body.ascension-design .policy-options-cards { gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+body.ascension-design .policy-options-card { padding: 24px; border-color: var(--widget-line); border-radius: 8px; background: var(--widget-paper); }
+body.ascension-design .policy-options-tags { gap: 6px; }
+body.ascension-design .policy-options-tag { padding: 5px 9px; color: var(--widget-ink); background: var(--widget-lime); border-radius: 4px; font-size: 12px; }
+body.ascension-design .policy-options-card-title { margin-block: 20px 16px; font-size: 20px; line-height: 1.35; letter-spacing: -.025em; }
+body.ascension-design .policy-options-change { padding: 16px; background: var(--widget-canvas); border-radius: 8px; }
+body.ascension-design .policy-options-change-label { color: var(--widget-muted); font-size: 12px; margin-bottom: 5px; }
+body.ascension-design .policy-options-removed,
+body.ascension-design .policy-options-added { color: var(--widget-ink); font-size: 14px; line-height: 1.6; }
+body.ascension-design .policy-options-added { color: var(--widget-cobalt); }
+body.ascension-design .policy-options-constraints { margin-top: 20px; padding: 8px 16px; border-color: var(--widget-line); border-radius: 8px; background: var(--widget-paper); }
+body.ascension-design .policy-options-constraint-controls { gap: 16px; padding-block: 8px 16px; }
+body.ascension-design .policy-options-lock-label { align-items: center; min-height: 44px; padding-block: 8px; font-size: 14px; }
+body.ascension-design .policy-options-lock { width: 20px; height: 20px; margin: 0; }
+body.ascension-design .policy-options-load { margin-top: 24px; }
+
+/* Tasks and implementation passports retain their existing open/closed behavior. */
+body.ascension-design .action-register-controls { gap: 12px; margin-block: 24px; }
+body.ascension-design .action-register-group { border-color: var(--widget-line); padding-block: 24px 8px; margin-top: 24px; }
+body.ascension-design .action-register-group-title { font-size: 21px; font-weight: 650; letter-spacing: -.025em; }
+body.ascension-design .action-register-cards { gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+body.ascension-design .action-register-card { padding: 24px; border-color: var(--widget-line); border-radius: 8px; background: var(--widget-paper); }
+body.ascension-design .action-register-card-title { font-size: 17px; font-weight: 650; line-height: 1.45; }
+body.ascension-design :is(.action-register-help, .action-register-hint, .action-register-district, .action-register-card-preview) { color: var(--widget-muted); font-size: 14px; }
+body.ascension-design .action-register-field { margin-block: 16px; }
+body.ascension-design .action-register-implementation { border-color: var(--widget-line); margin-block: 20px; padding-top: 12px; }
+body.ascension-design .action-register button.action-register-delete-confirm { color: #963f25; border-color: #b85836; }
+
+/* Evidence: source, dates and gaps are visually separate from calculated metrics. */
+body.ascension-design .evidence-register p { font-size: 14px; line-height: 1.65; }
+body.ascension-design .evidence-form { gap: 20px; margin-block: 24px; }
+body.ascension-design .evidence-list details { padding-block: 10px; border-color: var(--widget-line); }
+body.ascension-design .evidence-list details[open] { padding-bottom: 24px; }
+body.ascension-design .evidence-actions { gap: 16px; margin-block: 24px; }
+body.ascension-design .evidence-actions :is(label, input) { font-size: 14px; }
+body.ascension-design .evidence-actions input[type="file"] { min-height: 44px; }
+
+/* Decision brief: editorial reading rhythm, with an actual scrollable data table. */
+body.ascension-design .decision-brief-fields { gap: 20px; margin-block: 24px; }
+body.ascension-design .decision-brief-preview-title { font-size: 27px; font-weight: 650; letter-spacing: -.035em; margin-block: 32px 12px; }
+body.ascension-design .decision-brief-goal { max-width: 76ch; font-size: 16px; line-height: 1.7; }
+body.ascension-design .decision-brief-metrics { gap: 16px; margin-block: 24px; }
+body.ascension-design .decision-brief-metric { padding: 20px; border-color: var(--widget-line); border-radius: 8px; background: var(--widget-canvas); }
+body.ascension-design .decision-brief-metric-label { color: var(--widget-muted); font-size: 14px; }
+body.ascension-design .decision-brief-metric-value { color: var(--widget-cobalt); font-size: 22px; line-height: 1.4; letter-spacing: -.025em; }
+body.ascension-design .decision-brief-subheading { font-size: 19px; margin-block: 28px 12px; }
+body.ascension-design .decision-brief-list { font-size: 15px; line-height: 1.7; }
+body.ascension-design .decision-brief-table-wrap { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; border: 1px solid var(--widget-line); border-radius: 8px; }
+body.ascension-design .decision-brief-table { min-width: 520px; font-size: 14px; table-layout: auto; }
+body.ascension-design .decision-brief-caption { padding: 16px; font-size: 15px; }
+body.ascension-design .decision-brief-cell { padding: 14px 16px; border-color: var(--widget-line); font-size: 14px; }
+body.ascension-design .decision-brief-thead { color: var(--widget-muted); background: var(--widget-canvas); }
+body.ascension-design .decision-brief-cell:first-child { width: 38%; }
+
+/* Team workspace is styled only when its real module is mounted. */
+body.ascension-design .team-workspace-summary { padding: 20px 24px; }
+body.ascension-design .team-workspace-content { padding: 0 24px 24px; }
+body.ascension-design .team-workspace h3 { margin-top: 24px; font-size: 18px; }
+body.ascension-design :is(.team-workspace-help, .team-workspace-identity) { color: var(--widget-muted); }
+body.ascension-design :is(.team-workspace-login, .team-workspace-controls) { gap: 12px; margin-block: 20px; }
+body.ascension-design .team-workspace-acknowledgement { min-height: 44px; align-items: flex-start; }
+body.ascension-design .team-workspace input.team-workspace-acknowledge { width: 20px; height: 20px; min-height: 20px; padding: 0; flex-basis: 20px; }
+body.ascension-design .team-workspace-explanation { border-color: var(--widget-line); }
+body.ascension-design .team-workspace-entries { padding-left: 24px; scrollbar-width: thin; }
+body.ascension-design .team-workspace-entries li { padding-block: 10px; border-bottom: 1px solid var(--widget-line); }
+
+/* Primary actions, after neutral component rules to preserve a clear hierarchy. */
+body.ascension-design .policy-options-root .policy-options-find,
+body.ascension-design .action-register button.action-register-create,
+body.ascension-design .decision-brief-root .decision-brief-download,
+body.ascension-design .team-workspace button:is(.team-workspace-publish, .team-workspace-connect) {
+  color: #fff;
+  background: var(--widget-cobalt);
+  border-color: var(--widget-cobalt);
+}
+body.ascension-design .policy-options-root .policy-options-find:hover:not(:disabled),
+body.ascension-design .action-register button.action-register-create:hover:not(:disabled),
+body.ascension-design .decision-brief-root .decision-brief-download:hover:not(:disabled),
+body.ascension-design .team-workspace button:is(.team-workspace-publish, .team-workspace-connect):hover:not(:disabled) {
+  color: #fff;
+  background: #1c43b1;
+  border-color: #1c43b1;
+}
+body.ascension-design .policy-options-root .policy-options-find:disabled,
+body.ascension-design .action-register button.action-register-create:disabled,
+body.ascension-design .decision-brief-root .decision-brief-download:disabled,
+body.ascension-design .team-workspace button:is(.team-workspace-publish, .team-workspace-connect):disabled {
+  color: var(--widget-muted);
+  background: var(--widget-canvas);
+  border-color: var(--widget-line);
+}
+
+/* Alisher's comparison internals are untouched: wrappers only. */
+body.ascension-design #comparison-panel { min-width: 0; }
+body.ascension-design .comparison-slots { gap: 16px; }
+body.ascension-design .comparison-slot { padding: 24px; border-color: var(--widget-line); border-radius: 8px; background: var(--widget-paper); }
+body.ascension-design .comparison-districts { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+
+/* Public transit catalog and location panels; no geographic data or map sizing changes. */
+body.ascension-design .transit-panel > summary { padding: 20px 24px; }
+body.ascension-design .transit-body { padding: 0 24px 24px; }
+body.ascension-design .transit-count { color: var(--widget-muted); font-size: 13px; }
+body.ascension-design .transit-tools { gap: 12px; margin-block: 20px 16px; }
+body.ascension-design .transit-search-label { min-width: 0; flex-basis: 240px; }
+body.ascension-design .transit-tabs { gap: 8px; }
+body.ascension-design .transit-tabs button[aria-pressed="true"] { background: var(--widget-cobalt); border-color: var(--widget-cobalt); color: #fff; }
+body.ascension-design .transit-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-top: 16px; padding: 4px; overscroll-behavior-y: contain; scrollbar-width: thin; }
+body.ascension-design .transit-panel .transit-card { padding: 16px; }
+body.ascension-design .transit-card strong { font-size: 14px; font-weight: 600; }
+body.ascension-design .transit-card small { color: var(--widget-muted); font-size: 13px; line-height: 1.5; }
+body.ascension-design .transit-number { padding: 8px 6px; border-radius: 6px; background: var(--widget-lime); color: var(--widget-ink); font-size: 18px; font-variant-numeric: tabular-nums; }
+body.ascension-design .transit-stop-icon { color: var(--widget-cobalt); }
+body.ascension-design .transit-selection { padding: 24px; background: var(--widget-blue-wash); border-color: #b9c7ef; border-radius: 8px; }
+body.ascension-design .transit-selection h4 { margin-right: 40px; font-size: 21px; }
+body.ascension-design .transit-selection .transit-close { width: 44px; min-height: 44px; padding: 0; }
+body.ascension-design .transit-empty { color: var(--widget-muted); padding: 32px 8px; }
+body.ascension-design .location-map-panel h2 { font-size: 26px; letter-spacing: -.035em; }
+body.ascension-design .location-map-panel .button-row { gap: 12px; }
+
+/* Explorer colors and named overlay surfaces. Canvas and map controls retain layout. */
+body.ascension-design .citymap.citymap-exploring {
+  --explorer-cream: var(--brand-surface, #fcfbf7);
+  --explorer-ink: var(--ink, #17232d);
+  --explorer-green: var(--brand-blue, #2454d8);
+  --explorer-muted: var(--muted, #58636c);
+  --explorer-line: var(--line, #d8dcd8);
+  --explorer-shadow: 0 2px 10px #17232d0b;
+}
+body.ascension-design .city-explorer :is(.city-explorer-badge, .city-explorer-playback,
+  .city-explorer-panel, .city-explorer-empty, .city-explorer-list, .city-explorer-actions) {
+  background: var(--widget-paper);
+  border-color: var(--widget-line);
+  border-radius: 8px;
+  box-shadow: var(--explorer-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.ascension-design .city-explorer button { min-height: 44px; border-radius: 6px; color: var(--widget-ink); background: var(--widget-paper); font-size: 13px; box-shadow: none; }
+body.ascension-design .city-explorer button:hover:not(:disabled) { color: var(--widget-cobalt); border-color: var(--widget-cobalt); background: var(--widget-blue-wash); }
+body.ascension-design .city-explorer button:is([aria-pressed="true"], [aria-selected="true"], [aria-expanded="true"], [data-state="active"]),
+body.ascension-design .city-explorer-playback button[data-action="play"],
+body.ascension-design .city-explorer-panel-actions button:first-child { background: var(--widget-cobalt); border-color: var(--widget-cobalt); color: #fff; box-shadow: none; }
+body.ascension-design .city-explorer button.city-explorer-close { width: 44px; min-height: 44px; background: transparent; color: var(--widget-muted); font-size: 24px; }
+body.ascension-design .city-explorer-kicker { color: var(--widget-muted); font-size: 10px; }
+body.ascension-design .city-explorer-badge > strong { color: var(--widget-ink); font-size: 18px; }
+body.ascension-design .city-explorer-badge > span:last-child:not(.city-explorer-kicker) { font-size: 12px; }
+body.ascension-design :is(.city-explorer-detail, .city-explorer-facts dt, .city-explorer-facts dd,
+  .city-explorer-status, .city-explorer-status small, .city-explorer-disclaimer,
+  .city-explorer-list-item strong, .city-explorer-list-item span, .city-explorer-empty) { font-size: 13px; line-height: 1.55; }
+body.ascension-design :is(.city-explorer-detail, .city-explorer-help, .city-explorer-disclaimer,
+  .city-explorer-status, .city-explorer-status small, .city-explorer-empty) { color: var(--widget-muted); }
+body.ascension-design .city-explorer-help { background: var(--widget-paper); }
+body.ascension-design .city-explorer-list > p { font-size: 13px; }
+body.ascension-design .city-explorer button.city-explorer-list-item { background: transparent; color: var(--widget-ink); border-radius: 6px; }
+body.ascension-design .city-explorer button.city-explorer-list-item:is([aria-pressed="true"], [aria-selected="true"]) { background: var(--widget-lime); border-color: #bacd85; color: var(--widget-ink); }
+body.ascension-design .city-explorer-hover { color: #fff; background: var(--widget-ink); border-color: var(--widget-ink); box-shadow: none; font-size: 13px; }
+
+@media (max-width: 760px) {
+  body.ascension-design .policy-options-baseline .policy-options-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.ascension-design .policy-options-heading { flex-direction: column; align-items: stretch; gap: 16px; }
+  body.ascension-design .policy-options-find { width: 100%; }
+  body.ascension-design .decision-brief-fields,
+  body.ascension-design .evidence-form { grid-template-columns: minmax(0, 1fr); }
+  body.ascension-design .city-explorer-actions { max-width: 100%; }
+}
+
+@media (max-width: 560px) {
+  body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+    .evidence-register, .decision-brief-root, .location-map-panel, .comparison-root) {
+    margin-block: 16px;
+    padding: 20px 16px;
+  }
+  body.ascension-design :is(.scenario-library-list, .policy-options-cards, .action-register-cards,
+    .comparison-slots, .transit-list) { grid-template-columns: minmax(0, 1fr); }
+  body.ascension-design :is(.scenario-library-card, .policy-options-card, .action-register-card,
+    .policy-options-baseline, .comparison-slot, .transit-selection) { padding: 20px 16px; }
+  body.ascension-design :is(.scenario-library-save-form, .action-register-controls,
+    .team-workspace-login, .team-workspace-controls, .evidence-actions) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.ascension-design .scenario-library-save-form > .scenario-library-label,
+  body.ascension-design .team-workspace-field { flex-basis: auto; }
+  body.ascension-design .scenario-library-actions > button { flex: 1 1 120px; }
+  body.ascension-design .scenario-library-save-form > button,
+  body.ascension-design .action-register-controls button,
+  body.ascension-design .team-workspace-controls button,
+  body.ascension-design .team-workspace-confirmation button,
+  body.ascension-design .decision-brief-download { width: 100%; margin-inline: 0; }
+  body.ascension-design .decision-brief-metrics { grid-template-columns: minmax(0, 1fr); }
+  body.ascension-design .decision-brief-metric { padding: 16px; }
+  body.ascension-design .decision-brief-metric:nth-child(-n+2) { grid-column: auto; }
+  body.ascension-design .decision-brief-table { min-width: 520px; }
+  body.ascension-design .decision-brief-cell { padding: 12px 14px; }
+  body.ascension-design .team-workspace-summary,
+  body.ascension-design .transit-panel > summary { padding: 18px 16px; }
+  body.ascension-design .team-workspace-content,
+  body.ascension-design .transit-body { padding: 0 16px 20px; }
+  body.ascension-design .transit-tools > button { width: 100%; }
+  body.ascension-design .transit-tabs label { margin-left: 0; flex-basis: 100%; min-height: 44px; }
+  body.ascension-design .city-explorer-actions button { font-size: 12px; }
+  body.ascension-design .city-explorer-panel { padding: 16px; border-radius: 8px; }
+  body.ascension-design .city-explorer-panel h3 { font-size: 21px; }
+  body.ascension-design .city-explorer-badge { padding: 10px 12px; border-radius: 8px; }
+  body.ascension-design .city-explorer-playback { border-radius: 8px; }
+  body.ascension-design .city-explorer-status { font-size: 12px; }
+}
+
+/* Do not expose dormant, pending or inaccessible states through layout overrides. */
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel, .city-explorer) [hidden] {
+  display: none !important;
+}
+body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+  .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+  .location-map-panel, .city-explorer)[hidden] {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.ascension-design :is(.scenario-library-root, .policy-options-root, .action-register,
+    .evidence-register, .decision-brief-root, .team-workspace, .transit-panel,
+    .location-map-panel, .city-explorer) * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  body.ascension-design :is(.decision-brief-root, .decision-brief-metric) {
+    background: #fff;
+    color: #17232d;
+    box-shadow: none;
+  }
+  body.ascension-design .decision-brief-table-wrap { overflow: visible; border: 0; }
+  body.ascension-design .decision-brief-table { min-width: 0; }
+  body.ascension-design .decision-brief-cell { break-inside: avoid; }
+}

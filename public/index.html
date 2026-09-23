@@ -1,107 +1,17 @@
 <!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#153d35">
-  <meta name="description" content="Аким на 5 часов — симулятор городских решений на синтетических данных. Пять решений, единый бюджет и измеримый результат.">
-  <title>Ascension AI · 3D-симулятор Астаны</title>
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/comparison.css">
-  <link rel="stylesheet" href="/scenario-library.css">
-  <link rel="stylesheet" href="/policy-options-panel.css">
-  <link rel="stylesheet" href="/map.css">
-  <link rel="stylesheet" href="/city-explorer.css" data-city-explorer>
-  <link rel="stylesheet" href="/action-register.css">
-  <link rel="stylesheet" href="/team-workspace.css">
-  <link rel="stylesheet" href="/decision-brief.css">
-  <link rel="stylesheet" href="/evidence-register.css">
-  <link rel="stylesheet" href="/dashboard.css">
-  <link rel="stylesheet" href="/visual-design.css">
-  <link rel="stylesheet" href="/motion.css">
-  <link rel="stylesheet" href="/command-center.css">
-  <script type="module" src="/app.js"></script>
-  <script type="module" src="/comparison.js"></script>
-  <script type="module" src="/motion.js"></script>
-</head>
-<body class="compact-layout" data-command-center="true">
-  <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
-  <header class="compact-header">
-    <a class="compact-brand" href="#top" aria-label="Аким на 5 часов — начало">ASCENSION<span>Аким на 5 часов</span></a>
-    <nav aria-label="Основная навигация">
-      <a class="compact-link active" href="#workspace" aria-current="page">Симулятор</a>
-      <a class="compact-link" href="/citizens.html">Жителям</a>
-      <a class="compact-link" href="/mayor-overview.html">Кабинет акима</a>
-    </nav>
-  </header>
-
-  <main id="top">
-    <div class="page-content">
-      <section class="hero" aria-labelledby="page-title">
-        <div><div class="eyebrow">СИМУЛЯТОР ГОРОДСКИХ РЕШЕНИЙ</div><h1 id="page-title">Что вы измените в городе?</h1><p>Выберите 5 решений в пределах 100 условных единиц.<br>Посмотрите, как изменится жизнь в районах Астаны.</p></div>
-        <div class="hero-actions model-only"><button class="button button-outline" id="demo-button" disabled>Попробовать на примере</button><button class="text-button" id="reset-button" disabled hidden>Начать заново</button></div>
-      </section>
-
-      <div id="loading" class="loading-state" role="status">Загружаем исходные данные города…</div>
-      <div id="fatal-error" class="error-box" role="alert" hidden></div>
-      <div id="app" hidden>
-        <details id="map-section" class="compact-disclosure map-section">
-          <summary><span id="map-heading">Карта города</span><span class="compact-hint">Районы и приоритеты</span></summary>
-          <div class="compact-content">
-          <div id="city-map"></div>
-          <div id="geography-notice" class="geography-notice" hidden><div><h3 id="geography-title">Географический просмотр</h3><p>Карта доступна. Для расчёта решений в этой территории нужны её показатели, бюджет и подтверждённые эффекты мер. В текущем кейсе есть только учебный набор Астаны.</p></div><button id="return-astana" class="button button-outline">Вернуться к модели Астаны</button></div>
-          <div id="district-focus" class="district-focus model-only"></div>
-          </div>
-        </details>
-
-        <section id="workspace" class="workspace model-only" aria-label="Конструктор сценария">
-          <div class="catalog-area">
-            <div class="section-heading"><div><h2>Выберите решения</h2></div><span class="quiet-tag" id="planning-district">Астана · 5 районов</span></div>
-            <p class="section-description">Начните с направления. Можно выбрать не более 2 решений в каждом.</p>
-            <div id="filters" class="filters" role="group" aria-label="Фильтр по направлению"></div>
-            <div id="error-box" class="error-box" role="alert" tabindex="-1" hidden></div>
-            <div id="catalog" class="catalog-grid"></div>
-          </div>
-          <aside class="plan-panel" aria-labelledby="plan-heading">
-            <div class="plan-heading"><div><h2 id="plan-heading">Ваш план</h2></div><span id="plan-count" class="count-badge">0/5</span></div>
-            <div id="selected-list" class="selected-list"></div>
-            <div class="plan-summary"><div><span>Стоимость решений</span><strong><span id="plan-total">0</span> <small>у. е.</small></strong></div><div><span>Остаток бюджета</span><strong class="green"><span id="plan-left">100</span> <small>у. е.</small></strong></div></div>
-            <button id="simulate-button" class="button button-primary" disabled>Посмотреть результат</button>
-            <p id="simulate-hint" class="plan-hint">Выберите ещё 5 решений</p>
-            <details class="rules"><summary>Ограничения и совместимость</summary><ul><li>Бюджет — не более 100 у. е.; ровно 100 допустимо.</li><li>Каждая мера используется один раз.</li><li>Автобусные полосы и ЛРТ нельзя включить в один план.</li><li>В одном районе несовместимы парк и школа с детсадом, а также чистое топливо и модернизация сетей.</li><li>Для районной меры нужен один район. Городская действует во всех пяти.</li></ul></details>
-          </aside>
-        </section>
-
-        <div class="model-only">
-        <section id="results" class="results-section" aria-labelledby="result-heading" hidden>
-          <div class="section-heading"><div><h2 id="result-heading">Результат сценария</h2></div><span id="result-state" class="quiet-tag">Ожидает расчёта</span></div>
-
-          <div id="result-content" hidden></div>
-        </section>
-
-          <details id="policy-options-details" class="compact-disclosure" hidden><summary>Что можно улучшить в плане</summary><div id="policy-options-panel" class="compact-content"></div></details>
-          <details id="comparison-details" class="compact-disclosure" hidden><summary>Сравнить два последних расчёта</summary><div id="comparison-panel" class="compact-content"></div></details>
-          <details id="decision-brief-details" class="compact-disclosure" hidden><summary>Записка по решению</summary><div id="decision-brief" class="compact-content"></div></details>
-          <details id="saved-scenarios" class="compact-disclosure"><summary>Мои сценарии</summary><div id="scenario-library" class="compact-content"></div></details>
-        </div>
-        <section id="team-workspace-panel" aria-label="Общий реестр поручений"></section>
-        <details id="action-register-details" class="compact-disclosure"><summary>Поручения и исполнение</summary><div id="action-register-panel" class="compact-content"></div></details>
-
-        <details id="city" class="compact-disclosure city-section model-only">
-          <summary><span id="city-heading">Показатели районов</span><span class="compact-hint" id="district-state">Исходная картина</span></summary>
-          <div class="compact-content">
-          <p class="section-description">Каждый показатель — от 0 до 100, больше значит лучше. Значения ниже 40 критические.</p>
-          <div id="district-summary" class="district-summary"></div>
-          <div class="table-panel"><div class="table-toolbar"><h3>Все показатели</h3><span class="critical-key"><span></span> Ниже 40</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Таблица показателей районов, прокручивается горизонтально"><table id="indicator-table"></table></div><p class="table-note" id="table-note">Исходные значения официального синтетического набора.</p></div>
-          </div>
-        </details>
-
-        <details id="method" class="compact-disclosure model-only"><summary>Как работает модель</summary><div class="method-section"><div><div class="eyebrow">ПРОЗРАЧНАЯ МОДЕЛЬ</div><h2>Как складывается Score</h2><p>Рост средней оценки важен, но город не должен оставлять слабые районы позади.</p></div><div class="formula"><span><strong>0,7</strong> × средняя оценка</span><b>+</b><span><strong>0,3</strong> × худший район</span><b>−</b><span>число критических<br>показателей</span></div><p class="method-note">Средняя оценка взвешена по долям населения. Эффекты учитывают лаг реализации на горизонте 8 кварталов; синергии добавляются отдельно. Округление применяется только при отображении. Данные учебные и не описывают реальную ситуацию в Астане. Для применения в акимате нужны реальные данные и калибровка модели; карта сама по себе этого не заменяет.</p></div></details>
-        <details id="evidence-register-details" class="compact-disclosure"><summary>Паспорта данных</summary><div id="evidence-register" class="compact-content"></div></details>
-        <footer><span>ASCENSION <span class="footer-divider">/</span> Аким на 5 часов</span><a href="/citizens.html">Обращение жителя</a><a href="/mayor.html">Кабинет акимата</a><span id="service-status">Учебная модель · синтетические данные</span></footer>
-      </div>
-    </div>
-  </main>
-  <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-</body>
-</html>
+<html lang="ru"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#F4F2EB">
+<meta name="description" content="ASCENSION — город начинается с решения. Исследуйте Астану, соберите сценарий и оцените изменения. Пять решений, единый бюджет и понятный результат.">
+<title>ASCENSION · Город начинается с решения</title><link rel="icon" href="/assets/design/ascension-mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css"><link rel="stylesheet" href="/home-design.css"><script type="module" src="/brand-ui.js"></script>
+</head><body class="ascension-design home-page">
+<a class="skip-link" href="#overview">Перейти к содержанию</a>
+<header class="brand-header"><a class="brand-logo" href="/" aria-label="ASCENSION — главная"><img src="/assets/design/ascension-mark.svg" width="30" height="34" alt=""><strong>ASCENSION</strong></a><nav class="brand-nav" aria-label="Основная навигация"><a href="/" aria-current="page">Обзор</a><a href="/classic.html#workspace">Сценарии</a><a href="/citizens.html">Обращения</a><a href="/classic.html#action-register-details">Поручения</a><a href="/classic.html#city">Данные</a></nav><a class="brand-resident" href="/mayor.html">Кабинет акимата ↗</a></header>
+<main class="home-main" id="overview">
+<section class="home-hero" aria-labelledby="home-title"><div class="home-hero-copy"><div class="home-kicker">АСТАНА / ЛАБОРАТОРИЯ РЕШЕНИЙ</div><h1 id="home-title">Город начинается<br>с <em>решения.</em></h1><p class="home-lead">Пять решений. Один бюджет.<br>Узнайте, как ваши приоритеты меняют жизнь районов — и что стоит за каждым числом.</p><div class="home-actions"><a class="button button-primary" href="/classic.html#workspace">Собрать сценарий <span aria-hidden="true">↗</span></a><a class="button button-outline" href="/citizens.html">Сообщить о проблеме</a></div><p class="home-subnote">Учебная модель · синтетические данные · прозрачный расчёт</p></div><figure class="home-art"><img src="/assets/design/city-hero-approved.png" width="1536" height="1024" fetchpriority="high" alt="Архитектурная миниатюра Астаны: светлые здания, мосты и синяя река"><span class="home-art-tag">ГОРОД В ВАШИХ РЕШЕНИЯХ</span><figcaption><span>ASCENSION / АСТАНА</span><span>Концептуальная иллюстрация</span></figcaption></figure></section>
+<div class="home-facts" aria-label="Параметры учебной модели"><div><strong id="home-district-count">—</strong><span>районов с разными приоритетами</span></div><div><strong><b id="home-budget" style="font-weight:inherit">—</b><small>у. е.</small></strong><span>единый бюджет вашего плана</span></div><div><strong>8<small>кварталов</small></strong><span>горизонт реализации решений</span></div><div><strong id="home-score">—</strong><span>исходный индекс качества жизни</span></div></div>
+<section class="home-section" aria-labelledby="home-path-heading"><div class="home-heading"><div><div class="eyebrow">ВАША ТОЧКА ВХОДА</div><h2 id="home-path-heading">От идеи — к действию.</h2></div><a href="/command-center.html">Открыть карту города ↗</a></div><div class="home-paths"><a class="home-path" href="/classic.html#workspace"><div class="home-path-no">01 / СЦЕНАРИИ <b aria-hidden="true">↗</b></div><h3>Каким станет город?</h3><p>Выберите меры, распределите бюджет и сравните результат. Каждый эффект можно проверить.</p></a><a class="home-path" href="/command-center.html"><div class="home-path-no">02 / КАРТА И ИИ <b aria-hidden="true">↗</b></div><h3>Начните со своей идеи.</h3><p>Опишите приоритеты. ИИ предложит план, а модель рассчитает изменения по кварталам.</p></a><a class="home-path" href="/citizens.html"><div class="home-path-no">03 / ОБРАЩЕНИЯ <b aria-hidden="true">↗</b></div><h3>Ваш район. Ваш голос.</h3><p>Сообщите о городской проблеме, добавьте место и фотографию. Следите за статусом по квитанции.</p></a></div></section>
+<section class="home-section" aria-labelledby="home-district-heading"><div class="home-heading"><div><div class="eyebrow">ИСХОДНАЯ КАРТИНА</div><h2 id="home-district-heading">Пять районов. Общий город.</h2></div><a href="/classic.html#city">Все показатели ↗</a></div><div id="home-data-loading" class="home-skeleton" role="status">Загружаем показатели модели…</div><div id="home-data-error" class="home-load-error" hidden role="alert"><p>Не удалось загрузить показатели. Проверьте подключение и попробуйте ещё раз.</p><button type="button" id="home-retry">Загрузить снова</button></div><div id="home-districts" class="home-districts"></div><p class="home-data-note">Индекс от 0 до 100: выше — лучше. Эти значения относятся к учебному набору, а не к реальной статистике Астаны.</p></section>
+<section class="home-section home-method" aria-labelledby="home-method-title"><div><div class="eyebrow">ПОНЯТНОЕ ОБОСНОВАНИЕ</div><h2 id="home-method-title">Числа объяснимы.<br>Решение остаётся за вами.</h2><p>Расчёт учитывает средний результат, самый уязвимый район и критические показатели. ИИ помогает разобраться в компромиссах.</p><p class="home-api-status" id="home-ai-status" role="status">Проверяем доступность сервисов…</p><a class="button button-outline" href="/classic.html#method">Как устроен расчёт ↗</a></div><ol class="home-steps"><li><strong>Соберите пять решений</strong><span>Уложитесь в 100 у. е., не более двух мер одного направления.</span></li><li><strong>Увидьте последствия</strong><span>Сопоставьте районы и изменения за восемь кварталов.</span></li><li><strong>Проверьте альтернативы</strong><span>Сравните планы, сохраните сценарий и подготовьте записку.</span></li><li><strong>Перейдите к исполнению</strong><span>Свяжите решение с поручениями, источниками и ответственными.</span></li></ol></section>
+</main><footer class="brand-footer"><a class="brand-logo" href="/"><img src="/assets/design/ascension-mark.svg" alt="" width="23" height="25"><strong>ASCENSION</strong></a><span>Аким на 5 часов · учебная модель</span><a href="/citizens.html">Жителям</a><a href="/mayor.html">Кабинет акимата</a><a href="/classic.html#evidence-register-details">Источники и ограничения</a></footer>
+</body></html>
