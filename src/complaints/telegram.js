@@ -1,6 +1,10 @@
 const MAX_RECENT_UPDATES = 4096;
 const MAX_DRAFTS = 1000;
 const DRAFT_TTL_MS = 30 * 60 * 1000;
+const SESSION_UPDATE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_SESSION_UPDATES = 32;
+const UPDATE_PREFIX = 'telegram:update:';
+const UPDATE_EXPIRY_PREFIX = 'telegram:update-expiry:';
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const STATUS_LABELS = { new: 'Новое', in_progress: 'В работе', resolved: 'Решено', rejected: 'Отклонено' };
 const CONSENT_PROMPT = '📝 Новое обращение\n\nДля передачи обращения в акимат нужно ваше согласие на обработку текста, фото и указанного места. Эти сведения и Telegram ID доступны сотрудникам; в публичной проверке они не показываются. Не отправляйте чужие персональные данные.\n\nНажмите «✅ Согласен, продолжить» или отправьте /agree. До отправки обращение можно отменить.';
@@ -26,6 +30,29 @@ export const TELEGRAM_COMMANDS = Object.freeze([
 ]);
 const BUTTON_COMMANDS = new Map(Object.entries(TELEGRAM_BUTTONS).map(([command, label]) => [label, command]));
 const B = TELEGRAM_BUTTONS;
+
+const expiryKey = (expiresAt, id = '') => `${UPDATE_EXPIRY_PREFIX}${String(expiresAt).padStart(16, '0')}:${id}`;
+
+/** Called by the owning Durable Object alarm. Each batch has bounded storage work. */
+export async function cleanupTelegramUpdates(storage, { now = Date.now(), limit = 128 } = {}) {
+  if (!Number.isSafeInteger(now) || now < 0 || !Number.isInteger(limit) || limit < 1 || limit > 128) {
+    throw new TypeError('Некорректные параметры очистки обновлений Telegram.');
+  }
+  return storage.transaction(async transaction => {
+    const expired = await transaction.list({ prefix: UPDATE_EXPIRY_PREFIX, end: expiryKey(now + 1), limit });
+    let removed = 0;
+    for (const [key, index] of expired) {
+      const entry = await transaction.get(index.key);
+      // An expired index must never delete a newer reuse of the same update_id.
+      if (entry && entry.expiresAt <= now) { await transaction.delete(index.key); removed++; }
+      await transaction.delete(key);
+    }
+    const next = [...(await transaction.list({ prefix: UPDATE_EXPIRY_PREFIX, limit: 1 })).values()][0];
+    if (next) await transaction.setAlarm(Math.max(now + 1000, next.expiresAt));
+    // An executing alarm clears itself; avoiding deleteAlarm also preserves newly scheduled work.
+    return { removed, more: Boolean(next && next.expiresAt <= now) };
+  });
+}
 
 function keyboard(rows, placeholder = 'Выберите действие в меню') {
   return { keyboard: rows.map(row => row.map(button => typeof button === 'string' ? { text: button } : button)),
@@ -75,12 +102,14 @@ export function formatTelegramStatusNotification(complaint) {
   return lines.join('\n');
 }
 
-export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '', supportUrl = '' }) {
+export function createTelegramProcessor({ store, sendMessage = async () => ({ skipped: true }), publicBaseUrl = '', supportUrl = '', sessionStorage = null }) {
   if (!store?.create || !store?.get || !store?.track) throw new TypeError('Нужно хранилище обращений.');
+  if (sessionStorage && (typeof sessionStorage.get !== 'function' || typeof sessionStorage.put !== 'function')) throw new TypeError('Хранилище сессий должно поддерживать get и put.');
   const drafts = new Map();
   const updates = new Map();
   const chatQueues = new Map();
   const screens = new Map();
+  const sessions = new Map();
   const support = supportLink(supportUrl);
 
   function activeDraft(chatId) {
@@ -92,9 +121,11 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
 
   function screenFor(chatId) {
     const now = Date.now();
-    for (const [id, screen] of screens) if (now - screen.updatedAt > DRAFT_TTL_MS) screens.delete(id);
+    if (sessionStorage) {
+      if (now - (screens.get(chatId)?.updatedAt ?? 0) > DRAFT_TTL_MS) screens.delete(chatId);
+    } else for (const [id, screen] of screens) if (now - screen.updatedAt > DRAFT_TTL_MS) screens.delete(id);
     if (!screens.has(chatId)) {
-      if (screens.size >= MAX_DRAFTS) screens.delete(screens.keys().next().value);
+      if (!sessionStorage && screens.size >= MAX_DRAFTS) screens.delete(screens.keys().next().value);
       screens.set(chatId, { mode: 'menu', updatedAt: now });
     }
     const screen = screens.get(chatId);
@@ -135,10 +166,12 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
 
   function draftFor(chatId) {
     const now = Date.now();
-    for (const [id, draft] of drafts) if (now - draft.updatedAt > DRAFT_TTL_MS) drafts.delete(id);
+    if (sessionStorage) activeDraft(chatId);
+    else for (const [id, draft] of drafts) if (now - draft.updatedAt > DRAFT_TTL_MS) drafts.delete(id);
     if (!drafts.has(chatId)) {
-      if (drafts.size >= MAX_DRAFTS) drafts.delete(drafts.keys().next().value);
-      drafts.set(chatId, { text: '', attachments: [], address: '', consent: false, updatedAt: now });
+      if (!sessionStorage && drafts.size >= MAX_DRAFTS) drafts.delete(drafts.keys().next().value);
+      drafts.set(chatId, { text: '', attachments: [], address: '', consent: false, updatedAt: now,
+        ...(sessionStorage ? { generation: crypto.randomUUID() } : {}) });
     }
     const draft = drafts.get(chatId);
     draft.updatedAt = now;
@@ -193,7 +226,8 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     if (command === 'resume' || command === 'edit') return continueDraft();
     if (command === 'help' || command === 'support') {
       screen.mode = command;
-      const text = command === 'help' ? HELP_TEXT : `💬 Техподдержка\n\n${support ? `Чтобы написать человеку, откройте контакт поддержки:\n${support}\n\nОпишите, на каком шаге возникла проблема. Можно приложить скриншот и номер обращения. Личный код проверки отправлять не нужно.` : 'Контакт оператора пока не подключён. Ответы на частые вопросы:\n\n• Не получается отправить? Подтвердите согласие и добавьте описание не короче 10 символов.\n• Как прикрепить фото? Нажмите скрепку в поле сообщения.\n• Где номер обращения? Он в сообщении «Обращение принято».\n• Пропал черновик? После 30 минут бездействия или перезапуска начните новое обращение.'}\n\nСообщения из этого раздела не пересылаются оператору.`;
+      const help = sessionStorage ? HELP_TEXT.replace('При перезапуске бота незавершённый черновик нужно заполнить снова.', 'Черновик сохраняется при перезапуске бота в течение этих 30 минут.') : HELP_TEXT;
+      const text = command === 'help' ? help : `💬 Техподдержка\n\n${support ? `Чтобы написать человеку, откройте контакт поддержки:\n${support}\n\nОпишите, на каком шаге возникла проблема. Можно приложить скриншот и номер обращения. Личный код проверки отправлять не нужно.` : `Контакт оператора пока не подключён. Ответы на частые вопросы:\n\n• Не получается отправить? Подтвердите согласие и добавьте описание не короче 10 символов.\n• Как прикрепить фото? Нажмите скрепку в поле сообщения.\n• Где номер обращения? Он в сообщении «Обращение принято».\n• Пропал черновик? После 30 минут бездействия${sessionStorage ? '' : ' или перезапуска'} начните новое обращение.`}\n\nСообщения из этого раздела не пересылаются оператору.`;
       return reply(text, {}, navigationKeyboard(chatId));
     }
     if (command === 'status' || (!command && screen.mode === 'status')) {
@@ -218,6 +252,13 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     if (command === 'send') {
       const draft = drafts.get(chatId);
       const active = draft && Date.now() - draft.updatedAt <= DRAFT_TTL_MS ? draft : null;
+      if (sessionStorage && active) {
+        active.generation ??= crypto.randomUUID();
+        // The receipt stores this exact generation. Persist it before creating
+        // the complaint so recovery can clear a submitted draft after a crash,
+        // while a late replay still leaves a genuinely newer draft untouched.
+        await saveSession(chatId, sessions.get(chatId));
+      }
       // create deduplicates a Telegram update before validating its draft. This
       // recovers the original receipt if Telegram retries /send after a restart.
       let receipt;
@@ -227,6 +268,7 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
           address: active?.address ?? '', location: active?.location,
           attachments: active?.attachments ?? [], consent: active?.consent ?? false,
           source: 'telegram', telegramChatId: chatId, telegramUpdateId: update.update_id,
+          ...(sessionStorage && active?.generation ? { telegramDraftId: active.generation } : {}),
         });
       } catch (error) {
         if (error.status >= 400 && error.status < 500) {
@@ -238,8 +280,9 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
         throw error;
       }
       if (String(receipt.complaint.telegramChatId) !== chatId) return reply('Не удалось подтвердить это обращение. Начните новое: /start.');
-      if (!receipt.duplicateUpdate) drafts.delete(chatId);
-      if (!receipt.duplicateUpdate) screen.mode = 'menu';
+      const submittedDraft = active?.generation && receipt.complaint.telegramDraftId === active.generation;
+      if (!receipt.duplicateUpdate || submittedDraft) drafts.delete(chatId);
+      if (!receipt.duplicateUpdate || submittedDraft) screen.mode = 'menu';
       return reply(receiptReply(receipt), { submitted: true, complaintId: receipt.complaint.id, duplicateUpdate: !!receipt.duplicateUpdate });
     }
     if (command === 'review') {
@@ -304,10 +347,137 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     return reply(`Добавлено в черновик.\n\n${nextStep(draft)}`, {}, draftKeyboard(draft));
   }
 
+  async function loadSession(chatId) {
+    let session = sessions.get(chatId);
+    if (session) {
+      sessions.delete(chatId);
+      sessions.set(chatId, session);
+      return session;
+    }
+    const saved = await sessionStorage.get(`telegram:session:${chatId}`);
+    if (saved && (saved.version !== 1 || !Array.isArray(saved.updates))) throw new Error('Не удалось прочитать сохранённую сессию Telegram.');
+    const now = Date.now();
+    if (saved?.draft && now - saved.draft.updatedAt <= DRAFT_TTL_MS) drafts.set(chatId, saved.draft);
+    if (saved?.screen && now - saved.screen.updatedAt <= DRAFT_TTL_MS) screens.set(chatId, saved.screen);
+    session = { updates: new Map((saved?.updates ?? [])
+      .filter(entry => now - entry.createdAt < SESSION_UPDATE_TTL_MS)
+      .slice(-MAX_SESSION_UPDATES).map(entry => [entry.id, entry])) };
+    sessions.set(chatId, session);
+    return session;
+  }
+
+  function pruneSessionUpdates(session) {
+    const now = Date.now();
+    for (const [id, entry] of session.updates) {
+      if (now - entry.createdAt >= SESSION_UPDATE_TTL_MS) session.updates.delete(id);
+    }
+    while (session.updates.size > MAX_SESSION_UPDATES) session.updates.delete(session.updates.keys().next().value);
+  }
+
+  async function saveSession(chatId, session, entry) {
+    const now = Date.now();
+    pruneSessionUpdates(session);
+    const screen = screens.get(chatId);
+    // The 32-reply snapshot is only a cache. The separate ledger retains every
+    // update for 24 hours, regardless of subsequent traffic in this chat.
+    const snapshot = {
+      version: 1, updatedAt: now, draft: activeDraft(chatId),
+      screen: screen && now - screen.updatedAt <= DRAFT_TTL_MS ? screen : null,
+      updates: [...session.updates.values()].map(({ id, createdAt, prepared, complete }) => ({ id, createdAt, prepared, complete: !!complete })),
+    };
+    if (!entry) return sessionStorage.put(`telegram:session:${chatId}`, snapshot);
+    const expiresAt = entry.createdAt + SESSION_UPDATE_TTL_MS;
+    const key = `${UPDATE_PREFIX}${entry.id}`;
+    const changes = {
+      [`telegram:session:${chatId}`]: snapshot,
+      [key]: { version: 1, id: entry.id, chatId, createdAt: entry.createdAt, expiresAt,
+        prepared: entry.prepared, complete: !!entry.complete },
+      [expiryKey(expiresAt, entry.id)]: { key, expiresAt },
+    };
+    if (typeof sessionStorage.getAlarm !== 'function' || typeof sessionStorage.setAlarm !== 'function') {
+      // Minimal local test adapters have no alarm API. The Durable Object uses the transaction below.
+      return sessionStorage.put(changes);
+    }
+    // Commit mutation, reply, expiry, and its cleanup alarm together. A crash must
+    // never leave a durable ledger without an alarm, or a draft without its ledger.
+    await sessionStorage.transaction(async transaction => {
+      await transaction.put(changes);
+      const alarm = await transaction.getAlarm();
+      if (alarm === null || alarm > expiresAt) await transaction.setAlarm(expiresAt);
+    });
+  }
+
+  async function loadUpdate(id) {
+    const entry = await sessionStorage.get(`${UPDATE_PREFIX}${id}`);
+    if (!entry) return null;
+    if (entry.version !== 1 || entry.id !== id || typeof entry.chatId !== 'string'
+      || !Number.isSafeInteger(entry.expiresAt) || !Number.isSafeInteger(entry.createdAt)
+      || entry.expiresAt !== entry.createdAt + SESSION_UPDATE_TTL_MS
+      || !entry.prepared || typeof entry.prepared !== 'object' || typeof entry.complete !== 'boolean') {
+      throw new Error('Не удалось прочитать журнал обновлений Telegram.');
+    }
+    return entry.expiresAt > Date.now() ? entry : null;
+  }
+
+  async function processPersistentUpdate(update, chatId) {
+    const inFlight = updates.get(update.update_id);
+    if (inFlight) return inFlight.chatId === chatId ? inFlight.pending : { ignored: true, duplicateUpdate: true };
+    const previous = chatQueues.get(chatId) ?? Promise.resolve();
+    const pending = previous.catch(() => {}).then(async () => {
+      let entry;
+      try {
+        const session = await loadSession(chatId);
+        pruneSessionUpdates(session);
+        entry = session.updates.get(update.update_id);
+        if (!entry) entry = await loadUpdate(update.update_id);
+        if (entry?.chatId && entry.chatId !== chatId) return { ignored: true, duplicateUpdate: true };
+        if (entry) session.updates.set(update.update_id, entry);
+        if (entry?.complete) {
+          // Also retries a completion write that failed after successful delivery.
+          await saveSession(chatId, session, entry);
+          return { ...entry.prepared.result, duplicateUpdate: true };
+        }
+        if (!entry) {
+          entry = { id: update.update_id, createdAt: Date.now(), prepared: await prepare(update, chatId), complete: false };
+          session.updates.set(update.update_id, entry);
+        }
+        await saveSession(chatId, session, entry);
+        if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text, { replyMarkup: entry.prepared.markup });
+        entry.complete = true;
+        await saveSession(chatId, session, entry);
+        return entry.prepared.result;
+      } catch (error) {
+        if (!entry?.complete) {
+          // Never let the next update persist a mutation whose own ledger commit failed.
+          sessions.delete(chatId);
+          drafts.delete(chatId);
+          screens.delete(chatId);
+        }
+        throw error;
+      }
+    });
+    updates.set(update.update_id, { chatId, pending });
+    chatQueues.set(chatId, pending);
+    try {
+      return await pending;
+    } finally {
+      updates.delete(update.update_id);
+      if (chatQueues.get(chatId) === pending) chatQueues.delete(chatId);
+      for (const id of sessions.keys()) {
+        if (sessions.size <= MAX_DRAFTS) break;
+        if (chatQueues.has(id)) continue;
+        sessions.delete(id);
+        drafts.delete(id);
+        screens.delete(id);
+      }
+    }
+  }
+
   return async function processUpdate(update) {
     if (!update || !Number.isSafeInteger(update.update_id) || update.update_id < 0) return { ignored: true };
     const chatId = chatIdOf(update);
     if (!chatId) return { ignored: true };
+    if (sessionStorage) return processPersistentUpdate(update, chatId);
     let entry = updates.get(update.update_id);
     if (entry?.complete) return { ...entry.prepared.result, duplicateUpdate: true };
     if (entry?.pending) return entry.pending;
@@ -386,7 +556,8 @@ export function createTelegramTransport({ token = '', fetchImpl = globalThis.fet
 
   async function fetchLimited(url, options, maxBytes, timeoutMs) {
     try {
-      const response = await fetchImpl(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
+      // Workerd supports manual redirects; reject 3xx below without forwarding the token.
+      const response = await fetchImpl(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok || response.redirected) {
         await response.body?.cancel();
         throw telegramError('TELEGRAM_REQUEST_FAILED', 'Telegram временно недоступен.');

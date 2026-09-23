@@ -211,12 +211,27 @@ test('transport uses Telegram fixed host, POST methods, bounded long polling and
   assert.equal(photo.contentType, 'image/jpeg');
   for (const request of requests) {
     assert.equal(new URL(request.url).hostname, 'api.telegram.org');
-    assert.equal(request.options.redirect, 'error');
+    assert.equal(request.options.redirect, 'manual');
     assert.ok(request.options.signal instanceof AbortSignal);
   }
   assert.equal(requests[0].options.method, 'POST');
   assert.deepEqual(JSON.parse(requests[1].options.body), { offset: 99, timeout: 20, limit: 100, allowed_updates: ['message', 'callback_query'] });
   assert.equal(JSON.parse(requests[2].options.body).file_id, 'private-file-id');
+});
+
+test('Telegram redirects are rejected without following a token-bearing request', async () => {
+  let calls = 0;
+  const transport = createTelegramTransport({ token: TEST_TOKEN, fetchImpl: async (_url, options) => {
+    calls++;
+    assert.equal(options.redirect, 'manual');
+    return new Response('redirect', { status: 307, headers: { Location: 'https://untrusted.example' } });
+  } });
+  await assert.rejects(transport.sendMessage(100, 'test'), error => {
+    assert.equal(error.code, 'TELEGRAM_REQUEST_FAILED');
+    assert.ok(!error.message.includes(TEST_TOKEN));
+    return true;
+  });
+  assert.equal(calls, 1);
 });
 
 test('photo download rejects external/traversal paths before issuing any download request', async () => {

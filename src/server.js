@@ -39,8 +39,8 @@ export function createRequestHandler({ aiConfigured = isAIConfigured,
       const protocol = request.socket.encrypted ? 'https' : 'http';
       // Forwarded headers are client-controlled unless a trusted proxy policy is configured.
       const origin = trustedOrigin ?? `${protocol}://${request.headers.host}`;
-      // Citizen intake is a Node-only extension with its own storage and authentication.
-      // Adapt its existing transport helpers without changing the shared simulator API.
+      // Citizen intake shares its route core with Worker and selects file storage here.
+      // Adapt its transport helpers without changing the shared simulator API.
       if (await handleComplaints(request, response, pathname, {
         readJson: () => readNodeJson(request, headers),
         sendJson: (target, status, body) => sendJson(target, { status, body }),

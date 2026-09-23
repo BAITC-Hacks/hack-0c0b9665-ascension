@@ -1,37 +1,13 @@
 import { handleApiRequest } from './http/api.js';
 import { RequestError, errorResult } from './http/errors.js';
-import { createJsonBodyParser, validateJsonHeaders } from './http/json.js';
 import { SECURITY_HEADERS, getPath, requireMethod } from './http/policy.js';
 import { createWorkerExplanation } from './runtime/worker-explanation.js';
+import { readWorkerJson } from './runtime/worker-json.js';
 
 function json({ body, status = 200, headers = {} }) {
   return Response.json(body, { status, headers: {
     ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...headers,
   } });
-}
-
-/** Adapt the Web stream to the shared bounded, strict JSON parser. */
-async function readJson(request) {
-  validateJsonHeaders(request.headers);
-  const parser = createJsonBodyParser();
-  const reader = request.body?.getReader();
-  if (reader) {
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        parser.push(value);
-      }
-    } catch (error) {
-      // Preserve the original rejection even if the source fails during cancellation.
-      try { await reader.cancel(); } catch { /* The stream may already be errored. */ }
-      if (error instanceof RequestError) throw error;
-      throw new RequestError(400, 'INVALID_BODY', 'Не удалось прочитать тело запроса.');
-    } finally {
-      reader.releaseLock();
-    }
-  }
-  return parser.finish();
 }
 
 /** One handler per isolate; bindings and request data stay scoped to each fetch. */
@@ -42,10 +18,27 @@ export function createWorker(options = {}) {
       try {
         const url = new URL(request.url);
         const pathname = getPath(url.pathname + url.search);
+        if (pathname === '/api/citizen/config' || pathname === '/api/telegram/webhook'
+          || pathname === '/api/complaints' || pathname.startsWith('/api/complaints/')) {
+          if (typeof env.COMPLAINTS?.getByName !== 'function') {
+            throw new RequestError(503, 'COMPLAINTS_UNAVAILABLE', 'Хранилище обращений не подключено.');
+          }
+          const complaints = env.COMPLAINTS.getByName('city');
+          if (typeof complaints?.fetch !== 'function') {
+            throw new RequestError(503, 'COMPLAINTS_UNAVAILABLE', 'Хранилище обращений не подключено.');
+          }
+          const response = await complaints.fetch(request);
+          const headers = new Headers(response.headers);
+          headers.set('Cache-Control', 'no-store');
+          for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+          return new Response(request.method === 'HEAD' ? null : response.body, {
+            status: response.status, statusText: response.statusText, headers,
+          });
+        }
         const result = await handleApiRequest({
           pathname,
           method: request.method,
-          readJson: () => readJson(request),
+          readJson: () => readWorkerJson(request),
           aiConfigured: Boolean(env.OPENAI_API_KEY?.trim()),
           explain: (scenario, simulation) => explain(scenario, simulation, env),
           headers: request.headers,

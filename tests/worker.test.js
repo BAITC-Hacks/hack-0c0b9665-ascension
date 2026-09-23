@@ -266,3 +266,20 @@ test('Worker preserves asset metadata, adds security headers, and omits HEAD bod
   assert.equal(rejected.status, 405);
   assert.equal(rejected.headers.get('Allow'), 'GET, HEAD');
 });
+
+test('Worker complaint responses retain status and metadata but cannot enable caching', async () => {
+  const worker = createWorker();
+  const runtime = env({ COMPLAINTS: { getByName: name => {
+    assert.equal(name, 'city');
+    return { fetch: async () => Response.json({ valid: false, errors: [{ code: 'NOT_FOUND' }] }, {
+      status: 404, headers: { 'Cache-Control': 'public, max-age=3600', 'Retry-After': '2',
+        'Content-Security-Policy': 'unsafe-value' },
+    }) };
+  } } });
+  const response = await worker.fetch(new Request('https://example.test/api/complaints/unknown/photos/no'), runtime);
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.get('Retry-After'), '2');
+  assert.match(response.headers.get('Content-Security-Policy'), /default-src 'self'/u);
+  assert.equal((await response.json()).errors[0].code, 'NOT_FOUND');
+});

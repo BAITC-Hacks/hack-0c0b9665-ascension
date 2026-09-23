@@ -2,6 +2,7 @@
   "name": "ascension-city-map",
   "main": "src/cloudflare.js",
   "compatibility_date": "2026-09-23",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "assets": {
     "directory": "./public",
@@ -10,9 +11,15 @@
   },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 },
   "durable_objects": {
-    "bindings": [{ "name": "AI_BUDGET", "class_name": "AIBudget" }]
+    "bindings": [
+      { "name": "AI_BUDGET", "class_name": "AIBudget" },
+      { "name": "COMPLAINTS", "class_name": "Complaints" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AIBudget"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AIBudget"] },
+    { "tag": "v2-complaints", "new_sqlite_classes": ["Complaints"] }
+  ],
   "ratelimits": [
     {
       "name": "AI_RATE_LIMITER",
@@ -21,6 +28,8 @@
     }
   ],
   "vars": {
+    "PUBLIC_BASE_URL": "https://ascension-city-map.azamatbreach.workers.dev",
+    "TELEGRAM_BOT_USERNAME": "Ascension_City_bot",
     "OPENAI_MODEL": "gpt-6-astra",
     "AI_MAX_REQUESTS": "100",
     "AI_REQUESTS_PER_MINUTE": "10",

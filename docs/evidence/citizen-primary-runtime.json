@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-09-23T11:34:39.07Z",
+  "bundle": ".wrangler/integration-dry-run/cloudflare.js",
+  "checks": [
+    {
+      "name": "actual SQLite multi-key ledger outlives 32-entry cache and registers 24-hour cleanup alarm",
+      "passed": true,
+      "cacheSize": 32
+    },
+    {
+      "name": "full workerd restart and old text replay preserve draft, alarm and sent-message deduplication",
+      "passed": true
+    },
+    {
+      "name": "replayed old text is absent from final duplicate-free complaint",
+      "passed": true,
+      "complaintCount": 1
+    }
+  ],
+  "mockTelegramMessages": 37,
+  "realExternalRequests": 0,
+  "instrumentation": "Temporary subclass adds read-only smokeInspect RPC; inherited production fetch, alarm and constructor run unchanged.",
+  "bundleSha256": "c79ca98972b0afc313fbd3e52243d25b554a7148af740864ef294d9a11fe6674",
+  "passed": true,
+  "finishedAt": "2026-09-23T11:34:43.391Z",
+  "sourceCommit": "e673bfea0fa9e84874a16652289e33dbc31b6c98",
+  "runtime": "Miniflare 5.20260921.0-alpha / workerd 1.20260921.1",
+  "unitTests": {
+    "command": "node --test --test-concurrency=1 tests/*.test.js",
+    "failed": 0,
+    "passed": 384
+  }
+}
