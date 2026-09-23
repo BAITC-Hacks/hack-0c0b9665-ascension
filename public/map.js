@@ -1,5 +1,6 @@
 import { PLACES, DISTRICT_ANCHORS, findPreset } from './places.js';
 import { mountCityExplorer } from './city-explorer.js';
+import { DISTRICT_COLORS, DISTRICT_SECTORS, DISTRICT_BOUNDS, sectorBounds } from './district-sectors.js';
 
 const VERSION = '5.24.0';
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -32,7 +33,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   const host = typeof container === 'string' ? document.getElementById(container) : container;
   if (!host) throw new Error('A map container is required');
   const prefix = `citymap-${++componentNumber}`;
-  const state = { city: PLACES[0], result: null, districtId: 'nura', metric: 'score', phase: 'before', is3D: true, map: null, markers: [], loaded: false, destroyed: false, searchId: 0, lastSearchAt: 0, cache: new Map() };
+  const state = { city: PLACES[0], result: null, districtId: 'nura', hoveredId: null, sectorsVisible: true, metric: 'score', phase: 'before', is3D: false, map: null, markers: [], loaded: false, destroyed: false, searchId: 0, lastSearchAt: 0, cache: new Map() };
   if (!document.querySelector('link[data-city-explorer]')) {
     const stylesheet = document.createElement('link');
     stylesheet.rel = 'stylesheet';
@@ -45,9 +46,10 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     <div class="citymap-toolbar">
       <label class="citymap-place-label" for="${prefix}-place"><span class="citymap-field-caption">ТЕРРИТОРИЯ</span><select id="${prefix}-place" class="citymap-place" aria-label="Выбрать город или регион"><optgroup label="Города Казахстана">${PLACES.filter((p) => p.kind === 'city').map((p) => `<option value="${p.id}">${p.name}${p.hasScenarioData ? ' · демо' : ''}</option>`).join('')}</optgroup><optgroup label="Регионы и страна">${PLACES.filter((p) => p.kind !== 'city').map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup></select></label>
       <form class="citymap-search" role="search"><label class="citymap-field-caption" for="${prefix}-search">НАЙТИ НА КАРТЕ</label><div class="citymap-search-row"><span aria-hidden="true">⌕</span><input id="${prefix}-search" type="search" maxlength="120" autocomplete="off" placeholder="Любой город или регион" aria-describedby="${prefix}-search-status"><button type="submit" aria-label="Найти город или регион">Найти <span aria-hidden="true">↗</span></button></div><div class="citymap-search-results" hidden></div></form>
-      <div class="citymap-mode" aria-label="Вид карты"><button type="button" data-view="2d" aria-pressed="false">Обзор 2D</button><button type="button" data-view="3d" aria-pressed="true">Город 3D <span aria-hidden="true">◇</span></button></div>
+      <div class="citymap-mode" aria-label="Вид карты"><button type="button" data-view="2d" aria-pressed="true">Районы 2D</button><button type="button" data-view="3d" aria-pressed="false">Город 3D <span aria-hidden="true">◇</span></button></div>
     </div>
     <p class="citymap-search-status" id="${prefix}-search-status" role="status" hidden></p>
+    <div class="citymap-sector-toolbar"><div><span class="citymap-sector-symbol" aria-hidden="true"></span><strong>Пять районов — пять цветов</strong><span class="citymap-sector-caption">Схема учебной модели</span></div><div class="citymap-sector-actions"><button type="button" class="citymap-sector-toggle" aria-pressed="true">Секторы районов</button><button type="button" class="citymap-show-all">Все районы <span aria-hidden="true">↗</span></button></div></div>
     <div class="citymap-stage">
       <div class="citymap-canvas" aria-label="Интерактивная карта. Масштабируйте кнопками или колесом, перемещайте перетаскиванием."></div>
       <div class="citymap-location"><span class="citymap-live-dot" aria-hidden="true"></span><div><strong class="citymap-city-name">Астана</strong><span class="citymap-city-caption">Демонстрационный сценарий · 5 районов</span></div></div>
@@ -55,9 +57,11 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
       <div class="citymap-fallback" hidden><span aria-hidden="true">⌁</span><h3>Карта сейчас недоступна</h3><p>Проверьте подключение и поддержку WebGL в браузере. Данные районов остаются в списке под картой.</p><button type="button" class="citymap-retry">Повторить загрузку</button></div>
       <div class="citymap-map-tools"><button type="button" class="citymap-overview" title="Показать всю выбранную территорию" aria-label="Показать всю выбранную территорию">⌖</button><button type="button" class="citymap-buildings" title="Приблизить к зданиям" aria-label="Приблизить к зданиям">▥</button></div>
       <div class="citymap-inspector" aria-live="polite"></div>
+      <div class="citymap-hover-tip" hidden aria-hidden="true"></div>
       <div class="citymap-legend"><span class="citymap-legend-label">Оценка района</span><span class="citymap-gradient" aria-hidden="true"></span><div><span>0 · ниже</span><span>выше · 100</span></div></div>
       <p class="citymap-network-note" role="status" hidden></p>
     </div>
+    <p class="citymap-interaction-hint">Наведите на сектор, чтобы увидеть оценку. Нажмите на него или выберите район ниже. <span>Масштаб: + / − · Перемещение: перетаскивание</span></p>
     <div class="citymap-data-toolbar"><div class="citymap-phase" aria-label="Показатели до и после"><button type="button" data-phase="before" aria-pressed="true">До решений</button><button type="button" data-phase="after" aria-pressed="false" disabled>После решений</button></div><label for="${prefix}-metric" class="citymap-metric-label">Слой данных <select id="${prefix}-metric" class="citymap-metric"><option value="score">Общая оценка района</option>${dataset.indicators.map((i) => `<option value="${escape(i.id)}">${escape(i.name)}</option>`).join('')}</select></label></div>
     <div class="citymap-district-list" aria-label="Районы демонстрационной модели"></div>
     <p class="citymap-disclaimer">Показатели — синтетические данные кейса. Метки обозначают условные точки районов, не их границы. 3D показывает здания из OpenStreetMap; полнота и высота зависят от исходных данных.</p>
@@ -77,6 +81,9 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
 
   function renderDistricts() {
     const enabled = state.city.hasScenarioData === true;
+    host.classList.toggle('citymap-has-data', enabled);
+    el('.citymap-sector-toolbar').hidden = !enabled;
+    el('.citymap-interaction-hint').hidden = !enabled || state.is3D;
     el('.citymap-data-toolbar').hidden = !enabled;
     el('.citymap-district-list').hidden = !enabled;
     el('.citymap-legend').hidden = !enabled;
@@ -90,15 +97,16 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
       el('.citymap-return').addEventListener('click', () => setCity('astana'));
       el('.citymap-disclaimer').textContent = 'Для этой территории местные данные не подключены. Оценки и результаты Астаны сюда не переносятся. География и 3D-здания — OpenStreetMap.';
     } else {
-      el('.citymap-disclaimer').textContent = 'Показатели — синтетические данные кейса. Метки обозначают условные точки районов, не их границы. 3D показывает здания из OpenStreetMap; полнота и высота зависят от исходных данных.';
+      el('.citymap-disclaimer').textContent = 'Секторы — условная схема пяти районов учебной модели, не административные границы. Цвет сектора обозначает район, цвет числовой метки — значение показателя. Показатели синтетические; улицы и 3D-здания — OpenStreetMap.';
       el('.citymap-district-list').innerHTML = currentDistricts().map((district) => {
         const value = districtValue(district);
         const change = district.afterScore - district.beforeScore;
-        return `<button type="button" data-district="${escape(district.id)}" class="citymap-district-card ${district.id === state.districtId ? 'is-selected' : ''}" aria-pressed="${district.id === state.districtId}"><span class="citymap-district-card-name"><span class="citymap-tone-dot" data-tone="${valueTone(value)}"></span>${escape(district.name)}</span><strong>${fmt(value)}</strong><span class="citymap-district-card-foot">${state.phase === 'after' && state.result ? `${signed(change)} к оценке` : 'Исходный показатель'}</span></button>`;
+        return `<button type="button" data-district="${escape(district.id)}" style="--district-color:${DISTRICT_COLORS[district.id]}" class="citymap-district-card ${district.id === state.districtId ? 'is-selected' : ''}" aria-pressed="${district.id === state.districtId}"><span class="citymap-district-card-name"><span class="citymap-sector-dot"></span>${escape(district.name)}<span class="citymap-selected-check" aria-hidden="true">✓</span></span><strong>${fmt(value)}<span class="citymap-tone-dot" data-tone="${valueTone(value)}"></span></strong><span class="citymap-district-card-foot">${state.phase === 'after' && state.result ? `${signed(change)} к оценке` : 'Исходный показатель'}</span></button>`;
       }).join('');
       renderInspector();
     }
     updateMarkers();
+    updateSectors();
   }
 
   function renderInspector() {
@@ -110,6 +118,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     const value = districtValue(district);
     const beforeValue = state.metric === 'score' ? district.beforeScore : district.before[state.metric];
     const afterValue = state.metric === 'score' ? district.afterScore : district.after[state.metric];
+    el('.citymap-inspector').style.setProperty('--district-color', DISTRICT_COLORS[district.id]);
     el('.citymap-inspector').innerHTML = `<div class="citymap-inspector-heading"><span class="citymap-kicker">${state.phase === 'after' ? 'ПОСЛЕ РЕШЕНИЙ' : 'ИСХОДНАЯ КАРТИНА'}</span><span class="citymap-sample-tag">Демо</span></div><h3>${escape(district.name)} <span>район</span></h3><div class="citymap-inspector-value"><strong data-tone="${valueTone(value)}">${fmt(value)}</strong><span>${escape(metricName())}${state.result ? `<b class="citymap-inspector-delta">${fmt(beforeValue)} → ${fmt(afterValue)} <em>(${signed(afterValue - beforeValue)})</em></b>` : '<b>из 100 баллов</b>'}</span></div><div class="citymap-priority"><span>${criticalCount ? `${criticalCount} критических показателя` : 'Точка внимания'}</span><strong>${escape(weakest.name)}</strong><span>${fmt(values[weakest.id])} / 100 · минимальный показатель</span></div>`;
   }
 
@@ -126,10 +135,16 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
       button.type = 'button';
       button.className = `citymap-marker ${state.districtId === district.id ? 'is-selected' : ''}`;
       button.dataset.tone = valueTone(value);
+      button.dataset.district = district.id;
+      button.style.setProperty('--district-color', DISTRICT_COLORS[district.id]);
       button.setAttribute('aria-label', `${district.name}. ${metricName()}: ${fmt(value)}. Условная точка района.`);
       button.setAttribute('aria-pressed', String(state.districtId === district.id));
       button.innerHTML = `<span class="citymap-marker-number">${fmt(value)}</span><span class="citymap-marker-label">${escape(district.name)}</span>`;
       button.addEventListener('click', (event) => { event.stopPropagation(); focusDistrict(district.id, false); });
+      button.addEventListener('mouseenter', () => hoverDistrict(district.id));
+      button.addEventListener('mouseleave', () => hoverDistrict(null));
+      button.addEventListener('focus', () => hoverDistrict(district.id));
+      button.addEventListener('blur', () => hoverDistrict(null));
       state.markers.push(new globalThis.maplibregl.Marker({ element: button, anchor: 'bottom' }).setLngLat(coordinates).addTo(state.map));
     }
   }
@@ -137,10 +152,75 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   function focusDistrict(id, move = true) {
     if (!state.city.hasScenarioData || !currentDistricts().some((district) => district.id === id)) return;
     state.districtId = id;
+    hoverDistrict(null);
     renderDistricts();
     inspectDistrict();
-    if (move && state.loaded) state.map.easeTo({ center: DISTRICT_ANCHORS[id], zoom: Math.max(state.map.getZoom(), 12.2), duration: reducedMotion ? 0 : 750 });
+    if (move && state.loaded) {
+      if (!state.is3D) state.map.fitBounds(sectorBounds(id), { padding: mapPadding(), maxZoom: 13, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : 700 });
+      else state.map.easeTo({ center: DISTRICT_ANCHORS[id], zoom: Math.max(state.map.getZoom(), 12.2), duration: reducedMotion ? 0 : 750 });
+    }
+    all('[data-district]').find(button => button.dataset.district === id && button.classList.contains('citymap-district-card'))?.focus({ preventScroll: true });
     if (typeof onDistrictSelect === 'function') onDistrictSelect(id);
+  }
+
+  function mapPadding() {
+    // Reserve space for the inspector on desktop; it sits below the map on phones.
+    return globalThis.matchMedia?.('(max-width: 670px)').matches
+      ? { top: 85, right: 58, bottom: 65, left: 25 }
+      : { top: 100, right: 80, bottom: 65, left: el('.citymap-inspector').offsetWidth + 40 };
+  }
+
+  function updateSectors() {
+    const visible = state.city.hasScenarioData && state.sectorsVisible && !state.is3D;
+    el('.citymap-sector-toggle').setAttribute('aria-pressed', String(state.sectorsVisible && !state.is3D));
+    el('.citymap-sector-toggle').disabled = state.is3D;
+    el('.citymap-interaction-hint').hidden = !state.city.hasScenarioData || state.is3D;
+    if (!state.loaded || !state.map.getSource('citymap-districts')) return;
+    for (const layer of ['citymap-sector-fill', 'citymap-sector-halo', 'citymap-sector-line']) state.map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+    for (const { id } of currentDistricts()) state.map.setFeatureState({ source: 'citymap-districts', id }, { selected: id === state.districtId, hover: id === state.hoveredId });
+  }
+
+  function hoverDistrict(id, point) {
+    if (!state.city.hasScenarioData || state.is3D || !state.sectorsVisible) id = null;
+    if (state.hoveredId !== id) {
+      state.hoveredId = id;
+      updateSectors();
+      all('[data-district]').forEach(button => button.classList.toggle('is-previewed', button.dataset.district === id));
+    }
+    const tip = el('.citymap-hover-tip');
+    const district = currentDistricts().find(item => item.id === id);
+    tip.hidden = !district || !point;
+    if (!district || !point) return;
+    tip.style.setProperty('--district-color', DISTRICT_COLORS[id]);
+    const contentKey = `${id}:${state.metric}:${state.phase}:${districtValue(district)}`;
+    if (tip.dataset.contentKey !== contentKey) {
+      tip.innerHTML = `<strong><span class="citymap-sector-dot"></span>${escape(district.name)}</strong><span>${escape(metricName())} <b>${fmt(districtValue(district))}</b></span><small>Нажмите, чтобы выбрать район</small>`;
+      tip.dataset.contentKey = contentKey;
+    }
+    const stage = el('.citymap-stage');
+    tip.style.left = `${Math.max(8, Math.min(point.x + 16, stage.clientWidth - tip.offsetWidth - 8))}px`;
+    tip.style.top = `${Math.max(8, Math.min(point.y + 16, stage.clientHeight - tip.offsetHeight - 8))}px`;
+  }
+
+  function addSectors(map, beforeLayer) {
+    map.addSource('citymap-districts', { type: 'geojson', data: DISTRICT_SECTORS });
+    const hovered = ['boolean', ['feature-state', 'hover'], false];
+    const selected = ['boolean', ['feature-state', 'selected'], false];
+    map.addLayer({ id: 'citymap-sector-fill', type: 'fill', source: 'citymap-districts', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', hovered, .44, selected, .29, .14] } }, beforeLayer);
+    map.addLayer({ id: 'citymap-sector-halo', type: 'line', source: 'citymap-districts', paint: { 'line-color': '#ffffff', 'line-width': ['case', hovered, 6, selected, 5, 3], 'line-opacity': .9 } }, beforeLayer);
+    map.addLayer({ id: 'citymap-sector-line', type: 'line', source: 'citymap-districts', paint: { 'line-color': ['get', 'color'], 'line-width': ['case', hovered, 3, selected, 2.5, 1.2], 'line-opacity': .9 } }, beforeLayer);
+    map.on('mousemove', 'citymap-sector-fill', event => {
+      if (!state.is3D && state.sectorsVisible && state.city.hasScenarioData) {
+        map.getCanvas().style.cursor = 'pointer';
+        hoverDistrict(event.features?.[0]?.properties.districtId ?? null, event.point);
+      }
+    });
+    map.on('mouseleave', 'citymap-sector-fill', () => { map.getCanvas().style.cursor = ''; hoverDistrict(null); });
+    map.on('movestart', () => hoverDistrict(null));
+    map.on('click', 'citymap-sector-fill', event => {
+      if (!state.is3D && state.sectorsVisible && state.city.hasScenarioData) focusDistrict(event.features?.[0]?.properties.districtId, false);
+    });
+    updateSectors();
   }
 
   function inspectDistrict() {
@@ -154,8 +234,9 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   function showTerritory() {
     if (!state.map || !state.loaded) return;
     state.is3D = false;
+    hoverDistrict(null);
     updateViewButtons();
-    if (state.city.bounds) state.map.fitBounds(state.city.bounds, { padding: { top: 100, right: 65, bottom: 90, left: 65 }, maxZoom: 12, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : 950 });
+    if (state.city.hasScenarioData || state.city.bounds) state.map.fitBounds(state.city.hasScenarioData ? DISTRICT_BOUNDS : state.city.bounds, { padding: mapPadding(), maxZoom: 12, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : 950 });
     else state.map.flyTo({ center: state.city.center, zoom: state.city.zoom ?? 11.5, pitch: 0, bearing: 0, duration: reducedMotion ? 0 : 950 });
   }
 
@@ -163,12 +244,15 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     all('[data-view]').forEach((button) => button.setAttribute('aria-pressed', String((button.dataset.view === '3d') === state.is3D)));
     if (state.loaded && state.map.getLayer('citymap-buildings-3d')) state.map.setLayoutProperty('citymap-buildings-3d', 'visibility', state.is3D ? 'visible' : 'none');
     explorer?.setEnabled(state.is3D);
+    updateSectors();
   }
 
   function set3D(enabled, close = false) {
     state.is3D = enabled;
+    hoverDistrict(null);
     updateViewButtons();
     if (!state.loaded) return;
+    if (!enabled) { showTerritory(); return; }
     const center = state.city.hasScenarioData && enabled && state.map.getZoom() < 13 ? [71.4304, 51.1282] : state.map.getCenter();
     state.map.flyTo({ center, pitch: enabled ? 58 : 0, bearing: enabled ? -18 : 0, zoom: enabled ? Math.max(state.map.getZoom(), close ? 15.8 : 14.7) : state.map.getZoom(), duration: reducedMotion ? 0 : 1100 });
   }
@@ -181,6 +265,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
     el('.citymap-search button[type="submit"]').disabled = false;
     // Dataset identity is explicit; searched places never inherit Astana metrics.
     state.city = { ...next, hasScenarioData: next.id === 'astana' && next.hasScenarioData === true };
+    hoverDistrict(null);
     explorer?.setCity(state.city);
     el('.citymap-city-name').textContent = state.city.name;
     el('.citymap-city-caption').textContent = state.city.hasScenarioData ? 'Демонстрационный сценарий · 5 районов' : 'Географический обзор · местные данные не подключены';
@@ -286,6 +371,7 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
 
   function failMap() {
     clearTimeout(loadingTimer);
+    hoverDistrict(null);
     state.loaded = false;
     explorer?.destroy();
     explorer = null;
@@ -321,13 +407,15 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
         el('.citymap-fallback').hidden = true;
         host.classList.remove('citymap-is-unavailable');
         const firstLabel = map.getStyle().layers.find((layer) => layer.type === 'symbol' && layer.layout?.['text-field'])?.id;
+        addSectors(map, firstLabel);
         map.addLayer({ id: 'citymap-buildings-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 13, filter: ['!=', ['get', 'hide_3d'], true], layout: { visibility: state.is3D ? 'visible' : 'none' }, paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 3], 0, '#dce4d8', 20, '#b6cdc2', 70, '#7daba5', 160, '#477a7d'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 3], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.96 } }, firstLabel);
         map.setLight({ anchor: 'viewport', color: '#fff4de', intensity: .38, position: [1.5, 210, 35] });
         explorer = mountCityExplorer({ host, map, city: state.city, reducedMotion });
         explorer.setCity(state.city);
         explorer.setEnabled(state.is3D);
         updateMarkers();
-        if (state.city.bounds) showTerritory();
+        if (!state.is3D || state.city.bounds) showTerritory();
+        else set3D(true);
       });
       map.on('error', () => {
         if (state.destroyed || state.map !== map) return;
@@ -353,6 +441,20 @@ export function createCityMap({ container, dataset, baseline, onDistrictSelect }
   el('.citymap-search').addEventListener('submit', search);
   el('input[type="search"]').addEventListener('keydown', (event) => { if (event.key === 'Escape') el('.citymap-search-results').hidden = true; });
   el('.citymap-district-list').addEventListener('click', (event) => { const button = event.target.closest('[data-district]'); if (button) focusDistrict(button.dataset.district); });
+  el('.citymap-district-list').addEventListener('keydown', event => {
+    const button = event.target.closest('[data-district]');
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+    if (!button || !keys.includes(event.key)) return;
+    event.preventDefault();
+    const cards = all('.citymap-district-card');
+    const index = cards.indexOf(button);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : (index + (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1) + cards.length) % cards.length;
+    cards[next]?.focus({ preventScroll: true });
+  });
+  for (const type of ['pointerover', 'focusin']) el('.citymap-district-list').addEventListener(type, event => { const button = event.target.closest('[data-district]'); if (button) hoverDistrict(button.dataset.district); });
+  for (const type of ['pointerleave', 'focusout']) el('.citymap-district-list').addEventListener(type, () => hoverDistrict(null));
+  el('.citymap-sector-toggle').addEventListener('click', () => { state.sectorsVisible = !state.sectorsVisible; hoverDistrict(null); updateSectors(); });
+  el('.citymap-show-all').addEventListener('click', showTerritory);
   el('.citymap-metric').addEventListener('change', (event) => { state.metric = event.target.value; renderDistricts(); inspectDistrict(); });
   all('[data-phase]').forEach((button) => button.addEventListener('click', () => { state.phase = button.dataset.phase; renderDistricts(); inspectDistrict(); }));
   all('[data-view]').forEach((button) => button.addEventListener('click', () => set3D(button.dataset.view === '3d')));
