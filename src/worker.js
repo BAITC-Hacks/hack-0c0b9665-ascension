@@ -7,6 +7,7 @@ import { createWorkerAIAdmission } from './runtime/ai-admission.js';
 import { createPlanning } from './runtime/planning.js';
 import { isWorkspacePath } from './http/workspace.js';
 import { handleWorkerWorkspace } from './runtime/worker-workspace.js';
+import { resolveAIConfiguration } from './ai/provider.js';
 
 function json({ body, status = 200, headers = {} }) {
   return Response.json(body, { status, headers: {
@@ -46,7 +47,7 @@ export function createWorker(options = {}) {
           pathname,
           method: request.method,
           readJson: () => readWorkerJson(request),
-          aiConfigured: Boolean(env.OPENAI_API_KEY?.trim()),
+          aiConfigured: resolveAIConfiguration({}, env).configured,
           explain: (scenario, simulation) => explain(scenario, simulation, env),
           plan: input => plan(input, env),
           headers: request.headers,

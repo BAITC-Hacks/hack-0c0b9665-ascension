@@ -159,7 +159,7 @@ npm start
 | Расчёт | Общее детерминированное ядро `src/core/simulator.js` и фиксированный `data/city.json` |
 | Поиск альтернатив | То же ядро в браузерном Web Worker; esbuild **0.28.2** только для пересборки |
 | Карта | MapLibre GL JS **5.24.0**, OpenFreeMap / OpenStreetMap, поиск Photon |
-| AI-объяснение | OpenAI Responses API, модель по умолчанию **`gpt-6-astra`**, строгий формат ответа |
+| AI-объяснение и текстовый план | **NVIDIA Nemotron 3 Super** через Cloudflare Workers AI; сервер проверяет JSON, меры, бюджет и результаты. Для своего Node-сервера доступны NVIDIA NIM и OpenAI |
 | План и динамика | `/api/plan`: предложение мер с последующей официальной проверкой; `/api/trajectory`: девять учебных кадров без вызова AI |
 | Публичный симулятор | Cloudflare Workers; постоянная общая квота AI в Durable Object |
 | Обращения и бот | Node.js с JSON-файлом или Cloudflare Worker с Durable Object `Complaints`; Telegram Bot API; общий модуль `src/complaints/` |
@@ -219,6 +219,6 @@ npm run check:policy-worker
 - **MapLibre GL JS 5.24.0**: BSD-3-Clause; [локальная лицензия и уведомления компонентов](public/vendor/maplibre-LICENSE.txt). Шрифты интерфейса — системные.
 - **esbuild 0.28.2**: MIT; инструмент разработки для сборки браузерного Worker. Версия закреплена в `package-lock.json`.
 - **OpenStreetMap**: [© участники OSM, ODbL](https://www.openstreetmap.org/copyright); тайлы и стиль — [OpenFreeMap](https://openfreemap.org/), схема — [OpenMapTiles](https://openmaptiles.org/), поиск — [Photon](https://github.com/komoot/photon). Атрибуция сохранена на карте. [Источники и ограничения географии](docs/map-data.md).
-- **OpenAI, Cloudflare Workers и Telegram Bot API** используются как внешние сервисы по их условиям доступа. Веса модели в репозитории не распространяются; собственного обучения модели проект не выполняет.
+- **NVIDIA Nemotron, OpenAI, Cloudflare Workers и Telegram Bot API** используются по условиям моделей и внешних сервисов. Веса в репозитории не распространяются; собственного обучения модель не проходила в рамках проекта. [Подключение NVIDIA, условия и проверка](docs/nvidia-ai.md).
 
 Пять учебных районов не заявляются актуальным административным делением Астаны. Метки на карте — условные точки, а не официальные границы; наличие и высота 3D-зданий зависят от данных OSM. Другие города доступны для просмотра географии. Библиотека сценариев не синхронизируется между устройствами. Для применения в акимате потребуются реальные проверенные данные, калибровка эффектов, промышленное хранилище и управление доступом.

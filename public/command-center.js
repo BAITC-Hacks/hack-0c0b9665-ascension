@@ -394,9 +394,15 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   function showProposal(response) {
     const preview = $('.cc-plan-preview'); preview.replaceChildren(); preview.hidden = false;
     preview.append(element('span', 'cc-kicker', 'ПРЕДЛОЖЕННЫЙ ПЛАН'), element('p', 'cc-plan-summary', response.summary || 'Проверьте предложенные меры перед применением.'));
+    const isNvidia = response.mode === 'ai' && response.available === true && response.valid === true && response.provider === 'nvidia';
+    if (isNvidia) {
+      const source = element('p', 'cc-plan-rationale', 'План подготовлен NVIDIA Nemotron.');
+      if (typeof response.model === 'string') source.title = response.model;
+      preview.append(source);
+    }
     if (response.modelComment?.text) {
       const comment = element('div', 'cc-model-comment');
-      comment.append(element('strong', '', 'Комментарий AI · требует проверки'), element('p', '', response.modelComment.text));
+      comment.append(element('strong', '', `Комментарий ${isNvidia ? 'NVIDIA Nemotron' : 'AI'} · требует проверки`), element('p', '', response.modelComment.text));
       preview.append(comment);
     }
     const list = element('ol', 'cc-proposed-measures');

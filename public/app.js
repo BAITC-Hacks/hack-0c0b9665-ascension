@@ -303,6 +303,7 @@ async function calculate() {
 async function explain(input, version) {
   if (state.version !== version || !state.result) return;
   const requestId = ++state.explanationId;
+  $('service-status').textContent = 'Расчёт готов · ожидаем AI-анализ';
   $('ai-mode').className = 'ai-mode';
   $('ai-mode').textContent = 'Готовим объяснение';
   $('ai-body').innerHTML = '<p class="ai-loading">Анализируем рассчитанные показатели. Числовой результат уже готов.</p>';
@@ -311,14 +312,16 @@ async function explain(input, version) {
     if (state.version !== version || requestId !== state.explanationId || !state.result) return;
     if (explanation.valid === false || !explanation.summary) throw new Error(explanation.errors?.map((item) => item.message).join(' ') || 'Объяснение недоступно. Повторите запрос.');
     const isAI = explanation.mode === 'ai' && explanation.available === true;
-    $('service-status').textContent = isAI ? 'AI-анализ доступен · модель кейса' : 'Расчётное объяснение · модель кейса';
-    $('ai-mode').textContent = isAI ? 'AI-анализ' : 'Без AI · расчётное объяснение';
+    const isNvidia = isAI && explanation.provider === 'nvidia';
+    $('service-status').textContent = isAI ? `${isNvidia ? 'NVIDIA Nemotron' : 'AI-анализ доступен'} · модель кейса` : 'Расчётное объяснение · модель кейса';
+    $('ai-mode').textContent = isAI ? `AI-анализ${isNvidia ? ' · NVIDIA Nemotron' : ''}` : 'Без AI · расчётное объяснение';
     $('ai-mode').className = `ai-mode${isAI ? '' : ' offline'}`;
     const sections = [['Сильные стороны', explanation.strengths], ['Риски и компромиссы', explanation.risks], ['Рекомендации', explanation.recommendations]];
-    $('ai-body').innerHTML = `<p class="ai-summary">${escapeHtml(explanation.summary)}</p><details class="explanation-details"><summary>Риски и рекомендации</summary><div class="ai-columns">${sections.map(([title, items]) => `<div><h4>${title}</h4><ul>${(Array.isArray(items) && items.length ? items : ['Дополнительных замечаний нет.']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`).join('')}</div></details><div class="ai-footer"><p>${isAI ? 'Текст сформирован AI на основе рассчитанного сценария. Числовые показатели выше получены моделью города.' : 'AI сейчас недоступен. Показано детерминированное объяснение по правилам модели; оно не является LLM-анализом.'}</p><button class="retry-button" id="retry-ai">Повторить анализ</button></div>`;
+    $('ai-body').innerHTML = `<p class="ai-summary">${escapeHtml(explanation.summary)}</p><details class="explanation-details"><summary>Риски и рекомендации</summary><div class="ai-columns">${sections.map(([title, items]) => `<div><h4>${title}</h4><ul>${(Array.isArray(items) && items.length ? items : ['Дополнительных замечаний нет.']).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`).join('')}</div></details><div class="ai-footer"><p>${isAI ? `Текст сформирован ${isNvidia ? 'NVIDIA Nemotron' : 'AI'} на основе рассчитанного сценария. Числовые показатели выше получены моделью города.` : 'AI сейчас недоступен. Показано детерминированное объяснение по правилам модели; оно не является LLM-анализом.'}</p><button class="retry-button" id="retry-ai">Повторить анализ</button></div>`;
     $('retry-ai').addEventListener('click', () => void explain(input, version));
   } catch (error) {
     if (state.version !== version || requestId !== state.explanationId || !state.result) return;
+    $('service-status').textContent = 'Расчётная модель · AI-анализ недоступен';
     $('ai-mode').textContent = 'Объяснение недоступно';
     $('ai-mode').className = 'ai-mode offline';
     $('ai-body').innerHTML = `<p class="ai-summary">${escapeHtml(error.message)}</p><div class="ai-footer"><p>Расчёт сценария сохранён. Можно повторно запросить объяснение.</p><button class="retry-button" id="retry-ai">Повторить</button></div>`;
