@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153d35">
+  <meta name="description" content="Аким на 5 часов — симулятор городских решений на синтетических данных. Пять решений, единый бюджет и измеримый результат.">
+  <title>Ascension AI · 3D-симулятор Астаны</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/comparison.css">
+  <link rel="stylesheet" href="/scenario-library.css">
+  <link rel="stylesheet" href="/policy-options-panel.css">
+  <link rel="stylesheet" href="/map.css">
+  <link rel="stylesheet" href="/city-explorer.css" data-city-explorer>
+  <link rel="stylesheet" href="/action-register.css">
+  <link rel="stylesheet" href="/decision-brief.css">
+  <link rel="stylesheet" href="/evidence-register.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/visual-design.css">
+  <link rel="stylesheet" href="/motion.css">
+  <link rel="stylesheet" href="/command-center.css">
+  <script type="module" src="/app.js"></script>
+  <script type="module" src="/comparison.js"></script>
+  <script type="module" src="/motion.js"></script>
+</head>
+<body data-command-center="true">
+  <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
+  <aside class="sidebar" aria-label="Навигация">
+    <a class="brand" href="#top" aria-label="Аким на 5 часов — начало">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M6 25 16 6l10 19M11 18h10" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span>ASCENSION<span class="brand-caption">городские решения</span></span>
+    </a>
+    <div class="sidebar-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+    <nav>
+      <a class="nav-item active" href="#map-section" data-mobile-label="Карта" aria-label="Карта города"><span aria-hidden="true">◎</span> Карта города</a>
+      <a class="nav-item" href="#workspace" data-mobile-label="План" aria-label="Конструктор решений"><span aria-hidden="true">▦</span> Конструктор решений</a>
+      <a class="nav-item" href="#city"><span aria-hidden="true">◫</span> Показатели районов</a>
+      <a class="nav-item" href="#results" data-mobile-label="Результат" aria-label="Результат сценария"><span aria-hidden="true">↗</span> Результат сценария</a>
+      <a class="nav-item" href="#policy-options-panel"><span aria-hidden="true">◇</span> Альтернативы решений</a>
+      <a class="nav-item" href="#comparison-panel" data-mobile-label="Сравнение" aria-label="Сравнение сценариев"><span aria-hidden="true">⇄</span> Сравнение сценариев</a>
+      <a class="nav-item" href="#scenario-library"><span aria-hidden="true">▤</span> Мои сценарии</a>
+      <a class="nav-item" href="#action-register-panel"><span aria-hidden="true">☑</span> Поручения и исполнение</a>
+      <a class="nav-item" href="#evidence-register"><span aria-hidden="true">◈</span> Паспорта данных</a>
+      <a class="nav-item" href="#method"><span aria-hidden="true">ⓘ</span> Как это работает</a>
+      <a class="nav-item" href="/citizens.html"><span aria-hidden="true">✉</span> Обращение жителя</a>
+      <a class="nav-item" href="/mayor.html"><span aria-hidden="true">▣</span> Кабинет акимата</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="city-symbol" aria-hidden="true"><svg viewBox="0 0 176 114" fill="none"><path d="M4 110h168M18 110V65h22v45M25 65V49h8v16M51 110V39h24v71M58 39V27h10v12M88 110V66h23v44M126 110V50h33v60M133 50V35h19v15" stroke="currentColor" stroke-width="1.3"/><path d="M85 110 94 38M105 110 96 38M92 54h7M90 72h11" stroke="currentColor" stroke-width="2"/><circle cx="95" cy="27" r="11" fill="currentColor" opacity=".5"/><path d="M57 53h12m-12 12h12m-12 12h12m63-12h22m-22 12h22m-22 12h22" stroke="currentColor"/></svg></div>
+      <span class="sidebar-kicker">АСТАНА · КЕЙС 12</span>
+      <p>Пять решений.<br>Один город. Ваш сценарий.</p>
+      <span class="synthetic-note"><span class="status-dot"></span> Синтетические данные</span>
+    </div>
+  </aside>
+
+  <main id="top">
+    <header class="topbar">
+      <div class="breadcrumb">Рабочее пространство <span>/</span> <strong>Центр городских решений</strong></div>
+      <span class="topbar-tag" id="service-status">Модель кейса №12</span>
+    </header>
+    <div class="page-content">
+      <section class="hero" aria-labelledby="page-title">
+        <div><div class="eyebrow"><span class="status-dot"></span> ТЕРРИТОРИЯ · ПРИОРИТЕТЫ · РЕШЕНИЯ</div><h1 id="page-title">Город на карте. <span>Решения в цифрах.</span></h1><p>Найдите район и проверьте эффект плана на горизонте 8 кварталов в учебной модели.</p></div>
+        <div class="hero-actions model-only"><button class="button button-primary" id="demo-button" disabled><span aria-hidden="true">▷</span> Загрузить демо</button><button class="text-button" id="reset-button" disabled>Начать заново <span aria-hidden="true">↻</span></button></div>
+      </section>
+
+      <div id="loading" class="loading-state" role="status">Загружаем исходные данные города…</div>
+      <div id="fatal-error" class="error-box" role="alert" hidden></div>
+      <div id="app" hidden>
+        <div id="district-focus" class="district-focus model-only"></div>
+        <section class="overview-grid model-only" aria-label="Параметры сценария">
+          <article class="overview-card"><div class="metric-label">Исходный Score <span class="metric-icon" aria-hidden="true">↗</span></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
+          <article class="overview-card"><div class="metric-label">Бюджет модели <span class="metric-icon" aria-hidden="true">◇</span></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Условные единицы, не денежная смета</div></article>
+          <article class="overview-card"><div class="metric-label">Осталось распределить <span class="metric-icon" aria-hidden="true">◷</span></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
+          <article class="overview-card"><div class="metric-label">Решений в сценарии <span class="metric-icon" aria-hidden="true">▦</span></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
+        </section>
+
+        <section id="map-section" class="map-section" aria-labelledby="map-heading">
+          <div class="section-heading"><div><div class="eyebrow">01 / ТЕРРИТОРИЯ</div><h2 id="map-heading">Карта и приоритеты</h2></div><span class="data-badge">География OSM · показатели учебные</span></div>
+          <div id="city-map"></div>
+          <div id="geography-notice" class="geography-notice" hidden><div><h3 id="geography-title">Географический просмотр</h3><p>Карта доступна. Для расчёта решений в этой территории нужны её показатели, бюджет и подтверждённые эффекты мер. В текущем кейсе есть только учебный набор Астаны.</p></div><button id="return-astana" class="button button-outline">Вернуться к модели Астаны</button></div>
+        </section>
+
+        <section id="workspace" class="workspace model-only" aria-label="Конструктор сценария">
+          <div class="catalog-area">
+            <div class="section-heading"><div><div class="eyebrow">02 / ПЛАН ДЕЙСТВИЙ</div><h2>Выберите инициативы</h2></div><span class="quiet-tag" id="planning-district">14 мер · 5 направлений</span></div>
+            <p class="section-description">Ровно 5 уникальных мер, не более 2 в одном направлении.</p>
+            <div id="filters" class="filters" role="group" aria-label="Фильтр по направлению"></div>
+            <div id="error-box" class="error-box" role="alert" tabindex="-1" hidden></div>
+            <div id="catalog" class="catalog-grid"></div>
+          </div>
+          <aside class="plan-panel" aria-labelledby="plan-heading">
+            <div class="plan-heading"><div><div class="eyebrow">ВАШ СЦЕНАРИЙ</div><h2 id="plan-heading">План изменений</h2></div><span id="plan-count" class="count-badge">0/5</span></div>
+            <div id="selected-list" class="selected-list"></div>
+            <div class="plan-summary"><div><span>Стоимость решений</span><strong><span id="plan-total">0</span> <small>у. е.</small></strong></div><div><span>Остаток бюджета</span><strong class="green"><span id="plan-left">100</span> <small>у. е.</small></strong></div></div>
+            <button id="simulate-button" class="button button-primary" disabled>Рассчитать сценарий <span aria-hidden="true">↗</span></button>
+            <p id="simulate-hint" class="plan-hint">Выберите ещё 5 решений</p>
+            <details class="rules"><summary>Ограничения и совместимость</summary><ul><li>Бюджет — не более 100 у. е.; ровно 100 допустимо.</li><li>Каждая мера используется один раз.</li><li>M1 и M3 несовместимы в любом районе.</li><li>M4 + M7 и M5 + M13 несовместимы в одном районе.</li><li>Для районной меры нужен один район. Городская действует во всех пяти.</li></ul></details>
+          </aside>
+        </section>
+
+        <section id="results" class="results-section model-only" aria-labelledby="result-heading">
+          <div class="section-heading"><div><div class="eyebrow">02 / ВЛИЯНИЕ РЕШЕНИЙ</div><h2 id="result-heading">Результат сценария</h2></div><span id="result-state" class="quiet-tag">Ожидает расчёта</span></div>
+          <div id="result-placeholder" class="result-placeholder"><span class="placeholder-icon" aria-hidden="true">↗</span><div><h3>У каждого решения есть последствия</h3><p>Соберите пять инициатив и рассчитайте их влияние на город.<br>Здесь появятся Score, изменения по районам и объяснение результата.</p></div></div>
+          <div id="result-content" hidden></div>
+        </section>
+
+        <section id="policy-options-panel" class="model-only"></section>
+        <section id="comparison-panel" class="model-only"></section>
+        <section id="decision-brief" class="model-only"></section>
+        <section id="action-register-panel"></section>
+        <section id="scenario-library" class="model-only"></section>
+
+        <section id="city" class="city-section model-only" aria-labelledby="city-heading">
+          <div class="section-heading"><div><div class="eyebrow">03 / ГОРОД В ДЕТАЛЯХ</div><h2 id="city-heading">За числами — пять районов</h2></div><span class="quiet-tag" id="district-state">Исходная картина</span></div>
+          <p class="section-description">Каждый показатель — от 0 до 100, больше значит лучше. Значения ниже 40 критические.</p>
+          <div id="district-summary" class="district-summary"></div>
+          <div class="table-panel"><div class="table-toolbar"><h3>Все показатели</h3><span class="critical-key"><span></span> Ниже 40</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Таблица показателей районов, прокручивается горизонтально"><table id="indicator-table"></table></div><p class="table-note" id="table-note">Исходные значения официального синтетического набора.</p></div>
+        </section>
+
+        <section id="method" class="method-section model-only"><div><div class="eyebrow">ПРОЗРАЧНАЯ МОДЕЛЬ</div><h2>Как складывается Score</h2><p>Рост средней оценки важен, но город не должен оставлять слабые районы позади.</p></div><div class="formula"><span><strong>0,7</strong> × средняя оценка</span><b>+</b><span><strong>0,3</strong> × худший район</span><b>−</b><span>число критических<br>показателей</span></div><p class="method-note">Средняя оценка взвешена по долям населения. Эффекты учитывают лаг реализации на горизонте 8 кварталов; синергии добавляются отдельно. Округление применяется только при отображении. Данные учебные и не описывают реальную ситуацию в Астане. Для применения в акимате нужны реальные данные и калибровка модели; карта сама по себе этого не заменяет.</p></section>
+        <section id="evidence-register"></section>
+        <footer><span>ASCENSION <span class="footer-divider">/</span> Аким на 5 часов</span><a href="/citizens.html">Обращение жителя</a><a href="/mayor.html">Кабинет акимата</a><span>HackAlem · кейс 12 · 2026</span></footer>
+      </div>
+    </div>
+  </main>
+  <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

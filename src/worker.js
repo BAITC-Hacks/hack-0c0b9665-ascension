@@ -3,6 +3,8 @@ import { RequestError, errorResult } from './http/errors.js';
 import { SECURITY_HEADERS, getPath, requireMethod } from './http/policy.js';
 import { createWorkerExplanation } from './runtime/worker-explanation.js';
 import { readWorkerJson } from './runtime/worker-json.js';
+import { createWorkerAIAdmission } from './runtime/ai-admission.js';
+import { createPlanning } from './runtime/planning.js';
 
 function json({ body, status = 200, headers = {} }) {
   return Response.json(body, { status, headers: {
@@ -12,7 +14,9 @@ function json({ body, status = 200, headers = {} }) {
 
 /** One handler per isolate; bindings and request data stay scoped to each fetch. */
 export function createWorker(options = {}) {
-  const explain = createWorkerExplanation(options);
+  const admission = createWorkerAIAdmission(options);
+  const explain = createWorkerExplanation({ ...options, admission });
+  const plan = createPlanning({ admission, plan: options.plan });
   return {
     async fetch(request, env) {
       try {
@@ -41,6 +45,7 @@ export function createWorker(options = {}) {
           readJson: () => readWorkerJson(request),
           aiConfigured: Boolean(env.OPENAI_API_KEY?.trim()),
           explain: (scenario, simulation) => explain(scenario, simulation, env),
+          plan: input => plan(input, env),
           headers: request.headers,
           origin: url.origin,
         });

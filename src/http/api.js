@@ -1,10 +1,12 @@
 import { getBaseline, getDataset, simulate, validateScenario } from '../core/simulator.js';
+import { simulateTrajectory } from '../core/trajectory.js';
 import { RequestError } from './errors.js';
 import { assertSameOrigin, requireMethod } from './policy.js';
 
 const API_METHODS = new Map([
   ['/api/health', 'GET'], ['/api/dataset', 'GET'], ['/api/baseline', 'GET'],
   ['/api/validate', 'POST'], ['/api/simulate', 'POST'], ['/api/explain', 'POST'],
+  ['/api/plan', 'POST'], ['/api/trajectory', 'POST'],
 ]);
 
 /**
@@ -12,7 +14,7 @@ const API_METHODS = new Map([
  * this layer guarantees that it receives only a valid scenario and a fresh official calculation.
  * A null result delegates a non-API path to the transport's static asset adapter.
  */
-export async function handleApiRequest({ pathname, method, readJson, aiConfigured, explain, headers, origin }) {
+export async function handleApiRequest({ pathname, method, readJson, aiConfigured, explain, plan, headers, origin }) {
   const expected = API_METHODS.get(pathname);
   if (!expected) {
     if (pathname === '/api' || pathname.startsWith('/api/')) {
@@ -27,6 +29,11 @@ export async function handleApiRequest({ pathname, method, readJson, aiConfigure
   if (pathname === '/api/baseline') return { status: 200, body: getBaseline() };
 
   const scenario = await readJson();
+  if (pathname === '/api/plan') return { status: 200, ...await plan(scenario) };
+  if (pathname === '/api/trajectory') {
+    const trajectory = simulateTrajectory(scenario);
+    return { status: trajectory.valid ? 200 : 422, body: trajectory };
+  }
   if (pathname === '/api/validate') return { status: 200, body: validateScenario(scenario) };
   const result = simulate(scenario);
   if (!result.valid) return { status: 422, body: result };

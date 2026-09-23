@@ -1,23 +1,18 @@
-import { explainScenario, isAIConfigured } from '../ai/explain.js';
-import { createLocalAIGuard } from './local-ai-guard.js';
+import { explainScenario } from '../ai/explain.js';
+import { createNodeAIAdmission } from './ai-admission.js';
 
-/** Create once per server so limits survive across requests. Dependencies are injected for tests. */
-export function createNodeExplanation({ explain = explainScenario, aiConfigured = isAIConfigured,
-  aiLimits = {}, now = Date.now, env = process.env } = {}) {
-  const guard = createLocalAIGuard({ now });
-  const limits = {
-    maxRequests: aiLimits.maxRequests ?? env.AI_MAX_REQUESTS,
-    requestsPerMinute: aiLimits.requestsPerMinute ?? env.AI_REQUESTS_PER_MINUTE,
-    maxConcurrent: aiLimits.maxConcurrent ?? env.AI_MAX_CONCURRENT,
-  };
-  return async (scenario, result) => {
-    const permit = aiConfigured() ? guard.acquire(limits) : {};
-    if (permit.reason) {
-      const fallback = await explainScenario(scenario, result, { apiKey: '' });
-      return { body: { ...fallback, reason: permit.reason },
-        headers: permit.retryAfter ? { 'Retry-After': String(permit.retryAfter) } : {} };
-    }
-    try { return { body: await explain(scenario, result) }; }
-    finally { permit.release?.(); }
-  };
+/** The composition root shares admission with planning; standalone callers retain safe defaults. */
+export function createNodeExplanation({ explain = explainScenario, aiConfigured,
+  aiLimits = {}, now = Date.now, env = process.env, admission } = {}) {
+  const run = admission ?? createNodeAIAdmission({ aiConfigured, aiLimits, now, env });
+  // Only the default provider and its actual process environment may use the legacy success cache.
+  // Explicit environments and all fallbacks receive an explicit key to avoid ambient credentials.
+  const useProcessDefaults = explain === explainScenario && env === process.env;
+  return (scenario, result) => run({
+    operation: options => explain(scenario, result, useProcessDefaults ? undefined : options),
+    fallback: async ({ reason, options }) => {
+      if (reason === 'missing_api_key') return explain(scenario, result, options);
+      return { ...await explainScenario(scenario, result, options), reason };
+    },
+  });
 }

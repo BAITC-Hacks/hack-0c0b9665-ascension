@@ -1,0 +1,10 @@
+# Allow only runtime sources into the build context, never credentials or citizen data.
+**
+!Dockerfile
+!package.json
+!src/
+!src/**
+!data/
+!data/**
+!public/
+!public/**
