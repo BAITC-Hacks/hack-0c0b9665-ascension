@@ -297,7 +297,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
   }
   const root = node('section', 'action-register');
   const heading = node('h2', 'action-register-title', 'Реестр действий');
-  const notice = node('p', 'action-register-notice', 'Локальный черновик в этом браузере. Не отправлено исполнителям. Нет синхронизации и официального согласования.');
+  const notice = node('p', 'action-register-notice', 'Локальный черновик в этом браузере. Не отправлено исполнителям. Нет автоматической синхронизации и официального согласования.');
   const disclaimer = node('p', 'action-register-help', 'Меры и районы взяты из учебной модели. Ответственных, сроки и критерии проверки задаёт человек. Значения модели не доказывают выполнение и не обосновывают реальные управленческие решения.');
   const controls = node('div', 'action-register-controls');
   const create = button('action-register-create', 'Создать черновик поручений', generate);
@@ -348,7 +348,7 @@ export function mountActionRegister(container, { dataset = null, city = null } =
         if (raw.length > MAX_STORAGE_CHARS) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
         storage.setItem(ACTION_REGISTER_STORAGE_KEY, raw);
         persistedRaw = raw;
-        storageState = 'Сохранено в этом браузере. Нет синхронизации.';
+        storageState = 'Сохранено в этом браузере. Нет автоматической синхронизации.';
       }
     } catch (error) { storageState = storageError(error); }
     storageNotice.textContent = storageState;
