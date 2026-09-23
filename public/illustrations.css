@@ -1,0 +1,112 @@
+/* Generated artwork complements the interface; labels and values remain HTML. */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 344px;
+  padding: 25px 0 30px;
+}
+.hero-art {
+  position: absolute;
+  z-index: -1;
+  inset: -28px -22px -8px auto;
+  width: 70%;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, transparent, #000 28%), linear-gradient(to bottom, #000 86%, transparent);
+  mask-composite: intersect;
+}
+.hero-art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
+.hero-copy { position: relative; width: 59%; }
+.hero h1 { font-size: clamp(31px, 3.1vw, 46px); }
+.hero p { color: #61736a; }
+.hero-actions { flex-direction: row; justify-content: flex-start; padding-top: 23px; gap: 20px; }
+.hero-actions .button-outline { background: #fffffff0; border-color: #bccdbd; box-shadow: 0 3px 10px #19362a06; }
+.hero-actions .button-outline:hover { background: #eaf2e8; }
+.hero-hint { display: block; margin-top: 12px; color: #748373; }
+.overview-card { position: relative; }
+.metric-label { min-height: 32px; padding-right: 51px; line-height: 1.5; }
+.metric-icon { position: absolute; right: 13px; top: 13px; display: block; width: 56px; height: 56px; object-fit: contain; }
+.metric-number { margin-top: 15px; }
+.measure-top { gap: 8px; margin-bottom: 12px; }
+.measure-category { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.direction-art { display: block; width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; }
+.direction-tag { padding: 4px 6px; line-height: 1.45; }
+.measure-id { flex-shrink: 0; }
+.empty-plan { padding-top: 15px; }
+.empty-plan-art { display: block; width: 92px; height: 92px; object-fit: contain; margin: 0 auto 7px; flex-shrink: 0; }
+.district-heading { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+.district-art { display: block; width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+.district-population { margin-top: 0; }
+.result-placeholder { padding: 24px 30px; background: linear-gradient(100deg, #f0f3eb 35%, #f0f3ebd9), url('/assets/illustrations/city-texture.webp') right center / cover; }
+.result-placeholder-art { width: 104px; height: 104px; flex-shrink: 0; object-fit: contain; }
+.method-section { background: linear-gradient(105deg, #eaf0e4f5, #eaf0e4d4), url('/assets/illustrations/city-texture.webp') right center / cover; }
+.method-section p { color: #64765c; }
+.formula { color: #5e7352; }
+.comparison-root { color: var(--ink); background: #eef2e9; border-color: var(--line); font-family: inherit; font-size: 12px; }
+.comparison-title { font-size: 21px; letter-spacing: -.6px; }
+.comparison-intro, .comparison-label, .comparison-empty, .comparison-status, .comparison-export-hint { color: #6b7b62; }
+.comparison-intro, .comparison-status, .comparison-export-hint { font-size: 11px; }
+.comparison-slot, .comparison-cell { border-color: var(--line); }
+.comparison-slot-title { font-size: 15px; }
+.comparison-metric { border-color: #e8ede3; }
+.comparison-table { font-size: 12px; }
+.comparison-load, .comparison-export-button { font-size: 11px; border-color: var(--green); background: var(--green); }
+.comparison-load:hover:not(:disabled), .comparison-export-button:hover:not(:disabled) { background: #135e44; }
+.comparison-load:disabled, .comparison-export-button:disabled { color: #79896d; border-color: #d7e0cf; background: #e8eee0; }
+.comparison-load:focus-visible, .comparison-export-button:focus-visible { outline-color: #78ac8a; }
+@media (max-width: 1230px) {
+  .hero-copy { width: 65%; }
+  .hero-art { width: 65%; opacity: .8; }
+  .metric-label { padding-right: 39px; }
+  .metric-icon { width: 45px; height: 45px; right: 10px; top: 16px; }
+  .direction-art { width: 46px; height: 46px; }
+  .measure-category { gap: 4px; }
+}
+@media (min-width: 801px) and (max-width: 1050px) {
+  .district-heading { flex-direction: column-reverse; align-items: flex-start; gap: 6px; }
+  .district-population { margin-top: 5px; }
+}
+@media (max-width: 800px) {
+  .hero { min-height: 326px; padding-top: 12px; }
+  .hero-copy { width: 74%; }
+  .hero-art { width: 68%; opacity: .5; }
+  .hero h1 { font-size: 33px; }
+  .hero-hint { font-size: 9px; }
+  .metric-label { padding-right: 0; min-height: 29px; max-width: 100%; }
+  .metric-icon { position: static; width: 40px; height: 40px; margin-left: 5px; flex-shrink: 0; }
+  .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .empty-plan { gap: 17px; padding: 9px 0; }
+  .empty-plan-art { width: 70px; height: 70px; margin: 0; }
+  .direction-art { width: 56px; height: 56px; }
+}
+@media (max-width: 560px) {
+  .hero { min-height: 0; padding: 0; display: flex; flex-direction: column; gap: 0; align-items: stretch; margin-bottom: 22px; }
+  .hero-copy { width: 100%; order: -1; }
+  .hero h1 { font-size: clamp(27px, 8vw, 37px); }
+  .hero-art { position: relative; z-index: 0; inset: auto; width: 100%; height: 160px; margin-top: -4px; opacity: 1; mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 85%, transparent); mask-composite: add; }
+  .hero-art img { object-position: right 55%; }
+  .hero-actions { gap: 17px; padding-top: 19px; }
+  .hero-hint { margin-top: 9px; font-size: 8px; }
+  .metric-label { min-height: 38px; font-size: 9px; gap: 4px; }
+  .metric-icon { width: 42px; height: 42px; margin-left: 0; }
+  .metric-number { margin-top: 9px; }
+  .overview-card { padding: 13px; }
+  .metric-description { line-height: 1.6; }
+  .result-placeholder { gap: 14px; padding: 19px; align-items: center; }
+  .result-placeholder-art { width: 64px; height: 64px; }
+  .direction-tag { font-size: 10px; }
+  .measure-category { gap: 8px; }
+  .comparison-table { font-size: 11px; }
+}
+@media (max-width: 360px) {
+  .hero h1 { font-size: 25px; letter-spacing: -1.2px; }
+  .hero-actions { gap: 12px; }
+  .hero-actions .button-outline { min-width: 144px; }
+  .hero-actions .text-button { font-size: 10px; white-space: nowrap; }
+  .hero-actions .text-button span { padding-left: 6px; }
+  .metric-icon { width: 32px; height: 32px; }
+  .metric-label { font-size: 9px; }
+  .district-art { width: 38px; height: 38px; }
+  .district-heading { flex-direction: column-reverse; align-items: flex-start; gap: 6px; }
+}
