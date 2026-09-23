@@ -150,6 +150,23 @@ test('freshness is explicit at 365 days and future measurements or checks do not
   }
 });
 
+test('default assessment uses the local calendar date at midnight rather than the previous UTC day', () => {
+  const RealDate = globalThis.Date;
+  const originalTimezone = process.env.TZ;
+  try {
+    process.env.TZ = 'Asia/Qyzylorda';
+    globalThis.Date = class extends RealDate {
+      constructor(...args) { super(...(args.length ? args : ['2026-09-23T19:30:00.000Z'])); }
+    };
+    const evidence = reviewed({ periodStart: '2026-09-24', periodEnd: '2026-09-24', reviewedOn: '2026-09-24' });
+    assert.equal(assessObservation(evidence, dataset).reviewed, true);
+  } finally {
+    globalThis.Date = RealDate;
+    if (originalTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTimezone;
+  }
+});
+
 test('external import preserves evidence while clearing all claimed review authority', () => {
   const source = freeze(reviewed({ reviewNote: 'See page 4' }));
   const imported = parse([source]);

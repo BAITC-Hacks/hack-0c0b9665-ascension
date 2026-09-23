@@ -12,7 +12,7 @@ const isRecord = value => value !== null && typeof value === 'object' && !Array.
 const fail = message => { throw new Error(message); };
 const only = (value, fields) => isRecord(value) && Object.keys(value).every(key => fields.includes(key));
 const keyOf = record => `${record.indicatorId}:${record.districtId}`;
-const todayUTC = () => new Date().toISOString().slice(0, 10);
+const todayLocal = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; };
 
 function date(value, label) {
   if (value === '' || value === undefined) return '';
@@ -56,7 +56,7 @@ export function normalizeObservation(value, dataset) {
   return record;
 }
 
-export function assessObservation(value, dataset, { today = todayUTC() } = {}) {
+export function assessObservation(value, dataset, { today = todayLocal() } = {}) {
   const record = normalizeObservation(value, dataset);
   date(today, 'сегодня');
   const missing = missingFields(record, today);
