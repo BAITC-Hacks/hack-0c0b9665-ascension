@@ -246,3 +246,23 @@ body.cc-active .cc-shell.cc-layers-open #city-map .city-explorer-panel,body.cc-a
 @media(prefers-reduced-motion:reduce) { .cc-shell *, .cc-shell *::before, .cc-shell *::after { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
 @media print { body.cc-active { overflow:visible; } body.cc-active > main { display:block; } .cc-shell { position:static; height:auto; } .cc-header,.cc-ai,.cc-dock,.cc-timeline,.cc-model-badge,.cc-kpis,body.cc-active .cc-shell #city-map { display:none!important; } .cc-drawer { position:static; width:auto; overflow:visible; box-shadow:none; } .cc-drawer-content { overflow:visible; } .cc-close { display:none; } }
 .cc-model-comment { margin:12px 0; padding:12px; border-left:3px solid #a98245; border-radius:8px; background:#f4efe3; font-size:11px; line-height:1.6; } .cc-model-comment strong { font-size:10px; color:#785c31; } .cc-model-comment p { margin:6px 0 0; }
+/* The shared map adds controls over time: keep all map settings in one
+   scrollable stack instead of assigning a separate fixed top to each row. */
+body.cc-active .cc-shell #city-map .cc-map-settings { display:none; position:absolute; z-index:10; top:153px; right:68px; bottom:175px; width:330px; overflow-y:auto; overflow-x:hidden; padding:0 0 14px; scrollbar-width:thin; overscroll-behavior:contain; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings { display:block; }
+body.cc-active .cc-shell #city-map .citymap-sector-toolbar,body.cc-active .cc-shell #city-map .citymap-interaction-hint { display:none; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings :is(.citymap-toolbar,.citymap-sector-toolbar,.citymap-data-toolbar,.citymap-district-list) { position:relative; inset:auto; width:auto; margin:0; border:0; border-radius:0; box-shadow:none; background:transparent; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-sector-toolbar { display:flex; padding:12px 15px; border-top:1px solid var(--cc-line); border-bottom:1px solid var(--cc-line); gap:9px; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-sector-toolbar > div:first-child { gap:6px; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-sector-caption { flex-basis:100%; padding-left:26px; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-sector-actions { width:100%; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-sector-actions button { flex:1; min-height:36px; padding:7px; font-size:9px; }
+body.cc-active .cc-shell.cc-layers-open #city-map .cc-map-settings .citymap-district-list { padding:10px 12px 0; }
+body.cc-active .cc-shell.cc-layers-open #city-map .citymap-district-card:last-child { grid-column:auto; }
+body.cc-active .cc-shell.cc-layers-open #city-map .city-explorer-bottom { top:auto; bottom:104px; }
+body.cc-active .cc-shell #city-map:not(.citymap-exploring) .citymap-map-tools { top:308px; }
+.cc-pane .transit-panel { margin:0; }
+@media(max-width:760px) {
+  body.cc-active .cc-shell #city-map .cc-map-settings { top:115px; left:12px; right:52px; bottom:175px; width:auto; }
+  body.cc-active .cc-shell #city-map:not(.citymap-exploring) .citymap-map-tools { top:280px; }
+}
