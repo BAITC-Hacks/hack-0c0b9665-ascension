@@ -84,6 +84,42 @@ test('facts contain official computed numbers, district effects, catalogue costs
   assert.equal(facts.decisions.find((item) => item.id === 'M12').target, 'Все районы');
 });
 
+test('Worker facts can skip replacement search while preserving every simulator result', async () => {
+  const scenario = example();
+  const result = simulate(scenario);
+  const searched = buildExplanationFacts(scenario, result);
+  const skipped = buildExplanationFacts(scenario, result, { skipReplacementSearch: true });
+  assert.equal(searched.replacementSearchPerformed, true);
+  assert.ok(searched.bestSingleReplacement);
+  assert.equal(skipped.replacementSearchPerformed, false);
+  assert.equal(skipped.bestSingleReplacement, null);
+  assert.deepEqual(skipped, { ...searched, replacementSearchPerformed: false, bestSingleReplacement: null });
+  const output = await explainScenario(scenario, result, { apiKey: '', skipReplacementSearch: true });
+  assertFallback(output, 'not_configured');
+  assert.match(output.recommendations.join(' '), /Поиск замены не выполнялся/);
+  assert.doesNotMatch(output.recommendations.join(' '), /улучшение не найдено|Проверенная замена/);
+  assert.deepEqual(simulate(scenario), result);
+});
+
+test('Worker AI request marks unsearched alternatives and provider failure retains the same honest fallback', async () => {
+  const scenario = example();
+  let calls = 0;
+  const output = await explainScenario(scenario, simulate(scenario), mockOptions(async (_url, init) => {
+    calls++;
+    const payload = JSON.parse(init.body);
+    const facts = JSON.parse(payload.input[1].content);
+    assert.equal(facts.replacementSearchPerformed, false);
+    assert.equal(facts.bestSingleReplacement, null);
+    close(facts.score, 56.54307);
+    assert.match(payload.input[0].content, /поиск замены не выполнялся/);
+    assert.match(payload.input[0].content, /не утверждай, что улучшений нет/);
+    return { ok: false, status: 503 };
+  }, { skipReplacementSearch: true }));
+  assert.equal(calls, 1);
+  assertFallback(output, 'provider_error');
+  assert.match(output.recommendations[0], /Поиск замены не выполнялся/);
+});
+
 test('critical facts and deterministic risks preserve a remaining social deficit and negative transport effect', async () => {
   const scenario = { decisions: [
     { measureId: 'M9', districtId: 'nura' },

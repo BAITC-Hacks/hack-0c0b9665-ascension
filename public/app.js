@@ -1,4 +1,7 @@
+import { createCityMap } from './map.js';
+
 const $ = (id) => document.getElementById(id);
+let cityMap;
 const directions = {
   transport: { name: 'Транспорт', icon: '↔' },
   ecology: { name: 'Экология', icon: '⌁' },
@@ -14,7 +17,7 @@ const demo = [
   { measureId: 'M5', districtId: 'saryarka' },
 ];
 const state = {
-  dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'all', picks: {},
+  dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'all', picks: {}, focusedDistrict: 'nura', hasScenarioData: true,
   result: null, busy: false, simulating: false, version: 0, mutationId: 0, simulationId: 0, explanationId: 0,
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -124,6 +127,8 @@ function invalidateResult() {
   $('result-placeholder').hidden = false;
   $('result-state').textContent = 'Ожидает расчёта';
   renderDistricts(state.baseline, false);
+  cityMap?.setResult(null);
+  renderDistrictFocus();
 }
 
 async function applyDecisions(decisions, message) {
@@ -164,6 +169,27 @@ function renderDistricts(result, calculated) {
   $('table-note').textContent = calculated ? 'В каждой ячейке: итоговое значение и изменение относительно исходного. Наведите курсор для значения «до».' : 'Исходные значения официального синтетического набора.';
 }
 
+function renderDistrictFocus() {
+  const result = state.result || state.baseline;
+  if (!result) return;
+  const district = result.districts.find(({ id }) => id === state.focusedDistrict) || result.districts[0];
+  const priorities = [...state.dataset.indicators].sort((a, b) => district.after[a.id] - district.after[b.id]).slice(0, 3);
+  const weakest = priorities[0];
+  $('district-focus').innerHTML = `<div class="focus-intro"><div class="eyebrow">ФОКУС НА РАЙОНЕ</div><h3>${escapeHtml(district.name)}</h3><p>${state.result ? 'После решений' : 'Исходная оценка'} <strong>${number(district.afterScore)}</strong> / 100</p><span class="focus-source">Учебный набор кейса №12</span></div><div class="priority-list">${priorities.map((indicator) => `<div class="priority-item"><div><span>${escapeHtml(indicator.name)}</span><strong class="${district.after[indicator.id] < 40 ? 'priority-critical' : ''}">${number(district.after[indicator.id], 1)}</strong></div><div class="priority-track"><span style="width:${district.after[indicator.id]}%" class="${district.after[indicator.id] < 40 ? 'priority-critical' : ''}"></span></div></div>`).join('')}</div><div class="focus-action"><p>Начните с направления<br><strong>${directions[weakest.direction].name}</strong></p><button class="button button-outline" id="focus-measures" data-direction="${weakest.direction}">Подобрать меры <span aria-hidden="true">↗</span></button></div>`;
+}
+
+function selectDistrict(id) {
+  if (!state.dataset.districts.some((district) => district.id === id)) return;
+  state.focusedDistrict = id;
+  for (const measure of state.dataset.measures) {
+    if (measure.scope === 'district' && !state.decisions.some((decision) => decision.measureId === measure.id)) state.picks[measure.id] = id;
+  }
+  $('planning-district').textContent = `Район для новых мер: ${districtName(id)}`;
+  renderDistrictFocus();
+  renderCatalog();
+  announce(`Выбран район ${districtName(id)}. Новые районные меры будут предложены для него.`);
+}
+
 function renderResult(result) {
   $('result-placeholder').hidden = true;
   $('result-content').hidden = false;
@@ -172,10 +198,12 @@ function renderResult(result) {
     <div class="result-detail"><h3>Дополнительный эффект сочетаний</h3><div class="synergy-list">${result.synergies.length ? result.synergies.map((synergy) => `<span class="synergy-chip">${synergy.pair.join(' + ')} · ${escapeHtml(districtName(synergy.districtId))} · ${Object.entries(synergy.effects).map(([id, effect]) => `${id} ${signed(effect, 0)}`).join(', ')}</span>`).join('') : '<p class="synergy-empty">В этом наборе нет активных синергий.</p>'}</div><details class="contributions" style="margin-top:16px"><summary>Вклад каждой меры с учётом лага</summary><ul>${result.contributions.map((contribution) => `<li><strong>${contribution.measureId}</strong> · ${contribution.districtIds.map(districtName).map(escapeHtml).join(', ')}: ${Object.entries(contribution.effects).map(([id, effect]) => `${id} ${signed(effect, 3)}`).join(', ')}. Реализовано ${number(contribution.realizedFactor * 100, 1)}% исходного эффекта.</li>`).join('')}</ul></details></div>
     <section class="ai-panel" aria-labelledby="ai-heading"><div class="ai-heading"><h3 id="ai-heading">Почему получился такой результат</h3><span id="ai-mode" class="ai-mode">Анализ</span></div><div id="ai-body" aria-live="polite"></div></section>`;
   renderDistricts(result, true);
+  cityMap?.setResult(result);
+  renderDistrictFocus();
 }
 
 async function calculate() {
-  if (state.busy || state.simulating || state.decisions.length !== 5) return;
+  if (state.busy || state.simulating || state.decisions.length !== 5 || !state.hasScenarioData) return;
   clearErrors();
   const version = state.version;
   const requestId = ++state.simulationId;
@@ -210,6 +238,7 @@ async function explain(input, version) {
     if (state.version !== version || requestId !== state.explanationId || !state.result) return;
     if (explanation.valid === false || !explanation.summary) throw new Error(explanation.errors?.map((item) => item.message).join(' ') || 'Объяснение недоступно. Повторите запрос.');
     const isAI = explanation.mode === 'ai' && explanation.available === true;
+    $('service-status').textContent = isAI ? 'AI-анализ доступен · модель кейса' : 'Расчётное объяснение · модель кейса';
     $('ai-mode').textContent = isAI ? 'AI-анализ' : 'Без AI · расчётное объяснение';
     $('ai-mode').className = `ai-mode${isAI ? '' : ' offline'}`;
     const sections = [['Сильные стороны', explanation.strengths], ['Риски и компромиссы', explanation.risks], ['Рекомендации', explanation.recommendations]];
@@ -264,6 +293,32 @@ $('reset-button').addEventListener('click', async () => {
   if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'all'; renderFilters(); renderCatalog(); }
 });
 $('simulate-button').addEventListener('click', () => void calculate());
+$('district-focus').addEventListener('click', (event) => {
+  const button = event.target.closest('#focus-measures');
+  if (!button) return;
+  selectDistrict(state.focusedDistrict);
+  state.filter = button.dataset.direction;
+  renderFilters();
+  renderCatalog();
+  $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+$('return-astana').addEventListener('click', () => cityMap?.setCity('astana'));
+window.addEventListener('city:changed', (event) => {
+  const city = event.detail;
+  if (!city) return;
+  state.hasScenarioData = city.hasScenarioData === true;
+  document.querySelectorAll('.model-only').forEach((element) => { element.hidden = !state.hasScenarioData; });
+  $('geography-notice').hidden = state.hasScenarioData;
+  $('geography-title').textContent = `${city.name} · географический просмотр`;
+  $('map-heading').textContent = state.hasScenarioData ? 'Астана · карта и приоритеты' : `${city.name} · карта территории`;
+  announce(state.hasScenarioData ? 'Учебная модель Астаны доступна.' : `Открыта карта: ${city.name}. Показатели и расчёты этой территории ещё не подключены.`);
+});
+document.querySelector('nav').addEventListener('click', (event) => {
+  const link = event.target.closest('a');
+  if (!link) return;
+  if (!state.hasScenarioData && link.hash !== '#map-section') cityMap?.setCity('astana');
+  document.querySelectorAll('.nav-item').forEach((item) => item.classList.toggle('active', item === link));
+});
 window.addEventListener('scenario:load', (event) => {
   const input = event.detail?.scenario;
   if (!state.dataset) return;
@@ -288,6 +343,9 @@ async function initialize() {
     renderDistricts(baseline, false);
     $('loading').hidden = true;
     $('app').hidden = false;
+    renderDistrictFocus();
+    cityMap = createCityMap({ container: $('city-map'), dataset, baseline, onDistrictSelect: selectDistrict });
+    void api('/api/health').then((health) => { $('service-status').textContent = health.aiConfigured ? 'AI настроен · модель кейса' : 'Расчётная модель · AI не подключён'; }).catch(() => {});
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
   } catch (error) {
     $('loading').hidden = true;
