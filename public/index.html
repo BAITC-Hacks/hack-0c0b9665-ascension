@@ -11,9 +11,16 @@
   <link rel="stylesheet" href="/scenario-library.css">
   <link rel="stylesheet" href="/policy-options-panel.css">
   <link rel="stylesheet" href="/map.css">
+  <link rel="stylesheet" href="/city-explorer.css" data-city-explorer>
+  <link rel="stylesheet" href="/action-register.css">
+  <link rel="stylesheet" href="/decision-brief.css">
+  <link rel="stylesheet" href="/evidence-register.css">
   <link rel="stylesheet" href="/dashboard.css">
+  <link rel="stylesheet" href="/visual-design.css">
+  <link rel="stylesheet" href="/motion.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/comparison.js"></script>
+  <script type="module" src="/motion.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Перейти к выбору решений</a>
@@ -31,6 +38,8 @@
       <a class="nav-item" href="#policy-options-panel"><span aria-hidden="true">◇</span> Альтернативы решений</a>
       <a class="nav-item" href="#comparison-panel" data-mobile-label="Сравнение" aria-label="Сравнение сценариев"><span aria-hidden="true">⇄</span> Сравнение сценариев</a>
       <a class="nav-item" href="#scenario-library"><span aria-hidden="true">▤</span> Мои сценарии</a>
+      <a class="nav-item" href="#action-register-panel"><span aria-hidden="true">☑</span> Поручения и исполнение</a>
+      <a class="nav-item" href="#evidence-register"><span aria-hidden="true">◈</span> Паспорта данных</a>
       <a class="nav-item" href="#method"><span aria-hidden="true">ⓘ</span> Как это работает</a>
       <a class="nav-item" href="/citizens.html"><span aria-hidden="true">✉</span> Обращение жителя</a>
       <a class="nav-item" href="/mayor.html"><span aria-hidden="true">▣</span> Кабинет акимата</a>
@@ -57,6 +66,7 @@
       <div id="loading" class="loading-state" role="status">Загружаем исходные данные города…</div>
       <div id="fatal-error" class="error-box" role="alert" hidden></div>
       <div id="app" hidden>
+        <div id="district-focus" class="district-focus model-only"></div>
         <section class="overview-grid model-only" aria-label="Параметры сценария">
           <article class="overview-card"><div class="metric-label">Исходный Score <span class="metric-icon" aria-hidden="true">↗</span></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
           <article class="overview-card"><div class="metric-label">Бюджет модели <span class="metric-icon" aria-hidden="true">◇</span></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Условные единицы, не денежная смета</div></article>
@@ -68,7 +78,6 @@
           <div class="section-heading"><div><div class="eyebrow">01 / ТЕРРИТОРИЯ</div><h2 id="map-heading">Карта и приоритеты</h2></div><span class="data-badge">География OSM · показатели учебные</span></div>
           <div id="city-map"></div>
           <div id="geography-notice" class="geography-notice" hidden><div><h3 id="geography-title">Географический просмотр</h3><p>Карта доступна. Для расчёта решений в этой территории нужны её показатели, бюджет и подтверждённые эффекты мер. В текущем кейсе есть только учебный набор Астаны.</p></div><button id="return-astana" class="button button-outline">Вернуться к модели Астаны</button></div>
-          <div id="district-focus" class="district-focus model-only"></div>
         </section>
 
         <section id="workspace" class="workspace model-only" aria-label="Конструктор сценария">
@@ -97,6 +106,8 @@
 
         <section id="policy-options-panel" class="model-only"></section>
         <section id="comparison-panel" class="model-only"></section>
+        <section id="decision-brief" class="model-only"></section>
+        <section id="action-register-panel"></section>
         <section id="scenario-library" class="model-only"></section>
 
         <section id="city" class="city-section model-only" aria-labelledby="city-heading">
@@ -107,7 +118,8 @@
         </section>
 
         <section id="method" class="method-section model-only"><div><div class="eyebrow">ПРОЗРАЧНАЯ МОДЕЛЬ</div><h2>Как складывается Score</h2><p>Рост средней оценки важен, но город не должен оставлять слабые районы позади.</p></div><div class="formula"><span><strong>0,7</strong> × средняя оценка</span><b>+</b><span><strong>0,3</strong> × худший район</span><b>−</b><span>число критических<br>показателей</span></div><p class="method-note">Средняя оценка взвешена по долям населения. Эффекты учитывают лаг реализации на горизонте 8 кварталов; синергии добавляются отдельно. Округление применяется только при отображении. Данные учебные и не описывают реальную ситуацию в Астане. Для применения в акимате нужны реальные данные и калибровка модели; карта сама по себе этого не заменяет.</p></section>
-        <footer><span>ASCENSION <span class="footer-divider">/</span> Аким на 5 часов</span><span>HackAlem · кейс 12 · 2026</span></footer>
+        <section id="evidence-register"></section>
+        <footer><span>ASCENSION <span class="footer-divider">/</span> Аким на 5 часов</span><a href="/citizens.html">Обращение жителя</a><a href="/mayor.html">Кабинет акимата</a><span>HackAlem · кейс 12 · 2026</span></footer>
       </div>
     </div>
   </main>
