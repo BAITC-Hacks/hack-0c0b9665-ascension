@@ -1,0 +1,150 @@
+{
+  "checkedAt": "2026-09-23 12:43:02 UTC",
+  "verdict": "PASS",
+  "deployment": {
+    "commit": "241c84bccc818c19fa0724d1a190d425ef213d91",
+    "cloudflareVersion": "06144753-c542-482b-a3fd-4f549a9b1479",
+    "requestedUrl": "https://ascension-city-map.azamatbreach.workers.dev/command-center.html",
+    "observedUrl": "https://ascension-city-map.azamatbreach.workers.dev/command-center"
+  },
+  "prompt": "Оцени и составь план ровно из пяти мер: в Нуре построить школу с детсадом, открыть поликлинику и добавить освещение с камерами; во всём городе внедрить единую цифровую платформу обращений; в Сарыарке перевести частный сектор на чистое топливо. Используй только эти пять мер. Проверь бюджет и покажи влияние на город.",
+  "method": "Typed the exact original prompt in the public browser UI, received one real /api/plan response, clicked Apply, inspected actual server /api/simulate and /api/trajectory responses, moved the visible slider to quarter 0 and quarter 8. No mocked or modified page response.",
+  "httpStatus": {
+    "plan": 200,
+    "validate": 200,
+    "simulate": 200,
+    "trajectory": 200
+  },
+  "responseProjection": {
+    "mode": "ai",
+    "available": true,
+    "valid": true,
+    "summary": "План проверен, учебная симуляция рассчитана. Стоимость 95 из 100.",
+    "modelComment": {
+      "label": "Непроверенный комментарий Ascension AI",
+      "text": "План составлен только из запрошенных мер для проверки бюджета и оценки влияния на город."
+    },
+    "decisions": [
+      {
+        "measureId": "M7",
+        "districtId": "nura"
+      },
+      {
+        "measureId": "M8",
+        "districtId": "nura"
+      },
+      {
+        "measureId": "M10",
+        "districtId": "nura"
+      },
+      {
+        "measureId": "M12"
+      },
+      {
+        "measureId": "M5",
+        "districtId": "saryarka"
+      }
+    ],
+    "unsupported": [],
+    "assumptions": [
+      "Модель использует синтетический набор данных. Это учебный сценарий, а не прогноз для реальной Астаны."
+    ],
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "totalCost": 95
+    },
+    "result": {
+      "valid": true,
+      "totalCost": 95,
+      "score": 56.54306999999999
+    }
+  },
+  "trajectory": {
+    "valid": true,
+    "totalCost": 95,
+    "score": 56.54306999999999,
+    "model": "lagged-saturation-v1",
+    "synthetic": true,
+    "frames": [
+      {
+        "quarter": 0,
+        "score": 52.557680000000005
+      },
+      {
+        "quarter": 1,
+        "score": 52.557680000000005
+      },
+      {
+        "quarter": 2,
+        "score": 52.61118411078718
+      },
+      {
+        "quarter": 3,
+        "score": 52.74916839650146
+      },
+      {
+        "quarter": 4,
+        "score": 53.04386878717201
+      },
+      {
+        "quarter": 5,
+        "score": 54.502273212827994
+      },
+      {
+        "quarter": 6,
+        "score": 55.99271760349855
+      },
+      {
+        "quarter": 7,
+        "score": 56.383537889212825
+      },
+      {
+        "quarter": 8,
+        "score": 56.54306999999999
+      }
+    ]
+  },
+  "simulation": {
+    "valid": true,
+    "score": 56.54306999999999,
+    "totalCost": 95
+  },
+  "strictEquality": {
+    "planScoreEqualsSimulation": true,
+    "trajectoryLastScoreEqualsSimulation": true
+  },
+  "ui": {
+    "viewport": [
+      1280,
+      800
+    ],
+    "documentWidth": 1280,
+    "mapCanvas": {
+      "x": 216,
+      "y": 80,
+      "width": 1064,
+      "height": 720
+    },
+    "threeD": true,
+    "quarter0Display": "52,56",
+    "quarter8Display": "56,54",
+    "budgetDisplay": "95 / 100",
+    "nuraMarkerBefore": "49,2",
+    "nuraMarkerAfter": "53,0",
+    "criticalBefore": 2,
+    "criticalAfter": 0,
+    "aiStatus": "Сценарий рассчитан. Выберите квартал на шкале времени.",
+    "screenshot": "Captured inline with supported Cua screenshot tool; no local screenshot file was produced."
+  },
+  "network": {
+    "paidPlanRequestsThisVerification": 1,
+    "automaticExplainBlockedInTestTab": true,
+    "explainBlockedReason": "inspector",
+    "eventsTruncated": false,
+    "temporaryBlockRemoved": true,
+    "viewportReset": true
+  },
+  "scope": "Response fields are a sanitized projection, not a full raw response. Validity applies to this checked scenario; the simulation remains a synthetic educational model.",
+  "previousFailureArtifact": "C:/Users/Azalytical/.codex/visualizations/2026/09/23/01a0ce00-1f5c-7b01-aed0-bc878be97725/ascension-ai-live-first-check.json"
+}
