@@ -6,6 +6,8 @@ let complaints = [];
 let selectedId = null;
 let requestVersion = 0;
 let serviceAvailable = false;
+let accessGranted = false;
+let adminRequired = false;
 const drafts = new Map();
 const pendingSaves = new Set();
 const photoUrls = new Set();
@@ -31,15 +33,24 @@ function filteredQuery() {
   return params.toString();
 }
 
-async function loadComplaints() {
+async function loadComplaints({ background = false } = {}) {
+  if (background && !serviceAvailable) return;
   if (!serviceAvailable) { setError(COMPLAINTS_UNAVAILABLE); return; }
+  if (background && (!accessGranted || document.hidden || pendingSaves.size || $('refresh-button').disabled)) return;
   const version = ++requestVersion;
+  const previousSelection = complaints.find(item => item.id === selectedId);
   $('complaints-list').setAttribute('aria-busy', 'true');
   $('refresh-button').disabled = true;
   setError('');
   try {
-    const data = await api(`/api/complaints?${filteredQuery()}`, { headers: headers() });
+    const data = await api(`/api/complaints?${filteredQuery()}`, { headers: headers(), cache: 'no-store', signal: AbortSignal.timeout(15000) });
     if (version !== requestVersion) return;
+    accessGranted = true;
+    if (adminRequired) {
+      $('admin-mode').textContent = 'Кабинет подключён · обращения из Telegram и веб-формы в общей очереди.';
+      $('access-details').open = false;
+    }
+    $('sync-status').textContent = `Обновлено ${new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date())} · обновление каждые 10 секунд`;
     complaints = Array.isArray(data.complaints) ? data.complaints : [];
     $('stat-total').textContent = complaints.length;
     $('stat-new').textContent = complaints.filter(item => item.status === 'new').length;
@@ -49,12 +60,21 @@ async function loadComplaints() {
     if (!complaints.some(item => item.id === selectedId)) selectedId = null;
     renderList();
     renderMap();
-    renderDetail();
-    announce(`Список обновлён. Обращений: ${complaints.length}.`);
+    const nextSelection = complaints.find(item => item.id === selectedId);
+    // Keep the open editor and loaded photos intact during automatic refresh.
+    // Drafts retain their original version for the server's conflict check.
+    if (!background || previousSelection?.id !== nextSelection?.id ||
+      (previousSelection?.updatedAt !== nextSelection?.updatedAt && !drafts.has(selectedId))) renderDetail();
+    if (!background) announce(`Список обновлён. Обращений: ${complaints.length}.`);
   } catch (error) {
     if (version !== requestVersion) return;
     const accessError = error.status === 401 || error.status === 403;
-    setError(accessError ? 'Для доступа нужен действующий токен администратора. Откройте «Доступ к панели» и подключитесь.' : error.message);
+    if (accessError) {
+      accessGranted = false;
+      $('access-details').open = true;
+    }
+    $('sync-status').textContent = accessError ? 'Войдите, чтобы получать обращения из Telegram и сайта.' : 'Связь с очередью прервана. Повторим загрузку автоматически.';
+    setError(accessError ? 'Для доступа нужен действующий ключ администратора. Введите его в разделе «Вход в кабинет».' : error.message);
     $('results-count').textContent = 'Не удалось загрузить';
     if (!complaints.length) $('complaints-list').innerHTML = `<div class="empty-state"><h3>${accessError ? 'Панель защищена' : 'Список недоступен'}</h3><p>${accessError ? 'Введите токен администратора выше.' : 'Проверьте соединение и нажмите «Обновить».'}</p></div>`;
     else $('results-count').textContent = 'Показаны предыдущие данные';
@@ -285,6 +305,7 @@ $('access-form').addEventListener('submit', event => {
   event.preventDefault();
   if (!serviceAvailable) { setError(COMPLAINTS_UNAVAILABLE); return; }
   adminToken = $('admin-token').value.trim();
+  accessGranted = false;
   $('admin-token').value = '';
   complaints = [];
   selectedId = null;
@@ -294,6 +315,7 @@ $('access-form').addEventListener('submit', event => {
 });
 $('clear-token').addEventListener('click', () => {
   adminToken = '';
+  accessGranted = false;
   $('admin-token').value = '';
   complaints = [];
   drafts.clear();
@@ -307,6 +329,8 @@ $('clear-token').addEventListener('click', () => {
   loadComplaints();
 });
 window.addEventListener('pagehide', releasePhotos);
+window.setInterval(() => { void loadComplaints({ background: true }); }, 10000);
+window.addEventListener('focus', () => { if (serviceAvailable) void loadComplaints({ background: true }); });
 async function checkAvailability() {
   serviceAvailable = false;
   $('refresh-button').disabled = true;
@@ -316,6 +340,7 @@ async function checkAvailability() {
   try {
     const config = await getComplaintConfig();
     serviceAvailable = true;
+    adminRequired = config.adminConfigured;
     accessControls.forEach(control => { control.disabled = false; });
     $('admin-mode').textContent = config.adminConfigured ? 'Защищённая панель · введите токен администратора для доступа.' : config.demoMode ? 'Локальное демо · доступ без токена разрешён только с этого компьютера.' : 'Для удалённого доступа требуется настроенный токен администратора.';
     $('refresh-button').textContent = 'Обновить ↻';
