@@ -7,6 +7,7 @@ import { mountActionRegister } from './action-register.js';
 import { mountDecisionBrief } from './decision-brief.js';
 import { mountEvidenceRegister } from './evidence-register.js';
 import { mountTeamWorkspace } from './team-workspace.js';
+import { createScenarioViewTransfer, scenarioViewDestination } from './scenario-view-transfer.js';
 
 const $ = (id) => document.getElementById(id);
 const preferredScrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
@@ -14,6 +15,8 @@ let cityMap;
 let panelDisposers = [];
 let initializationId = 0;
 let panelsReady = false;
+let commandCenter;
+const viewTransfer = createScenarioViewTransfer();
 const commandMode = document.body.dataset.commandCenter === 'true';
 let currentCity = PLACES.find(({ id }) => id === 'astana');
 const directions = {
@@ -126,6 +129,7 @@ function renderPlan() {
   $('simulate-button').disabled = state.busy || state.simulating || state.decisions.length !== 5;
   $('simulate-button').innerHTML = state.simulating ? 'Рассчитываем…' : 'Посмотреть результат';
   $('simulate-hint').textContent = state.busy ? 'Проверяем совместимость решений…' : state.simulating ? 'Проверяем влияние на все районы' : state.decisions.length < 5 ? `Выберите ещё ${5 - state.decisions.length} ${5 - state.decisions.length === 1 ? 'решение' : 5 - state.decisions.length < 5 ? 'решения' : 'решений'}` : 'Пять решений готовы к расчёту';
+  if (state.transferWarning) $('simulate-hint').textContent += ` ${state.transferWarning}`;
   $('demo-button').disabled = state.busy;
   $('reset-button').disabled = state.decisions.length === 0 && !state.busy;
   $('reset-button').hidden = state.decisions.length === 0 && !state.busy;
@@ -152,21 +156,23 @@ function invalidateResult() {
 async function applyDecisions(decisions, message) {
   if (state.busy) return false;
   const requestId = ++state.mutationId;
+  const requestedVersion = state.version;
   state.busy = true;
   clearErrors();
   renderPlan();
   renderCatalog();
   try {
     const validation = await api('/api/validate', { decisions });
-    if (requestId !== state.mutationId) return false;
+    if (requestId !== state.mutationId || state.version !== requestedVersion || !state.hasScenarioData) return false;
     if (!Array.isArray(validation.errors) || !Number.isFinite(validation.totalCost)) throw new Error('Сервер вернул некорректный результат проверки.');
     const blockingErrors = validation.errors.filter((error) => error.code !== 'DECISION_COUNT' || decisions.length >= 5);
     if (blockingErrors.length) { showErrors(blockingErrors); return false; }
     state.decisions = decisions.map((decision) => ({ ...decision }));
     state.totalCost = validation.totalCost;
     for (const decision of decisions) if (decision.districtId) state.picks[decision.measureId] = decision.districtId;
+    state.transferWarning = viewTransfer.clear();
     invalidateResult();
-    announce(`${message} Выбрано ${decisions.length} из 5. Осталось ${state.dataset.budget - state.totalCost} условных единиц.`);
+    announce(`${message} Выбрано ${decisions.length} из 5. Осталось ${state.dataset.budget - state.totalCost} условных единиц.${state.transferWarning ? ` ${state.transferWarning}` : ''}`);
     return true;
   } catch (error) {
     if (requestId === state.mutationId) showErrors([error.message]);
@@ -242,6 +248,18 @@ document.addEventListener('click', (event) => {
   const link = event.target.closest('a[href]');
   if (link?.hash && link.origin === location.origin && link.pathname === location.pathname) revealHashTarget(link.hash);
 });
+document.addEventListener('click', (event) => {
+  const destination = scenarioViewDestination(event.target.closest('a[href]'), location.href, event);
+  if (!destination || !state.dataset) return;
+  try {
+    if (state.busy) throw new Error('Дождитесь проверки последнего изменения плана.');
+    viewTransfer.save({ destination, decisions: state.decisions, cityId: currentCity.id, hasScenarioData: state.hasScenarioData });
+  } catch (error) {
+    event.preventDefault();
+    commandCenter?.openPanel('workspace');
+    showErrors([`${error.message} Переход отменён, чтобы сохранить ваш план. Можно рассчитать его и сохранить в «Моих сценариях».`]);
+  }
+}, true);
 
 function renderResult(result) {
   $('results').hidden = false;
@@ -351,12 +369,14 @@ $('reset-button').addEventListener('click', () => {
   state.totalCost = 0;
   state.picks = {};
   state.filter = 'transport';
+  state.transferWarning = viewTransfer.clear();
+  $('planning-district').textContent = 'Астана · 5 районов';
   clearErrors();
   invalidateResult();
   renderFilters();
   renderPlan();
   renderCatalog();
-  announce(`Создан новый сценарий. Выбрано 0 из 5. Осталось ${state.dataset.budget} условных единиц.`);
+  announce(`Создан новый сценарий. Выбрано 0 из 5. Осталось ${state.dataset.budget} условных единиц.${state.transferWarning ? ` ${state.transferWarning}` : ''}`);
 });
 $('simulate-button').addEventListener('click', () => void calculate());
 $('district-focus').addEventListener('click', (event) => {
@@ -406,6 +426,7 @@ window.addEventListener('scenario:load', (event) => {
 
 function disposeInterface() {
   panelsReady = false;
+  commandCenter = null;
   // The command shell moves existing panels: restore them before disposing roots.
   for (const dispose of panelDisposers.splice(0).reverse()) {
     try { dispose(); } catch { console.warn('Не удалось полностью освободить панель интерфейса.'); }
@@ -453,7 +474,7 @@ async function initialize() {
     if (commandMode) {
       const { mountCommandCenterBridge } = await import('./command-center-bridge.js');
       if (requestId !== initializationId) return;
-      const commandCenter = mountCommandCenterBridge({
+      const mountedCommandCenter = mountCommandCenterBridge({
         dataset, baseline, map: cityMap, applyDecisions, calculate,
         getContext: () => ({
           hasScenarioData: state.hasScenarioData,
@@ -463,10 +484,22 @@ async function initialize() {
           decisions: state.decisions.map((decision) => ({ ...decision })),
         }),
       });
-      panelDisposers.push(() => commandCenter.destroy());
+      commandCenter = mountedCommandCenter;
+      panelDisposers.push(() => mountedCommandCenter.destroy());
     }
     void api('/api/health').then((health) => { $('service-status').textContent = health.aiConfigured ? 'AI настроен · модель кейса' : 'Расчётная модель · AI не подключён'; }).catch(() => {});
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
+    const transferred = await viewTransfer.restore({ currentHref: location.href, cityId: currentCity.id,
+      hasScenarioData: state.hasScenarioData, applyDecisions });
+    if (requestId !== initializationId) return;
+    if (transferred.status !== 'none') {
+      commandCenter?.openPanel('workspace');
+      if (transferred.status === 'error') showErrors([transferred.message]);
+      else if (transferred.status === 'imported') {
+        $('simulate-hint').textContent = transferred.warning || 'План перенесён. Для результата и AI-объяснения нужен новый расчёт.';
+        if (!commandMode) $('workspace').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+      }
+    }
   } catch (error) {
     if (requestId !== initializationId) return;
     disposeInterface();

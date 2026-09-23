@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mountCityExplorer } from '../public/city-explorer.js';
 
-test('changing city stops animation until destination roads load and destroy releases it', (t) => {
+function setupExplorer(t) {
   const frames = new Map();
   let frameId = 0;
   class Element {
@@ -11,7 +11,7 @@ test('changing city stops animation until destination roads load and destroy rel
     children = new Map();
     listeners = new Map();
     classList = { toggle() {}, remove() {} };
-    append() {}
+    append(child) { this.appended = child; }
     remove() {}
     setAttribute() {}
     addEventListener(event, listener) { this.listeners.set(event, listener); }
@@ -71,22 +71,31 @@ test('changing city stops animation until destination roads load and destroy rel
     frames.clear();
     pending.forEach((callback) => callback(now));
   };
-  const explorer = mountCityExplorer({ host: new Element(), map, city: { name: 'Астана' } });
+  const host = new Element();
+  const explorer = mountCityExplorer({ host, map, city: { name: 'Астана' } });
+  return {
+    explorer, root: host.querySelector('.citymap-stage').appended, frames, sources, layers, images, listeners, document, flushFrame,
+    setLoaded(value) { loaded = value; }, setCenter(value) { center = value; }, trafficPaints: () => trafficPaints,
+  };
+}
+
+test('changing city stops animation until destination roads load and destroy releases it', (t) => {
+  const { explorer, frames, sources, layers, images, listeners, document, flushFrame, setLoaded, setCenter, trafficPaints } = setupExplorer(t);
   explorer.setEnabled(true);
   flushFrame(100);
   assert.equal(frames.size, 1, 'loaded traffic continues animating');
   assert.ok(sources.get('city-explorer-traffic').data.features.length > 0);
 
-  loaded = false;
+  setLoaded(false);
   explorer.setCity({ name: 'Алматы' });
   assert.equal(frames.size, 0, 'city reset cancels the already scheduled frame');
-  const paintsAfterReset = trafficPaints;
+  const paintsAfterReset = trafficPaints();
   flushFrame(200);
-  assert.equal(trafficPaints, paintsAfterReset, 'no empty GeoJSON paints while destination is loading');
+  assert.equal(trafficPaints(), paintsAfterReset, 'no empty GeoJSON paints while destination is loading');
   assert.deepEqual(sources.get('city-explorer-traffic').data.features, []);
 
-  center = { lng: 76.945, lat: 43.238 };
-  loaded = true;
+  setCenter({ lng: 76.945, lat: 43.238 });
+  setLoaded(true);
   listeners.get('idle')();
   assert.equal(frames.size, 1, 'destination roads resume the animation');
   assert.ok(sources.get('city-explorer-traffic').data.features.every((feature) => feature.geometry.coordinates[0] > 76));
@@ -98,4 +107,25 @@ test('changing city stops animation until destination roads load and destroy rel
   assert.equal(sources.size, 0);
   assert.equal(images.size, 0);
   assert.deepEqual([...layers.keys()], ['road']);
+});
+
+test('timeline refresh updates an open district card without reopening a dismissed card', (t) => {
+  const { explorer, root } = setupExplorer(t);
+  explorer.setEnabled(true);
+  const district = { name: 'Нура', metric: 'Оценка района', value: 49.2, phase: 'До решений', weakest: 'Поликлиники · 35,0' };
+  const panel = root.querySelector('.city-explorer-panel');
+
+  explorer.inspectDistrict(district, { reveal: false });
+  assert.equal(panel.hidden, true, 'a passive calculation does not open a new card');
+  explorer.inspectDistrict(district);
+  assert.equal(panel.hidden, false, 'an explicit district selection opens its card');
+  explorer.inspectDistrict({ ...district, value: 53 }, { reveal: false });
+  assert.match(panel.innerHTML, /53 \/ 100/, 'an open card follows the current timeline value');
+
+  root.listeners.get('click')({ target: { closest: () => ({ dataset: { action: 'close' } }) } });
+  explorer.inspectDistrict({ ...district, value: 50 }, { reveal: false });
+  assert.equal(panel.hidden, true, 'the next frame respects the user closing the card');
+  explorer.inspectDistrict(district);
+  assert.equal(panel.hidden, false, 'selecting the same district again still opens its card');
+  explorer.destroy();
 });

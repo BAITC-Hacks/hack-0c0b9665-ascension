@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { getDataset, getBaseline, simulate, validateScenario } from '../src/core/simulator.js';
+import { createScenarioViewTransfer } from '../public/scenario-view-transfer.js';
 
 const source = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
 const decisions = [
@@ -17,7 +18,7 @@ function section(from, to) {
   return source.slice(start, end);
 }
 
-function setup({ offline = false, empty = false } = {}) {
+function setup({ offline = false, empty = false, viewTransfer = { clear: () => '' } } = {}) {
   const elements = new Map();
   const handlers = new Map();
   const element = (id) => {
@@ -38,7 +39,7 @@ function setup({ offline = false, empty = false } = {}) {
   let rendered = 0;
   let explained = 0;
   const context = {
-    state, $: element,
+    state, $: element, viewTransfer,
     window: { dispatchEvent: (event) => { events.push(event); return true; } },
     CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
     cityMap: { setResult: (value) => mapResults.push(value) },
@@ -79,6 +80,7 @@ function assertEmpty(harness) {
   assert.equal(state.busy, false);
   assert.equal(state.simulating, false);
   assert.equal(state.filter, 'transport');
+  assert.equal(element('planning-district').textContent, 'Астана · 5 районов');
   assert.equal(element('plan-count').textContent, '0/5');
   assert.equal(element('plan-total').textContent, 0);
   assert.equal(element('plan-left').textContent, 100);
@@ -91,6 +93,7 @@ test('reset clears a calculated plan immediately while offline without any valid
   const harness = setup({ offline: true });
   const previous = { ...harness.state };
   harness.element('error-box').textContent = 'Old network error';
+  harness.element('planning-district').textContent = 'Район для новых мер: Нура';
   await harness.reset();
   assertEmpty(harness);
   assert.equal(harness.requests.length, 0);
@@ -156,4 +159,44 @@ test('reset invalidates a pending calculation so its late result cannot restart 
   assert.equal(harness.rendered, 0);
   assert.equal(harness.explained, 0);
   assert.equal(harness.events.filter((event) => event.type === 'scenario:calculated').length, 0);
+});
+
+for (const action of ['reset', 'manual']) {
+  test(`a retained handoff after validation failure cannot return after ${action}`, async () => {
+    const items = new Map();
+    const storage = { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, value), removeItem: key => items.delete(key) };
+    const transfer = createScenarioViewTransfer({ storage: () => storage });
+    const harness = setup({ empty: true, viewTransfer: transfer });
+    const city = { cityId: 'astana', hasScenarioData: true };
+    transfer.save({ ...city, destination: '/classic.html', decisions });
+    const restoreInput = { ...city, currentHref: 'https://example.test/classic.html', applyDecisions: harness.context.applyDecisions };
+    const pending = transfer.restore(restoreInput);
+    harness.requests[0].reject(new TypeError('offline'));
+    assert.equal((await pending).status, 'rejected');
+    assert.equal(items.size, 1, 'failed requests can still be retried explicitly');
+
+    if (action === 'reset') harness.reset();
+    else {
+      const next = [{ measureId: 'M1', districtId: 'esil' }];
+      const changed = harness.context.applyDecisions(next, 'New manual plan');
+      harness.requests[1].resolve(validateScenario({ decisions: next }));
+      assert.equal(await changed, true);
+      assert.deepEqual(structuredClone(harness.state.decisions), next);
+    }
+    assert.equal(items.size, 0, 'an explicit new plan supersedes the failed handoff');
+    assert.equal((await transfer.restore(restoreInput)).status, 'none', 'reload cannot replay the old plan');
+  });
+}
+
+test('failed handoff cleanup leaves a visible warning without preventing reset', () => {
+  const items = new Map();
+  const storage = { getItem: key => items.get(key) ?? null, setItem: (key, value) => items.set(key, value), removeItem() { throw new Error('blocked'); } };
+  const transfer = createScenarioViewTransfer({ storage: () => storage });
+  transfer.save({ cityId: 'astana', hasScenarioData: true, destination: '/classic.html', decisions });
+  const harness = setup({ viewTransfer: transfer });
+  harness.reset();
+  assertEmpty(harness);
+  assert.match(harness.element('simulate-hint').textContent, /прежнего плана.*после обновления/);
+  assert.match(harness.element('announcer').textContent, /прежнего плана/);
+  assert.equal(items.size, 1);
 });

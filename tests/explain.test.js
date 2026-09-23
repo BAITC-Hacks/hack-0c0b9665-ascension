@@ -345,3 +345,66 @@ test('injected fetches do not reuse cached success when the next provider call f
   assert.equal(calls, 1);
   assertFallback(second, 'provider_error');
 });
+
+test('deadline returns the calculated fallback even if transport or response body ignores abort', async () => {
+  const scenario = example();
+  for (const stalledBody of [false, true]) {
+    let signal;
+    const output = await explainScenario(scenario, simulate(scenario), mockOptions(async (_url, init) => {
+      signal = init.signal;
+      return stalledBody ? { ok: true, json: () => new Promise(() => {}) } : new Promise(() => {});
+    }, { timeoutMs: 2, skipReplacementSearch: true }));
+    assertFallback(output, 'timeout');
+    assert.equal(signal.aborted, true);
+  }
+});
+
+test('provider response limit rejects declared and chunked oversized bodies without buffering them', async () => {
+  const scenario = example();
+  for (const declared of [true, false]) {
+    let cancelled = false;
+    const response = new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(declared ? 1 : 40 * 1024));
+        if (!declared) controller.enqueue(new Uint8Array(40 * 1024));
+      },
+      cancel() { cancelled = true; },
+    }), declared ? { headers: { 'Content-Length': String(64 * 1024 + 1) } } : undefined);
+    const output = await explainScenario(scenario, simulate(scenario),
+      mockOptions(async () => response, { skipReplacementSearch: true }));
+    assertFallback(output, 'invalid_model_analysis');
+    assert.equal(cancelled, true);
+  }
+});
+
+test('provider redirects and HTTP errors cancel unread response bodies', async () => {
+  const scenario = example();
+  for (const response of [{ ok: false, status: 302 }, { ok: true, status: 200, redirected: true },
+    { ok: false, status: 429 }, { ok: false, status: 503 }]) {
+    let cancelled = false;
+    let signal;
+    const output = await explainScenario(scenario, simulate(scenario), mockOptions(async (_url, init) => {
+      assert.equal(init.redirect, 'manual');
+      signal = init.signal;
+      return { ...response, body: { cancel: async () => { cancelled = true; } },
+        json: async () => { assert.fail('Rejected provider response must not be parsed'); } };
+    }, { skipReplacementSearch: true }));
+    assertFallback(output, response.status === 429 ? 'rate_limited' : 'provider_error');
+    assert.equal(cancelled, true);
+    assert.equal(signal.aborted, true);
+  }
+});
+
+test('explanation deadline cannot be extended beyond the documented limit', async t => {
+  const nativeTimeout = globalThis.setTimeout;
+  let observedDelay;
+  t.mock.method(globalThis, 'setTimeout', (callback, delay) => {
+    observedDelay = delay;
+    return nativeTimeout(callback, 1);
+  });
+  const scenario = example();
+  const output = await explainScenario(scenario, simulate(scenario), mockOptions(async () => new Promise(() => {}),
+    { timeoutMs: 99999999, skipReplacementSearch: true }));
+  assertFallback(output, 'timeout');
+  assert.equal(observedDelay, 25000);
+});
