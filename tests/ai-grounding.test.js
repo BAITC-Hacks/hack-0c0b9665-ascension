@@ -47,7 +47,8 @@ test('server renders numbers and resolves advisory codes; empty recommendations 
 
 for (const summary of ['Score равен 999, бюджет 999.', 'Score равен 100.',
   'Оценка 56,54.', 'Score ９９９.', 'Улучшение на Ⅳ балла.',
-  'Это подтверждённый прогноз для Астаны.', 'Глобальный оптимум найден.']) {
+  'Это подтверждённый прогноз для Астаны.', 'Глобальный оптимум найден.',
+  'Глобальный\nоптимум найден.', 'Глобаль\u200bный оптимум найден.', 'Добавьте шестое решение в план.']) {
   test(`rejects unsupported provider prose: ${summary}`, async () => {
     const output = await explain({ ...valid(), summary });
     assert.equal(output.mode, 'deterministic');
