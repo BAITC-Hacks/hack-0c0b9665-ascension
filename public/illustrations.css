@@ -108,4 +108,5 @@
   .metric-icon { width: 32px; height: 32px; }
   .metric-label { font-size: 9px; }
   .district-art { width: 38px; height: 38px; }
+  .district-heading { flex-direction: column-reverse; align-items: flex-start; gap: 6px; }
 }

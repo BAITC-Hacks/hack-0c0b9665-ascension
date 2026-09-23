@@ -82,6 +82,14 @@ try {
   await page.locator('[data-recommend-measure="M7"]').click();
   assert.equal(await page.locator('#district-M7').inputValue(), 'nura');
   await page.locator('[data-add="M7"]').click(); await count(1);
+  await page.locator('[data-district-reset]').click();
+  await page.locator('#explorer-mode').selectOption('baseline');
+  for (const width of [320, 390, 645]) {
+    await page.setViewportSize({ width, height: 844 }); await widthCheck();
+    await page.locator('.method-calculation-details summary').click(); await widthCheck();
+    await page.locator('#city .table-scroll').evaluate(element => { element.scrollLeft = element.scrollWidth; }); await widthCheck();
+    await page.locator('.method-calculation-details summary').click(); await widthCheck();
+  }
   await page.setViewportSize({ width: 390, height: 844 }); await widthCheck();
   await page.locator('#catalog-clear').click();
   await page.screenshot({ path: '/tmp/ascension-workspace-mobile.png', fullPage: true });
