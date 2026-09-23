@@ -22,7 +22,8 @@ const IMPLEMENTATION_FIELDS = [
   ['kpi.source', 'kpi-source', 'Источник значений KPI', 'textarea', 1000],
   ['budget.capexKzt', 'capex', 'CAPEX, тенге (разовые затраты)', 'money'],
   ['budget.opexKzt', 'opex', 'OPEX, тенге (эксплуатация)', 'money'],
-  ['budget.estimateSource', 'estimate-source', 'Источник сметы и период OPEX', 'textarea', 1000],
+  ['budget.opexPeriod', 'opex-period', 'Период эксплуатационных расходов', 'text', 200],
+  ['budget.estimateSource', 'estimate-source', 'Источник сметы', 'textarea', 1000],
   ['budget.estimateDate', 'estimate-date', 'Дата сметы', 'date', 10],
   ['prerequisites', 'prerequisites', 'Инфраструктурные предпосылки', 'textarea', 2000],
   ['nextStep', 'next-step', 'Следующий шаг', 'textarea', 1000],
@@ -36,7 +37,7 @@ function setPath(value, path, content) {
 export function emptyImplementation() {
   return { siteAddress: '', siteBasis: '', siteSourceUrl: '',
     kpi: { name: '', unit: '', baseline: null, target: null, source: '' },
-    budget: { capexKzt: null, opexKzt: null, estimateSource: '', estimateDate: '' },
+    budget: { capexKzt: null, opexKzt: null, opexPeriod: '', estimateSource: '', estimateDate: '' },
     prerequisites: '', nextStep: '' };
 }
 function validSourceUrl(value) {
@@ -60,6 +61,12 @@ export function implementationGaps(action) {
   if (!validDate(action.dueDate)) missing.push('Срок');
   if (!action.criterion.trim()) missing.push('Критерий проверки');
   for (const [path, , label] of IMPLEMENTATION_FIELDS) {
+    if (path === 'budget.opexPeriod') {
+      if (implementation.budget.opexKzt !== null && !(implementation.budget.opexPeriod ?? '').trim()) {
+        missing.push('Укажите период эксплуатационных расходов');
+      }
+      continue;
+    }
     if (path === 'siteSourceUrl') continue;
     if (path === 'siteBasis' && implementation.siteSourceUrl.trim()) continue;
     const value = getPath(implementation, path);
@@ -172,7 +179,13 @@ function parseStore(raw) {
         || (action.dueDate !== '' && !validDate(action.dueDate)) || statusError(action)) throw new Error('corrupted');
       actionIds.add(action.id);
       if (data.schemaVersion === 1) action.implementation = emptyImplementation();
-      else if (!validImplementation(action.implementation)) throw new Error('corrupted');
+      else {
+        // Add the optional period to historical v2 copies without overwriting their source text.
+        if (record(action.implementation?.budget) && !Object.hasOwn(action.implementation.budget, 'opexPeriod')) {
+          action.implementation.budget.opexPeriod = '';
+        }
+        if (!validImplementation(action.implementation)) throw new Error('corrupted');
+      }
     });
     ids.add(entry.id);
     keys.add(entry.sourceKey);
@@ -220,12 +233,14 @@ export function normalizeActionDocument(document, { maxBytes = 128 * 1024 } = {}
         allowedKeys(action, ['id', 'measureId', 'districtId', 'measureName', 'districtName', 'owner', 'dueDate', 'criterion', 'status', 'evidence', 'implementation']);
         allowedKeys(action.implementation, ['siteAddress', 'siteBasis', 'siteSourceUrl', 'kpi', 'budget', 'prerequisites', 'nextStep']);
         allowedKeys(action.implementation.kpi, ['name', 'unit', 'baseline', 'target', 'source']);
-        allowedKeys(action.implementation.budget, ['capexKzt', 'opexKzt', 'estimateSource', 'estimateDate']);
+        allowedKeys(action.implementation.budget, ['capexKzt', 'opexKzt', 'opexPeriod', 'estimateSource', 'estimateDate']);
       }
     }
     const raw = JSON.stringify(document);
     if (new TextEncoder().encode(raw).byteLength > maxBytes) throw new Error('size');
-    return { schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, registers: parseStore(raw) };
+    const normalized = { schemaVersion: ACTION_REGISTER_SCHEMA_VERSION, registers: parseStore(raw) };
+    if (new TextEncoder().encode(JSON.stringify(normalized)).byteLength > maxBytes) throw new Error('normalized size');
+    return normalized;
   } catch {
     throw Object.assign(new Error('Документ реестра не принят: нужна корректная схема 2 без посторонних полей, до 10 наборов и 128 КиБ UTF-8.'), { code: 'INVALID' });
   }
@@ -499,7 +514,8 @@ export function mountActionRegister(container, { dataset = null, city = null } =
       const control = node(type === 'textarea' ? 'textarea' : 'input', `action-register-${className}`);
       if (type !== 'textarea') control.type = type === 'money' ? 'number' : type;
       control.value = String(getPath(action.implementation, path) ?? '');
-      control.placeholder = path === 'siteAddress' ? 'Не определена' : 'Нужно уточнить';
+      control.placeholder = path === 'siteAddress' ? 'Не определена'
+        : path === 'budget.opexPeriod' ? 'Например: за год, месяц, весь проект' : 'Нужно уточнить';
       if (max) control.maxLength = max;
       if (type === 'number' || type === 'money') {
         control.step = 'any'; control.max = String(Number.MAX_SAFE_INTEGER);

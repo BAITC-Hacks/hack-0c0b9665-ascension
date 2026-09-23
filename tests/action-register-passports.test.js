@@ -16,7 +16,7 @@ assert.equal(result.valid, true);
 const emptyPassport = () => ({
   siteAddress: '', siteBasis: '', siteSourceUrl: '',
   kpi: { name: '', unit: '', baseline: null, target: null, source: '' },
-  budget: { capexKzt: null, opexKzt: null, estimateSource: '', estimateDate: '' },
+  budget: { capexKzt: null, opexKzt: null, opexPeriod: '', estimateSource: '', estimateDate: '' },
   prerequisites: '', nextStep: '',
 });
 
@@ -104,14 +104,14 @@ const filledPassport = {
   siteAddress: 'Адрес, введённый человеком', siteBasis: 'Основание выбора площадки из обследования',
   siteSourceUrl: 'https://example.invalid/source?place=1',
   kpi: { name: 'Показатель из ручного источника', unit: 'единиц', baseline: -2.5, target: 0, source: 'Ручной источник KPI' },
-  budget: { capexKzt: 0, opexKzt: 1250.5, estimateSource: 'Введённая смета', estimateDate: '2028-02-29' },
+  budget: { capexKzt: 0, opexKzt: 1250.5, opexPeriod: 'За месяц, по ручной оценке', estimateSource: 'Введённая смета', estimateDate: '2028-02-29' },
   prerequisites: 'Зависимость, определённая человеком', nextStep: 'Проверить исходные документы',
 };
 const passportInputs = [
   ['site-address', 'siteAddress'], ['site-basis', 'siteBasis'], ['site-source', 'siteSourceUrl'],
   ['kpi-name', 'kpi.name'], ['kpi-unit', 'kpi.unit'], ['kpi-baseline', 'kpi.baseline'],
   ['kpi-target', 'kpi.target'], ['kpi-source', 'kpi.source'], ['capex', 'budget.capexKzt'],
-  ['opex', 'budget.opexKzt'], ['estimate-source', 'budget.estimateSource'],
+  ['opex', 'budget.opexKzt'], ['opex-period', 'budget.opexPeriod'], ['estimate-source', 'budget.estimateSource'],
   ['estimate-date', 'budget.estimateDate'], ['prerequisites', 'prerequisites'], ['next-step', 'nextStep'],
 ];
 const atPath = (value, path) => path.split('.').reduce((entry, key) => entry[key], value);
@@ -165,6 +165,85 @@ test('v1 migration preserves complete manual records and source snapshots withou
     assert.deepEqual(action.implementation, { ...emptyPassport(), nextStep: index === 2 ? 'Добавлено после миграции' : '' });
   }
   ui.mount.dispose();
+});
+
+test('historical v2 records gain an empty OPEX period in memory and retain every old value until a manual edit', () => {
+  const historical = legacyDocument();
+  historical.schemaVersion = 2;
+  for (const action of historical.registers[0].actions) {
+    action.implementation = structuredClone(filledPassport);
+    delete action.implementation.budget.opexPeriod;
+  }
+  const raw = JSON.stringify(historical);
+  const storage = storageWith(raw);
+  const ui = setup(storage);
+  assert.equal(ui.cards().length, 5);
+  assert.equal(storage.writes, 0);
+  assert.equal(storage.getItem(KEY), raw);
+  const expected = structuredClone(historical);
+  for (const action of expected.registers[0].actions) action.implementation.budget.opexPeriod = '';
+  assert.deepEqual(ui.mount.getDocument(), expected);
+  assert.equal(storage.writes, 0, 'reading the normalized document must not rewrite historical storage');
+  assert.equal(field(ui.cards()[0], 'state').value, 'completed');
+  assert.equal(field(ui.cards()[0], 'evidence').value, historical.registers[0].actions[0].evidence);
+  for (const card of ui.cards()) assert.equal(field(card, 'opex-period').value, '');
+  edit(ui.cards()[1], 'opex-period', 'За квартал');
+  expected.registers[0].actions[1].implementation.budget.opexPeriod = 'За квартал';
+  assert.deepEqual(ui.saved(), expected);
+  assert.equal(storage.writes, 1);
+  ui.mount.dispose();
+});
+
+test('OPEX period is requested for an entered amount including zero, but remains advisory to manual statuses', () => {
+  const ui = setup();
+  create(ui);
+  const card = ui.cards()[0];
+  const missingPeriod = /Укажите период эксплуатационных расходов/;
+  assert.doesNotMatch(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'opex', '0');
+  assert.equal(ui.saved().registers[0].actions[0].implementation.budget.opexKzt, 0);
+  assert.match(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'opex-period', 'За один месяц');
+  assert.doesNotMatch(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'opex-period', '   ');
+  assert.match(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'opex', '');
+  assert.doesNotMatch(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'opex', '1250');
+  assert.match(field(card, 'readiness').textContent, missingPeriod);
+  edit(card, 'owner', 'Ответственный вручную');
+  edit(card, 'due', '2026-09-30');
+  edit(card, 'state', 'in_progress', 'change');
+  assert.equal(field(card, 'state').value, 'in_progress');
+  edit(card, 'state', 'completed', 'change');
+  assert.equal(field(card, 'state').value, 'in_progress');
+  edit(card, 'evidence', 'Ручное подтверждение результата');
+  edit(card, 'state', 'completed', 'change');
+  assert.equal(field(card, 'state').value, 'completed');
+  assert.match(field(card, 'readiness').textContent, missingPeriod);
+  ui.mount.dispose();
+});
+
+test('OPEX period is adjacent to its amount, has a distinct label and accepts up to 200 manual characters', () => {
+  const storage = storageWith();
+  const ui = setup(storage);
+  create(ui);
+  const card = ui.cards()[0];
+  const controls = all(field(card, 'implementation')).filter((element) => ['input', 'textarea'].includes(element.tagName));
+  const amountIndex = controls.indexOf(field(card, 'opex'));
+  assert.equal(controls[amountIndex + 1], field(card, 'opex-period'));
+  assert.match(field(card, 'opex-period').getAttribute('aria-label'), /^Период эксплуатационных расходов:/);
+  assert.match(field(card, 'estimate-source').getAttribute('aria-label'), /^Источник сметы:/);
+  const accepted = 'Ж'.repeat(200);
+  edit(card, 'opex-period', accepted);
+  assert.equal(ui.saved().registers[0].actions[0].implementation.budget.opexPeriod, accepted);
+  edit(card, 'opex-period', `${accepted}Ж`, 'change');
+  assert.equal(field(card, 'opex-period').value, accepted);
+  assert.equal(ui.saved().registers[0].actions[0].implementation.budget.opexPeriod, accepted);
+  ui.mount.dispose();
+  const restored = setup(storage);
+  assert.equal(field(restored.cards()[0], 'opex-period').value, accepted);
+  restored.mount.dispose();
 });
 
 test('every passport field persists through input or change without replacing controls and reloads in v2', () => {
@@ -303,6 +382,9 @@ test('malformed v2 passports reject the stored document without silently migrati
     (action) => { action.implementation.kpi.target = Number.MAX_SAFE_INTEGER + 1; },
     (action) => { action.implementation.budget.capexKzt = -1; },
     (action) => { action.implementation.budget.opexKzt = '10'; },
+    (action) => { action.implementation.budget.opexPeriod = null; },
+    (action) => { action.implementation.budget.opexPeriod = 12; },
+    (action) => { action.implementation.budget.opexPeriod = 'x'.repeat(201); },
     (action) => { action.implementation.siteAddress = {}; },
     (action) => { action.implementation.siteSourceUrl = 'javascript:alert(1)'; },
     (action) => { action.implementation.budget.estimateDate = '2026-02-30'; },
@@ -395,7 +477,7 @@ function parseCsv(csv) {
   return rows;
 }
 
-test('CSV exports all 14 passport fields, preserves zero/null and escapes multiline text and formulas', () => {
+test('CSV exports all 15 passport fields, preserves zero/null and escapes multiline text and formulas', () => {
   const ui = setup();
   create(ui);
   const exported = structuredClone(filledPassport);
@@ -404,18 +486,19 @@ test('CSV exports all 14 passport fields, preserves zero/null and escapes multil
   exported.kpi.name = '@formula';
   exported.kpi.baseline = null;
   exported.budget.opexKzt = null;
+  exported.budget.opexPeriod = '=Период, с "кавычками"';
   exported.nextStep = '+formula';
   fillPassport(ui.cards()[0], exported);
   const rows = parseCsv(registerCsv(ui.saved().registers));
   assert.equal(rows.length, 6);
-  assert.ok(rows.every((row) => row.length === 25));
+  assert.ok(rows.every((row) => row.length === 26));
   assert.deepEqual(rows[1].slice(11), [
     `'${exported.siteAddress}`, exported.siteBasis, exported.siteSourceUrl,
     `'${exported.kpi.name}`, exported.kpi.unit, '', '0', exported.kpi.source,
-    '0', '', exported.budget.estimateSource, exported.budget.estimateDate,
+    '0', '', `'${exported.budget.opexPeriod}`, exported.budget.estimateSource, exported.budget.estimateDate,
     exported.prerequisites, `'${exported.nextStep}`,
   ]);
-  assert.deepEqual(rows[2].slice(11), Array(14).fill(''));
+  assert.deepEqual(rows[2].slice(11), Array(15).fill(''));
   assert.deepEqual(JSON.parse(rows[1][10]), scenario);
   ui.mount.dispose();
 });
@@ -424,7 +507,7 @@ test('manual passport markup stays inert on editing, serialization and reload', 
   const ui = setup();
   create(ui);
   const hostile = '<img src=x onerror=alert(1)>';
-  for (const name of ['site-address', 'site-basis', 'kpi-name', 'kpi-unit', 'kpi-source', 'estimate-source', 'prerequisites', 'next-step']) {
+  for (const name of ['site-address', 'site-basis', 'kpi-name', 'kpi-unit', 'kpi-source', 'opex-period', 'estimate-source', 'prerequisites', 'next-step']) {
     edit(ui.cards()[0], name, hostile);
     assert.equal(field(ui.cards()[0], name).value, hostile);
   }
