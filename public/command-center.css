@@ -41,6 +41,11 @@ body.cc-active .skip-link { z-index:1100; }
 .cc-primary > span:last-child { margin-left:auto; }
 .cc-ai-status { margin:13px 0; padding-left:10px; border-left:2px solid #acc9b6; color:#5c7564; font-size:11px; line-height:1.6; }
 .cc-ai-status[data-tone="error"] { color:#8d4c36; border-color:#cb9477; }
+.cc-recovery-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.cc-recovery-actions button { flex:1 1 120px; min-height:40px; padding:8px; border:1px solid #c9d9ce; border-radius:9px; color:var(--cc-green); background:#f5faf4; font-size:12px; }
+.cc-result-empty h3 { margin-top:0; font-size:20px; }
+.cc-result-empty p { margin:12px 0 20px; color:var(--cc-muted); font-size:14px; line-height:1.7; }
+.cc-result-empty .cc-link-button { min-height:44px; font-size:12px!important; }
 .cc-ai-footnote { margin:15px 0 0; padding-top:13px; border-top:1px solid var(--cc-line); color:#7a8b7e; font-size:9px; line-height:1.6; }
 .cc-plan-preview { margin-top:18px; padding-top:16px; border-top:1px solid var(--cc-line); }
 .cc-kicker { display:block; color:#768b7d; font-size:8px; font-weight:750; letter-spacing:1.5px; line-height:1.4; }

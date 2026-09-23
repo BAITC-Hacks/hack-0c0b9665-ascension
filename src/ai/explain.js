@@ -5,6 +5,8 @@ const fmt = (number) => number.toFixed(2);
 const measures = new Map(data.measures.map((measure) => [measure.id, measure]));
 const districts = new Map(data.districts.map((district) => [district.id, district]));
 const cache = new Map();
+const MAX_TIMEOUT_MS = 25000;
+const MAX_PROVIDER_BYTES = 64 * 1024;
 const textFields = ['summary', 'strengths', 'risks', 'recommendations'];
 const schema = {
   type: 'object', additionalProperties: false,
@@ -92,6 +94,38 @@ function analysisSchema(catalog) {
 
 class InvalidModelAnalysis extends Error {}
 
+async function readProviderResponse(response, allowJsonMock) {
+  if (Number(response.headers?.get?.('content-length')) > MAX_PROVIDER_BYTES) {
+    try { await response.body?.cancel?.(); } catch { /* Preserve the response limit error. */ }
+    throw new InvalidModelAnalysis('Provider response is too large');
+  }
+  if (!response.body?.getReader) {
+    // Injected transports may expose json(); native fetch always uses the bounded stream.
+    if (allowJsonMock && typeof response.json === 'function') return response.json();
+    throw new InvalidModelAnalysis('Provider response has no readable body');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_PROVIDER_BYTES) {
+        try { await reader.cancel(); } catch { /* Preserve the response limit error. */ }
+        throw new InvalidModelAnalysis('Provider response is too large');
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+  } finally {
+    reader.releaseLock();
+  }
+  return JSON.parse(chunks.join(''));
+}
+
 function groundAnalysis(analysis, facts, catalog) {
   const prose = [analysis.summary, ...analysis.strengths, ...analysis.risks];
   // A number whitelist cannot distinguish "Score 100" from a legitimate budget
@@ -165,39 +199,64 @@ export async function explainScenario(scenario, result, options = {}) {
   const facts = buildExplanationFacts(scenario, result, options);
   const catalog = recommendationCatalog(facts);
   const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
-  if (!apiKey?.trim()) return deterministic(facts, 'not_configured');
+  if (typeof apiKey !== 'string' || !apiKey.trim()) return deterministic(facts, 'not_configured');
   const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? 'gpt-6-astra';
+  if (typeof model !== 'string' || !model.trim() || model.length > 120) {
+    return deterministic(facts, 'not_configured');
+  }
   const cacheKey = JSON.stringify(['evidence-contract-v1', model, facts.replacementSearchPerformed,
     [...scenario.decisions].sort((a,b) => a.measureId.localeCompare(b.measureId))]);
   // Injectable transports never share live-response cache with production.
   const useCache = !options.fetchImpl && !options.apiKey;
   const cached = useCache && cache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return structuredClone(cached.value);
+  const timeoutMs = Number.isFinite(options.timeoutMs)
+    ? Math.max(1, Math.min(MAX_TIMEOUT_MS, Math.floor(options.timeoutMs))) : MAX_TIMEOUT_MS;
+  const controller = new AbortController();
+  let timer;
   try {
-    const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
-      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(options.timeoutMs ?? 25000),
-      body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
-        ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
-        input: [
-          { role: 'developer', content: `Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. В summary, strengths, risks объясни качественно сильные стороны, риски и компромиссы, без цифр, числовых значений, процентов и кодов мер/показателей. Не рассчитывай новые числа и не записывай числа словами: числовую сводку и точные значения добавит сервер. Называй меры и районы словами. Не используй утверждения о гарантии, подтверждённом прогнозе или глобальном оптимуме; сервер добавит оговорку о синтетике. Не предлагай добавление, удаление или замену мер в свободной прозе. Объясни приоритет самого слабого района и оставшиеся дефициты. recommendations — только выбранные коды из списка ${Object.keys(catalog).join(', ')}; это не свободный текст. Если подходящего совета нет, верни пустой массив. Код VERIFIED_SINGLE_REPLACEMENT допустим только если он есть в списке. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По два–четыре коротких пункта strengths и risks.` },
-          { role: 'user', content: JSON.stringify(facts) },
-        ],
-        text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema: analysisSchema(catalog) } },
-      }),
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        const error = new Error('Request timed out');
+        error.name = 'TimeoutError';
+        reject(error);
+      }, timeoutMs);
     });
-    if (!response.ok) {
-      return deterministic(facts, response.status === 429 ? 'rate_limited' : 'provider_error');
-    }
-    const analysis = groundAnalysis(parseAnalysis(await response.json()), facts, catalog);
-    const value = { mode: 'ai', available: true, model, ...analysis };
-    if (useCache) {
-      if (cache.size >= 100) cache.delete(cache.keys().next().value);
-      cache.set(cacheKey, { expires: Date.now() + 600000, value });
-    }
-    return structuredClone(value);
+    const request = async () => {
+      const response = await (options.fetchImpl ?? fetch)('https://api.openai.com/v1/responses', {
+        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        redirect: 'manual', signal: controller.signal,
+        body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
+          ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
+          input: [
+            { role: 'developer', content: `Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. В summary, strengths, risks объясни качественно сильные стороны, риски и компромиссы, без цифр, числовых значений, процентов и кодов мер/показателей. Не рассчитывай новые числа и не записывай числа словами: числовую сводку и точные значения добавит сервер. Называй меры и районы словами. Не используй утверждения о гарантии, подтверждённом прогнозе или глобальном оптимуме; сервер добавит оговорку о синтетике. Не предлагай добавление, удаление или замену мер в свободной прозе. Объясни приоритет самого слабого района и оставшиеся дефициты. recommendations — только выбранные коды из списка ${Object.keys(catalog).join(', ')}; это не свободный текст. Если подходящего совета нет, верни пустой массив. Код VERIFIED_SINGLE_REPLACEMENT допустим только если он есть в списке. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По два–четыре коротких пункта strengths и risks.` },
+            { role: 'user', content: JSON.stringify(facts) },
+          ],
+          text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema: analysisSchema(catalog) } },
+        }),
+      });
+      if (response.redirected || !response.ok) {
+        controller.abort();
+        try { await response.body?.cancel?.(); } catch { /* Abort may have closed the stream. */ }
+        return deterministic(facts, response.status === 429 ? 'rate_limited' : 'provider_error');
+      }
+      const analysis = groundAnalysis(parseAnalysis(await readProviderResponse(response, Boolean(options.fetchImpl))), facts, catalog);
+      // A transport that ignores abort must never populate the shared cache after timeout.
+      if (controller.signal.aborted) throw controller.signal.reason;
+      const value = { mode: 'ai', available: true, model, ...analysis };
+      if (useCache) {
+        if (cache.size >= 100) cache.delete(cache.keys().next().value);
+        cache.set(cacheKey, { expires: Date.now() + 600000, value });
+      }
+      return structuredClone(value);
+    };
+    return await Promise.race([request(), deadline]);
   } catch (error) {
     return deterministic(facts, error instanceof InvalidModelAnalysis ? 'invalid_model_analysis'
       : ['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'provider_error');
+  } finally {
+    controller.abort();
+    clearTimeout(timer);
   }
 }

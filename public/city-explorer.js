@@ -382,8 +382,11 @@ export function mountCityExplorer({ host, map, city, reducedMotion = false }) {
       el('.city-explorer-city').textContent = nextCity.name;
       setStatus();
     },
-    inspectDistrict({ name, metric, value, phase, weakest }) {
+    inspectDistrict({ name, metric, value, phase, weakest }, { reveal = true } = {}) {
       if (!state.enabled) return;
+      // A new timeline frame refreshes an open district card, but must not
+      // reopen a dismissed card or replace the object the user is inspecting.
+      if (!reveal && (state.selection?.kind !== 'district' || state.selection.title !== name || el('.city-explorer-panel').hidden)) return;
       showPanel({ kind: 'district', title: name, facts: [[metric, `${number(value, 1)} / 100`], ['Период', phase], ['Точка внимания', weakest]], description: 'Выбран район: показатели и подбор мер на странице относятся к нему.', disclaimer: 'Синтетические показатели кейса. Метка — условная точка района, не граница. Движение машин не связано с расчётом Score.' });
     },
     destroy() {
