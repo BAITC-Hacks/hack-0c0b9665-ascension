@@ -12,6 +12,8 @@
     "bot:local": "node --env-file-if-exists=.env.local src/telegram-mode.js local",
     "bot:hosted": "node --env-file-if-exists=.env.local src/telegram-mode.js hosted",
     "bot:status": "node --env-file-if-exists=.env.local src/telegram-mode.js status",
+    "bot:setup": "node --env-file-if-exists=.env.local src/telegram-setup.js",
+    "test:self-host": "node scripts/self-host-smoke.js",
     "test": "node --test tests/*.test.js",
     "build:policy-worker": "node scripts/build-policy-worker.mjs",
     "check:policy-worker": "node scripts/build-policy-worker.mjs --check"
