@@ -34,7 +34,7 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
   root.id = 'ascension-command-center';
   root.innerHTML = `
     <header class="cc-header">
-      <a class="cc-brand" href="#map-section" aria-label="Ascension — карта города"><span class="cc-brand-mark" aria-hidden="true">A</span><span>ASCENSION<small>Учебная модель Астаны</small></span></a>
+      <a class="cc-brand" href="/" aria-label="ASCENSION — главная"><img class="cc-brand-mark" src="/assets/design/ascension-mark.svg" width="36" height="42" alt=""><span>ASCENSION<small>Учебная модель Астаны</small></span></a>
       <div class="cc-territory"><span class="cc-live-dot" aria-hidden="true"></span><strong>Астана</strong><span>3D · городская модель</span></div>
       <div class="cc-header-actions"></div>
     </header>
@@ -66,12 +66,15 @@ export function mountCommandCenter({ dataset, baseline, map } = {}) {
       <p class="cc-timeline-note">Эффекты появляются с задержкой реализации. Учебная модель.</p>
     </section>
     <nav class="cc-dock cc-glass" aria-label="Инструменты города">
+      <a href="/"><span aria-hidden="true">⌂</span><span>Обзор</span></a>
       <button type="button" data-action="ai" aria-controls="cc-ai-content" aria-expanded="true"><span aria-hidden="true">✦</span><span>Ascension AI</span></button>
       <button type="button" data-panel="workspace"><span aria-hidden="true">▦</span><span>План решений</span></button>
       <button type="button" data-panel="results"><span aria-hidden="true">↗</span><span>Результат</span></button>
       <button type="button" data-panel="city"><span aria-hidden="true">◫</span><span>Районы</span></button>
       <button type="button" data-action="layers" aria-expanded="false"><span aria-hidden="true">◇</span><span>Карта и слои</span></button>
       <button type="button" data-panel="tools"><span aria-hidden="true">···</span><span>Инструменты</span></button>
+      <a href="/citizens.html"><span aria-hidden="true">◇</span><span>Обращения</span></a>
+      <a href="/mayor.html"><span aria-hidden="true">▤</span><span>Кабинет акимата</span></a>
     </nav>
     <aside class="cc-drawer cc-glass" role="dialog" aria-modal="false" aria-labelledby="cc-drawer-title" hidden><div class="cc-drawer-heading"><div><span class="cc-kicker">РАБОЧЕЕ ПРОСТРАНСТВО</span><h2 id="cc-drawer-title"></h2></div><button class="cc-close" type="button" aria-label="Закрыть панель">×</button></div><div class="cc-drawer-content"></div></aside>
     <span class="cc-model-badge">Учебная модель · кейс 12</span>`;

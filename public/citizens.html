@@ -3,48 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#123d54">
+  <meta name="theme-color" content="#F4F2EB">
   <meta name="referrer" content="no-referrer">
   <meta name="description" content="Сообщите о городской проблеме и отслеживайте решение по личному коду обращения.">
   <title>Обращения жителей · Ascension</title>
   <link rel="stylesheet" href="/citizen.css">
+  <link rel="stylesheet" href="/brand.css">
+  <link rel="stylesheet" href="/portal-design.css">
   <script type="module" src="/citizen.js"></script>
 </head>
-<body data-page="citizens">
+<body data-page="citizens" class="ascension-design portal-page resident-page">
   <a class="skip-link" href="#main">Перейти к содержанию</a>
   <header class="site-header">
-    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">A</span><span>ASCENSION<small>городская лаборатория</small></span></a>
-    <nav aria-label="Главная навигация"><a href="/">Симулятор</a><a href="/citizens.html" aria-current="page">Жителям</a><a href="/mayor.html">Панель акима</a></nav>
-    <span class="city-label">АСТАНА <span aria-hidden="true">↗</span></span>
+    <a class="brand" href="/" aria-label="ASCENSION — главная"><img class="portal-brand-mark" src="/assets/design/ascension-mark.svg" alt="" width="38" height="38"><span>ASCENSION<small>Город. Люди. Решения.</small></span></a>
+    <nav aria-label="Главная навигация"><a href="/">Обзор</a><a href="/classic.html">Сценарии</a><a href="/citizens.html" aria-current="page">Жителям</a><a href="/mayor.html">Акимат</a><a href="/classic.html#action-register-details">Поручения</a><a href="/classic.html#city">Данные</a></nav>
+    <span class="city-label">Астана <span aria-hidden="true">↗</span></span>
   </header>
   <main id="main" class="page-shell">
     <section class="hero resident-hero">
-      <div><div class="eyebrow"><span class="live-dot"></span> ГОРОД НАЧИНАЕТСЯ С ВАС</div><h1>Замечаете проблему?<br><span>Помогите её решить.</span></h1><p>Расскажите, что произошло и где. Обращение появится в панели акима, а вы сможете следить за его статусом.</p><div class="hero-tags"><span>Один канал для города</span><span>История каждого решения</span></div></div>
-      <div class="city-art" aria-hidden="true"><svg viewBox="0 0 340 195" fill="none"><path d="M16 165h309M28 165V96h38v69M37 96V77h21v19M91 165V64h43v101M102 64V45h21v19M210 165V92h39v73M218 92V78h23v14M274 165V59h39v106M284 59V43h20v16" stroke="currentColor" stroke-width="2"/><path d="m158 165 18-94m27 94-19-94m-21 47h30m-36 23h39" stroke="currentColor" stroke-width="3"/><circle cx="180" cy="51" r="22" fill="#87c8bc"/><path d="M43 112h9m-9 17h9m54-48h14m-14 18h14m-14 18h14m94-9h12m-12 19h12m54-49h12m-12 20h12m-12 20h12" stroke="currentColor" stroke-width="3"/><circle cx="74" cy="36" r="4" fill="currentColor"/><path d="M275 20h13m-6-6v13" stroke="currentColor" stroke-width="2"/></svg><span>Маленький сигнал.<br>Важное изменение.</span></div>
+      <div class="portal-hero-copy"><div class="eyebrow">ЖИТЕЛЯМ / ГОРОД НАЧИНАЕТСЯ С ВАС</div><h1>Ваш район.<br><span>Ваш голос.</span></h1><p>Расскажите о проблеме рядом с вами. Сохраните номер обращения и следите за ходом его рассмотрения.</p><div class="portal-hero-actions"><a class="button primary" href="#complaint-form">Сообщить о проблеме <span aria-hidden="true">→</span></a><a class="portal-text-link" href="#tracking-form">Проверить обращение <span aria-hidden="true">↗</span></a></div></div>
+      <div class="portal-journey" aria-label="Как работает обращение"><p class="eyebrow">ОТ ПРОБЛЕМЫ К ОТВЕТУ</p><ol><li><span>01</span><div><strong>Опишите, что случилось</strong><p>Добавьте адрес или ориентир.</p></div></li><li><span>02</span><div><strong>Сохраните квитанцию</strong><p>Номер и личный код останутся у вас.</p></div></li><li><span>03</span><div><strong>Проверяйте статус</strong><p>История и ответ доступны по коду.</p></div></li></ol></div>
     </section>
     <div id="mode-note" class="notice compact" role="status">Учебный сервис обращений · классификация по локальным правилам</div>
     <div class="resident-grid">
       <section class="panel form-panel" aria-labelledby="submit-heading">
-        <div class="section-top"><div><div class="eyebrow">01 / ОБРАТНАЯ СВЯЗЬ</div><h2 id="submit-heading">Сообщить о проблеме</h2></div><span class="outline-badge">2–3 минуты</span></div>
-        <p class="muted section-intro">Чем точнее описание, тем проще передать задачу ответственному.</p>
+        <div class="section-top"><div><div class="eyebrow">НОВОЕ ОБРАЩЕНИЕ</div><h2 id="submit-heading">Что случилось?</h2></div><span class="outline-badge">Веб-форма</span></div>
+        <p class="muted section-intro">Опишите проблему и укажите место. Поля со звёздочкой обязательны.</p>
         <form id="complaint-form" method="post" action="/api/complaints">
+          <fieldset class="portal-field-group"><legend><span>1</span> Описание</legend>
           <label for="complaint-text">Что произошло? <span class="required">*</span></label>
           <textarea id="complaint-text" name="text" rows="5" required minlength="10" maxlength="5000" placeholder="Например: третий вечер не горят фонари у остановки на улице…" aria-describedby="text-hint"></textarea>
           <div class="field-hint split"><span id="text-hint">Не указывайте ИИН, телефон и другие личные данные.</span><span id="text-count">0 / 5000</span></div>
+          </fieldset>
+          <fieldset class="portal-field-group"><legend><span>2</span> Место</legend>
           <div class="two-fields"><div><label for="district">Район</label><select id="district" name="districtId"><option value="">Не знаю / не указан</option><option value="esil">Есиль</option><option value="almaty">Алматы</option><option value="saryarka">Сарыарка</option><option value="baikonur">Байконыр</option><option value="nura">Нура</option></select></div><div><label for="address">Адрес или ориентир</label><input id="address" name="address" maxlength="300" autocomplete="street-address" placeholder="Улица, дом, ближайший объект"></div></div>
           <details class="location-details"><summary>Добавить координаты <span>необязательно</span></summary><p class="field-hint">Точка видна только в панели акима. Адрес сам по себе не превращается в координаты.</p><div class="two-fields"><div><label for="latitude">Широта</label><input id="latitude" name="lat" type="number" min="-90" max="90" step="any" placeholder="51.1694" inputmode="decimal"></div><div><label for="longitude">Долгота</label><input id="longitude" name="lon" type="number" min="-180" max="180" step="any" placeholder="71.4491" inputmode="decimal"></div></div><button type="button" class="button subtle small" id="location-button">Использовать моё местоположение</button><p id="location-message" class="field-hint" role="status"></p></details>
+          </fieldset>
+          <fieldset class="portal-field-group portal-consent-group"><legend><span>3</span> Проверка и отправка</legend>
           <label class="checkbox-label"><input id="consent" type="checkbox" required><span>Согласен на обработку описания, адреса и выбранной геолокации для рассмотрения обращения. <span class="required">*</span></span></label>
           <p id="submit-error" class="notice error" role="alert" hidden></p>
           <button type="submit" id="submit-button" class="button primary wide">Отправить обращение <span aria-hidden="true">↗</span></button>
           <p class="field-hint centered">После отправки сохраните номер и личный код отслеживания.</p>
+          </fieldset>
         </form>
         <section id="receipt" class="receipt" aria-labelledby="receipt-heading" tabindex="-1" hidden>
           <div class="success-icon" aria-hidden="true">✓</div><h3 id="receipt-heading">Обращение зарегистрировано</h3><p>Сохраните эту квитанцию. Личный код нужен, чтобы узнать статус обращения.</p><dl><dt>Номер обращения</dt><dd id="receipt-id" class="mono"></dd><dt>Личный код</dt><dd id="receipt-token" class="mono secret-code"></dd></dl><div class="button-row"><button id="copy-receipt" class="button primary" type="button">Скопировать ссылку</button><button id="another-complaint" class="button subtle" type="button">Ещё обращение</button></div><p id="copy-message" class="field-hint" role="status"></p><p class="field-hint">Ссылка содержит личный код. Передавайте её только тем, кому доверяете.</p>
         </section>
       </section>
       <aside class="resident-aside">
-        <section class="panel tracking-panel" aria-labelledby="tracking-heading"><div class="eyebrow">02 / СТАТУС ОБРАЩЕНИЯ</div><h2 id="tracking-heading">Что с моим обращением?</h2><p class="muted section-intro">Введите данные из квитанции. Исходный текст и адрес здесь не показываются.</p><form id="tracking-form" method="post" action="/api/complaints/track"><label for="tracking-id">Номер обращения</label><input id="tracking-id" name="id" required autocomplete="off" placeholder="Номер из квитанции"><label for="tracking-token">Личный код</label><input id="tracking-token" name="trackingToken" type="password" required autocomplete="off" placeholder="Код из квитанции"><button type="submit" id="tracking-button" class="button secondary wide">Проверить статус <span aria-hidden="true">→</span></button><p id="tracking-error" class="notice error" role="alert" hidden></p></form><div id="tracking-result" class="tracking-result" role="status" hidden></div></section>
-        <section class="info-card"><div class="eyebrow">ПОНЯТНЫЙ ПУТЬ</div><h3>От сообщения к решению</h3><ol class="steps"><li><span>1</span><div><strong>Вы описываете проблему</strong><p>На сайте или через подключённого Telegram-бота.</p></div></li><li><span>2</span><div><strong>Обращение попадает в работу</strong><p>Локальные правила предлагают тему и приоритет. Сотрудник может их исправить.</p></div></li><li><span>3</span><div><strong>Вы видите результат</strong><p>Статус, история рассмотрения и итоговое решение — по личному коду.</p></div></li></ol><a id="telegram-link" class="button secondary wide" hidden target="_blank" rel="noopener noreferrer">Открыть Telegram <span aria-hidden="true">↗</span></a><p id="telegram-note" class="field-hint">Статус подключения Telegram уточняется…</p></section>
+        <section class="panel tracking-panel" aria-labelledby="tracking-heading"><div class="eyebrow">УЖЕ ОТПРАВИЛИ?</div><h2 id="tracking-heading">Проверить обращение</h2><p class="muted section-intro">Введите данные из квитанции. Исходный текст и адрес здесь не показываются.</p><form id="tracking-form" method="post" action="/api/complaints/track"><label for="tracking-id">Номер обращения</label><input id="tracking-id" name="id" required autocomplete="off" placeholder="Номер из квитанции"><label for="tracking-token">Личный код</label><input id="tracking-token" name="trackingToken" type="password" required autocomplete="off" placeholder="Код из квитанции"><button type="submit" id="tracking-button" class="button secondary wide">Проверить статус <span aria-hidden="true">→</span></button><p id="tracking-error" class="notice error" role="alert" hidden></p></form><div id="tracking-result" class="tracking-result" role="status" hidden></div></section>
+        <section class="info-card"><div class="eyebrow">ЕЩЁ ОДИН СПОСОБ</div><h3>Удобнее в Telegram?</h3><p class="portal-info-copy">При подключении бота можно отправить обращение и фото из Telegram. Номер и история сохраняют связь с вашим обращением.</p><a id="telegram-link" class="button secondary wide" hidden target="_blank" rel="noopener noreferrer">Открыть Telegram <span aria-hidden="true">↗</span></a><p id="telegram-note" class="field-hint">Статус подключения Telegram уточняется…</p><div class="portal-info-footnote"><strong>Как определяется тема</strong><p>Локальные правила предлагают тему и приоритет обращения. Сотрудник проверяет и при необходимости исправляет их.</p></div></section>
       </aside>
     </div>
     <footer><span>ASCENSION <span class="footer-divider">/</span> Городская обратная связь</span><span>Учебный проект · HackAlem 2026</span></footer>
