@@ -556,7 +556,8 @@ export function createTelegramTransport({ token = '', fetchImpl = globalThis.fet
 
   async function fetchLimited(url, options, maxBytes, timeoutMs) {
     try {
-      const response = await fetchImpl(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
+      // Workerd supports manual redirects; reject 3xx below without forwarding the token.
+      const response = await fetchImpl(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok || response.redirected) {
         await response.body?.cancel();
         throw telegramError('TELEGRAM_REQUEST_FAILED', 'Telegram временно недоступен.');
