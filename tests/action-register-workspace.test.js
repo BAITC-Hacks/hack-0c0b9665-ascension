@@ -171,6 +171,24 @@ test('non-JSON values, non-plain records, cycles and non-finite numbers cannot b
   assert.equal(getterCalls, 0, 'root metadata must also be checked before reading accessors');
 });
 
+test('custom array prototypes are rejected before inherited serialization or iteration can execute', () => {
+  for (const hook of ['toJSON', Symbol.iterator]) {
+    const doc = fixture();
+    let calls = 0;
+    const prototype = Object.create(Array.prototype);
+    if (hook === 'toJSON') {
+      prototype.toJSON = function () { calls += 1; return []; };
+    } else {
+      Object.defineProperty(prototype, hook, {
+        get() { calls += 1; return Array.prototype[Symbol.iterator]; },
+      });
+    }
+    Object.setPrototypeOf(doc.registers, prototype);
+    assert.throws(() => normalizeActionDocument(doc), errorCode('INVALID'));
+    assert.equal(calls, 0, `inherited ${String(hook)} must not execute`);
+  }
+});
+
 test('workspace size limits measure UTF-8 bytes and enforce the default 128 KiB bound', () => {
   const doc = fixture();
   const json = JSON.stringify(doc);

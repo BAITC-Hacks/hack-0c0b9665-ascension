@@ -188,7 +188,8 @@ function jsonValue(value, seen = new Set()) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
   if (typeof value === 'number' && finite(value)) return;
   if (!value || typeof value !== 'object' || seen.has(value)
-    || (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value)))) throw new Error('value');
+    || (Array.isArray(value) ? Object.getPrototypeOf(value) !== Array.prototype
+      : ![Object.prototype, null].includes(Object.getPrototypeOf(value)))) throw new Error('value');
   if (Object.values(Object.getOwnPropertyDescriptors(value)).some((descriptor) => !Object.hasOwn(descriptor, 'value'))) throw new Error('accessor');
   if (Array.isArray(value) && Reflect.ownKeys(value).some((key) => typeof key !== 'string'
     || (key !== 'length' && (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length)))) throw new Error('array fields');
