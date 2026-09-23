@@ -3,10 +3,14 @@ import { PLACES } from './places.js';
 import { mountScenarioLibrary } from './scenario-library.js';
 import { mountPolicyOptionsPanel } from './policy-options-panel.js';
 import { createPolicyOptionsFetcher } from './policy-options-client.js';
+import { mountActionRegister } from './action-register.js';
+import { mountDecisionBrief } from './decision-brief.js';
+import { mountEvidenceRegister } from './evidence-register.js';
 
 const $ = (id) => document.getElementById(id);
 const preferredScrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
 let cityMap;
+let panelDisposers = [];
 let currentCity = PLACES.find(({ id }) => id === 'astana');
 const directions = {
   transport: { name: 'Транспорт', icon: '↔' },
@@ -333,7 +337,8 @@ window.addEventListener('city:changed', (event) => {
 document.querySelector('nav').addEventListener('click', (event) => {
   const link = event.target.closest('a');
   if (!link || !link.hash || link.pathname !== location.pathname) return;
-  if (!state.hasScenarioData && link.hash !== '#map-section') cityMap?.setCity('astana');
+  const target = document.getElementById(link.hash.slice(1));
+  if (!state.hasScenarioData && target?.closest('.model-only')) cityMap?.setCity('astana');
   document.querySelectorAll('.nav-item').forEach((item) => item.classList.toggle('active', item === link));
 });
 window.addEventListener('scenario:load', (event) => {
@@ -350,6 +355,9 @@ window.addEventListener('scenario:load', (event) => {
 
 async function initialize() {
   try {
+    for (const dispose of panelDisposers.splice(0)) dispose();
+    cityMap?.destroy();
+    cityMap = null;
     const [dataset, baseline] = await Promise.all([api('/api/dataset'), api('/api/baseline')]);
     if (!dataset.measures?.length || !dataset.districts?.length || !baseline.valid) throw new Error('Не удалось получить исходные данные города.');
     state.dataset = dataset;
@@ -364,10 +372,15 @@ async function initialize() {
     $('app').hidden = false;
     renderDistrictFocus();
     cityMap = createCityMap({ container: $('city-map'), dataset, baseline, onDistrictSelect: selectDistrict });
-    mountScenarioLibrary($('scenario-library'), { city: currentCity });
-    mountPolicyOptionsPanel($('policy-options-panel'), {
+    panelDisposers.push(mountScenarioLibrary($('scenario-library'), { city: currentCity }));
+    const policyPanel = mountPolicyOptionsPanel($('policy-options-panel'), {
       dataset, city: currentCity, fetcher: createPolicyOptionsFetcher(),
     });
+    panelDisposers.push(() => policyPanel.destroy());
+    const actionRegister = mountActionRegister($('action-register-panel'), { dataset, city: currentCity });
+    panelDisposers.push(() => actionRegister.dispose());
+    panelDisposers.push(mountDecisionBrief($('decision-brief'), { dataset, city: currentCity }));
+    panelDisposers.push(mountEvidenceRegister($('evidence-register'), { dataset, city: currentCity }));
     void api('/api/health').then((health) => { $('service-status').textContent = health.aiConfigured ? 'AI настроен · модель кейса' : 'Расчётная модель · AI не подключён'; }).catch(() => {});
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
   } catch (error) {
