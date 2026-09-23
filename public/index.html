@@ -8,6 +8,8 @@
   <title>Аким на 5 часов · Ascension</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/comparison.css">
+  <link rel="stylesheet" href="/scenario-library.css">
+  <link rel="stylesheet" href="/policy-options-panel.css">
   <link rel="stylesheet" href="/map.css">
   <link rel="stylesheet" href="/dashboard.css">
   <script type="module" src="/app.js"></script>
@@ -22,11 +24,13 @@
     </a>
     <div class="sidebar-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
     <nav>
-      <a class="nav-item active" href="#map-section"><span aria-hidden="true">◎</span> Карта города</a>
-      <a class="nav-item" href="#workspace"><span aria-hidden="true">▦</span> Конструктор решений</a>
+      <a class="nav-item active" href="#map-section" data-mobile-label="Карта" aria-label="Карта города"><span aria-hidden="true">◎</span> Карта города</a>
+      <a class="nav-item" href="#workspace" data-mobile-label="План" aria-label="Конструктор решений"><span aria-hidden="true">▦</span> Конструктор решений</a>
       <a class="nav-item" href="#city"><span aria-hidden="true">◫</span> Показатели районов</a>
-      <a class="nav-item" href="#results"><span aria-hidden="true">↗</span> Результат сценария</a>
-      <a class="nav-item" href="#comparison-panel"><span aria-hidden="true">⇄</span> Сравнение сценариев</a>
+      <a class="nav-item" href="#results" data-mobile-label="Результат" aria-label="Результат сценария"><span aria-hidden="true">↗</span> Результат сценария</a>
+      <a class="nav-item" href="#policy-options-panel"><span aria-hidden="true">◇</span> Альтернативы решений</a>
+      <a class="nav-item" href="#comparison-panel" data-mobile-label="Сравнение" aria-label="Сравнение сценариев"><span aria-hidden="true">⇄</span> Сравнение сценариев</a>
+      <a class="nav-item" href="#scenario-library"><span aria-hidden="true">▤</span> Мои сценарии</a>
       <a class="nav-item" href="#method"><span aria-hidden="true">ⓘ</span> Как это работает</a>
     </nav>
     <div class="sidebar-bottom">
@@ -44,7 +48,7 @@
     </header>
     <div class="page-content">
       <section class="hero" aria-labelledby="page-title">
-        <div><div class="eyebrow"><span class="status-dot"></span> ТЕРРИТОРИЯ · ПРИОРИТЕТЫ · РЕШЕНИЯ</div><h1 id="page-title">Город на карте. <span>Решения в цифрах.</span></h1><p>Найдите район, оцените его потребности и проверьте эффект вашего плана.</p></div>
+        <div><div class="eyebrow"><span class="status-dot"></span> ТЕРРИТОРИЯ · ПРИОРИТЕТЫ · РЕШЕНИЯ</div><h1 id="page-title">Город на карте. <span>Решения в цифрах.</span></h1><p>Найдите район и проверьте эффект плана на горизонте 8 кварталов в учебной модели.</p></div>
         <div class="hero-actions model-only"><button class="button button-primary" id="demo-button" disabled><span aria-hidden="true">▷</span> Загрузить демо</button><button class="text-button" id="reset-button" disabled>Начать заново <span aria-hidden="true">↻</span></button></div>
       </section>
 
@@ -53,7 +57,7 @@
       <div id="app" hidden>
         <section class="overview-grid model-only" aria-label="Параметры сценария">
           <article class="overview-card"><div class="metric-label">Исходный Score <span class="metric-icon" aria-hidden="true">↗</span></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
-          <article class="overview-card"><div class="metric-label">Бюджет города <span class="metric-icon" aria-hidden="true">₸</span></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Единый старт для каждого сценария</div></article>
+          <article class="overview-card"><div class="metric-label">Бюджет модели <span class="metric-icon" aria-hidden="true">◇</span></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Условные единицы, не денежная смета</div></article>
           <article class="overview-card"><div class="metric-label">Осталось распределить <span class="metric-icon" aria-hidden="true">◷</span></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
           <article class="overview-card"><div class="metric-label">Решений в сценарии <span class="metric-icon" aria-hidden="true">▦</span></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
         </section>
@@ -89,7 +93,9 @@
           <div id="result-content" hidden></div>
         </section>
 
+        <section id="policy-options-panel" class="model-only"></section>
         <section id="comparison-panel" class="model-only"></section>
+        <section id="scenario-library" class="model-only"></section>
 
         <section id="city" class="city-section model-only" aria-labelledby="city-heading">
           <div class="section-heading"><div><div class="eyebrow">03 / ГОРОД В ДЕТАЛЯХ</div><h2 id="city-heading">За числами — пять районов</h2></div><span class="quiet-tag" id="district-state">Исходная картина</span></div>

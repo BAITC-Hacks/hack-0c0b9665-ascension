@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env.local src/server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "build:policy-worker": "node scripts/build-policy-worker.mjs",
+    "check:policy-worker": "node scripts/build-policy-worker.mjs --check"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

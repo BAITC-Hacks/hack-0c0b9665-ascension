@@ -1,13 +1,24 @@
 import { createCityMap } from './map.js';
+import { PLACES } from './places.js';
+import { mountScenarioLibrary } from './scenario-library.js';
+import { mountPolicyOptionsPanel } from './policy-options-panel.js';
+import { createPolicyOptionsFetcher } from './policy-options-client.js';
 
 const $ = (id) => document.getElementById(id);
+const preferredScrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
 let cityMap;
+let currentCity = PLACES.find(({ id }) => id === 'astana');
 const directions = {
   transport: { name: 'Транспорт', icon: '↔' },
   ecology: { name: 'Экология', icon: '⌁' },
   social: { name: 'Социальная сфера', icon: '♡' },
   safety: { name: 'Безопасность', icon: '◇' },
   services: { name: 'Городской сервис', icon: '▦' },
+};
+const shortIndicatorNames = {
+  T1: 'Дороги', T2: 'Общ. транспорт', E1: 'Озеленение', E2: 'Воздух',
+  S1: 'Школы и детсады', S2: 'Поликлиники', B1: 'Безопасность улиц',
+  B2: 'Безопасность дорог', C1: 'ЖКХ', C2: 'Обращения',
 };
 const demo = [
   { measureId: 'M7', districtId: 'nura' },
@@ -56,7 +67,7 @@ function showErrors(errors) {
   $('error-box').innerHTML = `<strong>Изменение не применено</strong><ul>${messages.map((message) => `<li>${escapeHtml(message)}</li>`).join('')}</ul>`;
   $('error-box').hidden = false;
   $('error-box').focus({ preventScroll: true });
-  $('error-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $('error-box').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'nearest' });
   announce(messages.join(' '));
 }
 function clearErrors() { $('error-box').hidden = true; $('error-box').textContent = ''; }
@@ -81,12 +92,12 @@ function renderCatalog() {
     const needsDistrict = measure.scope === 'district' && !state.picks[measure.id];
     const disabled = selected || full || needsDistrict || state.busy;
     const direction = directions[measure.direction];
-    const note = selected ? 'Уже в вашем плане' : full ? 'В плане уже 5 решений' : needsDistrict ? 'Сначала выберите район' : `Эффекты до учёта лага ${measure.lag} кв.`;
+    const note = selected ? 'Уже в вашем плане' : full ? 'В плане уже 5 решений' : needsDistrict ? 'Сначала выберите район' : `Эффекты до учёта задержки ${measure.lag} кв.`;
     return `<article class="measure-card${selected ? ' is-selected' : ''}" data-measure="${measure.id}">
       <div class="measure-top"><span class="direction-tag" data-direction="${measure.direction}"><span aria-hidden="true">${direction.icon}</span>${direction.name}</span><span class="measure-id">${measure.id}</span></div>
       <h3>${escapeHtml(measure.name)}</h3>
-      <div class="measure-meta"><span class="measure-cost">${measure.cost}<small>у. е.</small></span><span class="measure-lag">Лаг: ${measure.lag} кв.</span><span class="measure-lag">${measure.scope === 'city' ? 'Весь город' : 'Один район'}</span></div>
-      <div class="effect-chips">${Object.entries(measure.effects).map(([id, effect]) => `<span class="effect-chip${effect < 0 ? ' negative' : ''}" title="${escapeHtml(indicatorName(id))}">${id} ${signed(effect, 0)}</span>`).join('')}</div>
+      <div class="measure-meta"><span class="measure-cost">${measure.cost}<small>у. е.</small></span><span class="measure-lag">Задержка эффекта: ${measure.lag} кв.</span><span class="measure-lag">${measure.scope === 'city' ? 'Весь город' : 'Один район'}</span></div>
+      <div class="effect-chips">${Object.entries(measure.effects).map(([id, effect]) => `<span class="effect-chip${effect < 0 ? ' negative' : ''}" title="${escapeHtml(indicatorName(id))}">${escapeHtml(shortIndicatorNames[id] || indicatorName(id))} ${signed(effect, 0)}</span>`).join('')}</div>
       <div class="scope-picker">${measure.scope === 'district' ? `<label class="field-label" for="district-${measure.id}">Район реализации</label><select id="district-${measure.id}" data-pick="${measure.id}"${state.busy || selected ? ' disabled' : ''}>${districtOptions(state.picks[measure.id], true)}</select>` : '<span class="field-label">Масштаб реализации</span><div class="city-scope"><span aria-hidden="true">◎</span> Все 5 районов</div>'}</div>
       <button class="add-button${selected ? ' is-added' : ''}" data-add="${measure.id}" aria-label="${selected ? 'Добавлено' : 'Добавить'}: ${escapeHtml(measure.name)}" aria-describedby="note-${measure.id}"${disabled ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : '+'}</span>${selected ? 'В сценарии' : 'Добавить в план'}</button>
       <p class="add-note" id="note-${measure.id}">${note}</p>
@@ -117,6 +128,7 @@ function renderPlan() {
 }
 
 function invalidateResult() {
+  window.dispatchEvent(new CustomEvent('scenario:invalidated'));
   state.version += 1;
   state.simulationId += 1;
   state.explanationId += 1;
@@ -194,8 +206,8 @@ function renderResult(result) {
   $('result-placeholder').hidden = true;
   $('result-content').hidden = false;
   $('result-state').textContent = 'Расчёт завершён';
-  $('result-content').innerHTML = `<div class="result-grid"><article class="score-card"><div class="eyebrow">ASTANA QUALITY OF LIFE SCORE</div><div class="score-value">${number(result.score)}</div><div class="score-delta">${signed(result.deltaScore)} <span>к исходным ${number(result.baselineScore)}</span></div></article><article class="result-metric"><h3>Средняя оценка районов</h3><strong>${number(result.weightedAverage)}</strong><p>С учётом доли населения<br>Худший район: ${number(result.worstDistrictScore)}</p></article><article class="result-metric"><h3>Критические показатели</h3><strong>${result.criticalCount} <small style="font-size:13px;color:var(--muted)">/ 50</small></strong><p>До решений: ${state.baseline.criticalCount}<br>Стоимость: ${result.totalCost} · остаток: ${result.remainingBudget} у. е.</p></article></div>
-    <div class="result-detail"><h3>Дополнительный эффект сочетаний</h3><div class="synergy-list">${result.synergies.length ? result.synergies.map((synergy) => `<span class="synergy-chip">${synergy.pair.join(' + ')} · ${escapeHtml(districtName(synergy.districtId))} · ${Object.entries(synergy.effects).map(([id, effect]) => `${id} ${signed(effect, 0)}`).join(', ')}</span>`).join('') : '<p class="synergy-empty">В этом наборе нет активных синергий.</p>'}</div><details class="contributions" style="margin-top:16px"><summary>Вклад каждой меры с учётом лага</summary><ul>${result.contributions.map((contribution) => `<li><strong>${contribution.measureId}</strong> · ${contribution.districtIds.map(districtName).map(escapeHtml).join(', ')}: ${Object.entries(contribution.effects).map(([id, effect]) => `${id} ${signed(effect, 3)}`).join(', ')}. Реализовано ${number(contribution.realizedFactor * 100, 1)}% исходного эффекта.</li>`).join('')}</ul></details></div>
+  $('result-content').innerHTML = `<div class="result-grid"><article class="score-card"><div class="eyebrow">УЧЕБНЫЙ ИНДЕКС · МОДЕЛЬ КЕЙСА</div><div class="score-value">${number(result.score)}</div><div class="score-delta">${signed(result.deltaScore)} <span>к исходным ${number(result.baselineScore)}</span></div></article><article class="result-metric"><h3>Средняя оценка районов</h3><strong>${number(result.weightedAverage)}</strong><p>С учётом доли населения<br>Худший район: ${number(result.worstDistrictScore)}</p></article><article class="result-metric"><h3>Критические показатели</h3><strong>${result.criticalCount} <small style="font-size:13px;color:var(--muted)">/ 50</small></strong><p>До решений: ${state.baseline.criticalCount}<br>Стоимость: ${result.totalCost} · остаток: ${result.remainingBudget} у. е.</p></article></div>
+    <div class="result-detail"><h3>Дополнительный эффект сочетаний</h3><div class="synergy-list">${result.synergies.length ? result.synergies.map((synergy) => `<span class="synergy-chip">${synergy.pair.join(' + ')} · ${escapeHtml(districtName(synergy.districtId))} · ${Object.entries(synergy.effects).map(([id, effect]) => `${escapeHtml(shortIndicatorNames[id] || indicatorName(id))} ${signed(effect, 0)}`).join(', ')}</span>`).join('') : '<p class="synergy-empty">В этом наборе нет активных синергий.</p>'}</div><details class="contributions" style="margin-top:16px"><summary>Вклад каждой меры с учётом лага</summary><ul>${result.contributions.map((contribution) => `<li><strong>${contribution.measureId}</strong> · ${contribution.districtIds.map(districtName).map(escapeHtml).join(', ')}: ${Object.entries(contribution.effects).map(([id, effect]) => `${id} ${signed(effect, 3)}`).join(', ')}. Реализовано ${number(contribution.realizedFactor * 100, 1)}% исходного эффекта.</li>`).join('')}</ul></details></div>
     <section class="ai-panel" aria-labelledby="ai-heading"><div class="ai-heading"><h3 id="ai-heading">Почему получился такой результат</h3><span id="ai-mode" class="ai-mode">Анализ</span></div><div id="ai-body" aria-live="polite"></div></section>`;
   renderDistricts(result, true);
   cityMap?.setResult(result);
@@ -217,7 +229,7 @@ async function calculate() {
     state.result = result;
     renderResult(result);
     window.dispatchEvent(new CustomEvent('scenario:calculated', { detail: structuredClone({ scenario: input, result }) }));
-    $('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('results').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
     announce(`Сценарий рассчитан. Score ${number(result.score)}, изменение ${signed(result.deltaScore)}.`);
     void explain(input, version);
   } catch (error) {
@@ -300,13 +312,15 @@ $('district-focus').addEventListener('click', (event) => {
   state.filter = button.dataset.direction;
   renderFilters();
   renderCatalog();
-  $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('workspace').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
 });
 $('return-astana').addEventListener('click', () => cityMap?.setCity('astana'));
 window.addEventListener('city:changed', (event) => {
   const city = event.detail;
   if (!city) return;
+  currentCity = city;
   state.hasScenarioData = city.hasScenarioData === true;
+  if (!state.hasScenarioData) invalidateResult();
   document.querySelectorAll('.model-only').forEach((element) => { element.hidden = !state.hasScenarioData; });
   $('geography-notice').hidden = state.hasScenarioData;
   $('geography-title').textContent = `${city.name} · географический просмотр`;
@@ -321,12 +335,14 @@ document.querySelector('nav').addEventListener('click', (event) => {
 });
 window.addEventListener('scenario:load', (event) => {
   const input = event.detail?.scenario;
-  if (!state.dataset) return;
+  if (!state.dataset || !state.hasScenarioData) return;
   if (!input || !Array.isArray(input.decisions)) {
     showErrors(['Сохранённый сценарий должен содержать список решений.']);
     return;
   }
-  void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.');
+  void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.').then((applied) => {
+    if (applied) $('workspace').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+  });
 });
 
 async function initialize() {
@@ -345,6 +361,10 @@ async function initialize() {
     $('app').hidden = false;
     renderDistrictFocus();
     cityMap = createCityMap({ container: $('city-map'), dataset, baseline, onDistrictSelect: selectDistrict });
+    mountScenarioLibrary($('scenario-library'), { city: currentCity });
+    mountPolicyOptionsPanel($('policy-options-panel'), {
+      dataset, city: currentCity, fetcher: createPolicyOptionsFetcher(),
+    });
     void api('/api/health').then((health) => { $('service-status').textContent = health.aiConfigured ? 'AI настроен · модель кейса' : 'Расчётная модель · AI не подключён'; }).catch(() => {});
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
   } catch (error) {
