@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { AIBudgetState } from './ai-budget.js';
 import { createDurableComplaintStore } from './complaints/durable-store.js';
 import { createComplaintFetchHandler } from './complaints/worker-routes.js';
+import { cleanupTelegramUpdates } from './complaints/telegram.js';
 
 export { default } from './worker.js';
 
@@ -19,6 +20,7 @@ export class AIBudget extends DurableObject {
 export class Complaints extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.storage = ctx.storage;
     this.handle = createComplaintFetchHandler({
       store: createDurableComplaintStore({ storage: ctx.storage }),
       sessionStorage: ctx.storage,
@@ -35,5 +37,9 @@ export class Complaints extends DurableObject {
     // Body reads must not block unrelated requests. The store serializes its
     // mutations and the Telegram processor serializes each chat's session.
     return this.handle(request);
+  }
+
+  alarm() {
+    return cleanupTelegramUpdates(this.storage);
   }
 }

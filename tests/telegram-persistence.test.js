@@ -10,7 +10,11 @@ function memoryStorage() {
   return {
     values, reads, writes,
     async get(key) { reads.push(key); return structuredClone(values.get(key)); },
-    async put(key, value) { writes.push({ key, value: structuredClone(value) }); values.set(key, structuredClone(value)); },
+    async put(key, value) {
+      writes.push({ key, value: structuredClone(value) });
+      const entries = typeof key === 'string' ? [[key, value]] : Object.entries(key);
+      for (const [name, data] of entries) values.set(name, structuredClone(data));
+    },
     async list({ prefix }) { return structuredClone(new Map([...values].filter(([key]) => key.startsWith(prefix)))); },
     async transaction(operation) {
       const pending = structuredClone(values);
@@ -238,7 +242,8 @@ test('chat snapshots are independent and retain at most 32 replies', async () =>
   const main = first.sessionStorage.values.get('telegram:session:100');
   assert.equal(main.updates.length, 32);
   assert.deepEqual(main.updates.map(entry => entry.id), Array.from({ length: 32 }, (_, index) => index + 9));
-  assert.equal(first.sessionStorage.values.size, 2);
+  assert.equal([...first.sessionStorage.values.keys()].filter(key => key.startsWith('telegram:session:')).length, 2);
+  assert.equal([...first.sessionStorage.values.keys()].filter(key => key.startsWith('telegram:update:')).length, 41);
   assert.equal(first.sessionStorage.values.get('telegram:session:200').draft.consent, true);
   assert.equal(main.draft, null);
   assert.ok(Buffer.byteLength(JSON.stringify(main)) < 2 * 1024 * 1024);

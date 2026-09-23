@@ -13,7 +13,10 @@ const JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]);
 class MemoryStorage {
   entries = new Map();
   async get(key) { return structuredClone(this.entries.get(key)); }
-  async put(key, value) { this.entries.set(key, structuredClone(value)); }
+  async put(key, value) {
+    const entries = typeof key === 'string' ? [[key, value]] : Object.entries(key);
+    for (const [name, data] of entries) this.entries.set(name, structuredClone(data));
+  }
   async list({ prefix }) { return structuredClone(new Map([...this.entries].filter(([key]) => key.startsWith(prefix)))); }
   async transaction(operation) {
     const staged = new MemoryStorage();

@@ -29,6 +29,7 @@ export function createWorker(options = {}) {
           }
           const response = await complaints.fetch(request);
           const headers = new Headers(response.headers);
+          headers.set('Cache-Control', 'no-store');
           for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
           return new Response(request.method === 'HEAD' ? null : response.body, {
             status: response.status, statusText: response.statusText, headers,

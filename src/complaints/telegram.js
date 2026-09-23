@@ -3,6 +3,8 @@ const MAX_DRAFTS = 1000;
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 const SESSION_UPDATE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_SESSION_UPDATES = 32;
+const UPDATE_PREFIX = 'telegram:update:';
+const UPDATE_EXPIRY_PREFIX = 'telegram:update-expiry:';
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const STATUS_LABELS = { new: 'Новое', in_progress: 'В работе', resolved: 'Решено', rejected: 'Отклонено' };
 const CONSENT_PROMPT = '📝 Новое обращение\n\nДля передачи обращения в акимат нужно ваше согласие на обработку текста, фото и указанного места. Эти сведения и Telegram ID доступны сотрудникам; в публичной проверке они не показываются. Не отправляйте чужие персональные данные.\n\nНажмите «✅ Согласен, продолжить» или отправьте /agree. До отправки обращение можно отменить.';
@@ -28,6 +30,29 @@ export const TELEGRAM_COMMANDS = Object.freeze([
 ]);
 const BUTTON_COMMANDS = new Map(Object.entries(TELEGRAM_BUTTONS).map(([command, label]) => [label, command]));
 const B = TELEGRAM_BUTTONS;
+
+const expiryKey = (expiresAt, id = '') => `${UPDATE_EXPIRY_PREFIX}${String(expiresAt).padStart(16, '0')}:${id}`;
+
+/** Called by the owning Durable Object alarm. Each batch has bounded storage work. */
+export async function cleanupTelegramUpdates(storage, { now = Date.now(), limit = 128 } = {}) {
+  if (!Number.isSafeInteger(now) || now < 0 || !Number.isInteger(limit) || limit < 1 || limit > 128) {
+    throw new TypeError('Некорректные параметры очистки обновлений Telegram.');
+  }
+  return storage.transaction(async transaction => {
+    const expired = await transaction.list({ prefix: UPDATE_EXPIRY_PREFIX, end: expiryKey(now + 1), limit });
+    let removed = 0;
+    for (const [key, index] of expired) {
+      const entry = await transaction.get(index.key);
+      // An expired index must never delete a newer reuse of the same update_id.
+      if (entry && entry.expiresAt <= now) { await transaction.delete(index.key); removed++; }
+      await transaction.delete(key);
+    }
+    const next = [...(await transaction.list({ prefix: UPDATE_EXPIRY_PREFIX, limit: 1 })).values()][0];
+    if (next) await transaction.setAlarm(Math.max(now + 1000, next.expiresAt));
+    // An executing alarm clears itself; avoiding deleteAlarm also preserves newly scheduled work.
+    return { removed, more: Boolean(next && next.expiresAt <= now) };
+  });
+}
 
 function keyboard(rows, placeholder = 'Выберите действие в меню') {
   return { keyboard: rows.map(row => row.map(button => typeof button === 'string' ? { text: button } : button)),
@@ -335,7 +360,7 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
     if (saved?.draft && now - saved.draft.updatedAt <= DRAFT_TTL_MS) drafts.set(chatId, saved.draft);
     if (saved?.screen && now - saved.screen.updatedAt <= DRAFT_TTL_MS) screens.set(chatId, saved.screen);
     session = { updates: new Map((saved?.updates ?? [])
-      .filter(entry => now - entry.createdAt <= SESSION_UPDATE_TTL_MS)
+      .filter(entry => now - entry.createdAt < SESSION_UPDATE_TTL_MS)
       .slice(-MAX_SESSION_UPDATES).map(entry => [entry.id, entry])) };
     sessions.set(chatId, session);
     return session;
@@ -344,49 +369,94 @@ export function createTelegramProcessor({ store, sendMessage = async () => ({ sk
   function pruneSessionUpdates(session) {
     const now = Date.now();
     for (const [id, entry] of session.updates) {
-      if (now - entry.createdAt > SESSION_UPDATE_TTL_MS) session.updates.delete(id);
+      if (now - entry.createdAt >= SESSION_UPDATE_TTL_MS) session.updates.delete(id);
     }
     while (session.updates.size > MAX_SESSION_UPDATES) session.updates.delete(session.updates.keys().next().value);
   }
 
-  async function saveSession(chatId, session) {
+  async function saveSession(chatId, session, entry) {
     const now = Date.now();
     pruneSessionUpdates(session);
     const screen = screens.get(chatId);
-    // One bounded value per chat, never an ever-growing snapshot of every chat.
-    // Store the prepared reply alongside its draft mutation before contacting
-    // Telegram, so a delivery retry cannot append text or submit twice.
-    await sessionStorage.put(`telegram:session:${chatId}`, {
+    // The 32-reply snapshot is only a cache. The separate ledger retains every
+    // update for 24 hours, regardless of subsequent traffic in this chat.
+    const snapshot = {
       version: 1, updatedAt: now, draft: activeDraft(chatId),
       screen: screen && now - screen.updatedAt <= DRAFT_TTL_MS ? screen : null,
       updates: [...session.updates.values()].map(({ id, createdAt, prepared, complete }) => ({ id, createdAt, prepared, complete: !!complete })),
+    };
+    if (!entry) return sessionStorage.put(`telegram:session:${chatId}`, snapshot);
+    const expiresAt = entry.createdAt + SESSION_UPDATE_TTL_MS;
+    const key = `${UPDATE_PREFIX}${entry.id}`;
+    const changes = {
+      [`telegram:session:${chatId}`]: snapshot,
+      [key]: { version: 1, id: entry.id, chatId, createdAt: entry.createdAt, expiresAt,
+        prepared: entry.prepared, complete: !!entry.complete },
+      [expiryKey(expiresAt, entry.id)]: { key, expiresAt },
+    };
+    if (typeof sessionStorage.getAlarm !== 'function' || typeof sessionStorage.setAlarm !== 'function') {
+      // Minimal local test adapters have no alarm API. The Durable Object uses the transaction below.
+      return sessionStorage.put(changes);
+    }
+    // Commit mutation, reply, expiry, and its cleanup alarm together. A crash must
+    // never leave a durable ledger without an alarm, or a draft without its ledger.
+    await sessionStorage.transaction(async transaction => {
+      await transaction.put(changes);
+      const alarm = await transaction.getAlarm();
+      if (alarm === null || alarm > expiresAt) await transaction.setAlarm(expiresAt);
     });
+  }
+
+  async function loadUpdate(id) {
+    const entry = await sessionStorage.get(`${UPDATE_PREFIX}${id}`);
+    if (!entry) return null;
+    if (entry.version !== 1 || entry.id !== id || typeof entry.chatId !== 'string'
+      || !Number.isSafeInteger(entry.expiresAt) || !Number.isSafeInteger(entry.createdAt)
+      || entry.expiresAt !== entry.createdAt + SESSION_UPDATE_TTL_MS
+      || !entry.prepared || typeof entry.prepared !== 'object' || typeof entry.complete !== 'boolean') {
+      throw new Error('Не удалось прочитать журнал обновлений Telegram.');
+    }
+    return entry.expiresAt > Date.now() ? entry : null;
   }
 
   async function processPersistentUpdate(update, chatId) {
     const inFlight = updates.get(update.update_id);
-    if (inFlight) return inFlight;
+    if (inFlight) return inFlight.chatId === chatId ? inFlight.pending : { ignored: true, duplicateUpdate: true };
     const previous = chatQueues.get(chatId) ?? Promise.resolve();
     const pending = previous.catch(() => {}).then(async () => {
-      const session = await loadSession(chatId);
-      pruneSessionUpdates(session);
-      let entry = session.updates.get(update.update_id);
-      if (entry?.complete) {
-        // Also retries a completion write that failed after successful delivery.
-        await saveSession(chatId, session);
-        return { ...entry.prepared.result, duplicateUpdate: true };
+      let entry;
+      try {
+        const session = await loadSession(chatId);
+        pruneSessionUpdates(session);
+        entry = session.updates.get(update.update_id);
+        if (!entry) entry = await loadUpdate(update.update_id);
+        if (entry?.chatId && entry.chatId !== chatId) return { ignored: true, duplicateUpdate: true };
+        if (entry) session.updates.set(update.update_id, entry);
+        if (entry?.complete) {
+          // Also retries a completion write that failed after successful delivery.
+          await saveSession(chatId, session, entry);
+          return { ...entry.prepared.result, duplicateUpdate: true };
+        }
+        if (!entry) {
+          entry = { id: update.update_id, createdAt: Date.now(), prepared: await prepare(update, chatId), complete: false };
+          session.updates.set(update.update_id, entry);
+        }
+        await saveSession(chatId, session, entry);
+        if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text, { replyMarkup: entry.prepared.markup });
+        entry.complete = true;
+        await saveSession(chatId, session, entry);
+        return entry.prepared.result;
+      } catch (error) {
+        if (!entry?.complete) {
+          // Never let the next update persist a mutation whose own ledger commit failed.
+          sessions.delete(chatId);
+          drafts.delete(chatId);
+          screens.delete(chatId);
+        }
+        throw error;
       }
-      if (!entry) {
-        entry = { id: update.update_id, createdAt: Date.now(), prepared: await prepare(update, chatId), complete: false };
-        session.updates.set(update.update_id, entry);
-      }
-      await saveSession(chatId, session);
-      if (entry.prepared.text) await sendMessage(chatId, entry.prepared.text, { replyMarkup: entry.prepared.markup });
-      entry.complete = true;
-      await saveSession(chatId, session);
-      return entry.prepared.result;
     });
-    updates.set(update.update_id, pending);
+    updates.set(update.update_id, { chatId, pending });
     chatQueues.set(chatId, pending);
     try {
       return await pending;
