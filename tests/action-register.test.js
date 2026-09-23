@@ -153,7 +153,7 @@ test('only an explicit action after a valid current calculation creates five man
   }
   assert.match(ui.container.textContent, /Локальный черновик в этом браузере/);
   assert.match(ui.container.textContent, /Не отправлено исполнителям/);
-  assert.match(ui.container.textContent, /Нет синхронизации и официального согласования/);
+  assert.match(ui.container.textContent, /Нет автоматической синхронизации и официального согласования/);
   ui.mount.dispose();
 });
 
