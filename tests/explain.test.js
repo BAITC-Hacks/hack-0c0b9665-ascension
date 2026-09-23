@@ -17,7 +17,7 @@ const analysis = () => ({
   summary: 'Социальные меры устраняют критические показатели Нуры.',
   strengths: ['Школа и поликлиника улучшают социальную инфраструктуру.'],
   risks: ['В транспорте сохраняются нерешённые проблемы.'],
-  recommendations: ['Сравните проверенную замену одного решения.'],
+  recommendations: ['COMPARE_SCENARIOS'],
 });
 const completed = (value = analysis()) => ({
   status: 'completed',
@@ -241,7 +241,14 @@ test('successful mocked Responses request contains trusted simulator facts and r
     return jsonResponse(completed());
   }));
   assert.equal(calls, 1);
-  assert.deepEqual(output, { mode: 'ai', available: true, model: MODEL, ...analysis() });
+  assert.equal(output.mode, 'ai');
+  assert.equal(output.available, true);
+  assert.equal(output.model, MODEL);
+  assert.match(output.summary, /52\.56 → 56\.54/);
+  assert.ok(output.summary.endsWith(analysis().summary));
+  assert.deepEqual(output.strengths, analysis().strengths);
+  assert.equal(output.risks[0], analysis().risks[0]);
+  assert.match(output.recommendations[0], /Сравните альтернативные наборы/);
   assert.deepEqual(scenario, scenarioBefore);
   assert.deepEqual(result, resultBefore);
 });

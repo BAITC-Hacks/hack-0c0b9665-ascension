@@ -70,6 +70,51 @@ function decisionLabel(decision) {
     (decision.districtId ? ` (${districts.get(decision.districtId).name})` : ' (весь город)');
 }
 
+function recommendationCatalog(facts) {
+  const catalog = {
+    COMPARE_SCENARIOS: 'Сравните альтернативные наборы в панели сценариев. Любой изменённый план нужно заново проверить и рассчитать сервером.',
+    FOCUS_WEAKEST: `Проверьте приоритеты самого слабого района: ${facts.weakestDistrict}, оценка ${fmt(facts.worstDistrictScore)}.`,
+    MONITOR_LAGS: `Учитывайте задержки реализации: горизонт учебной модели — ${facts.horizonQuarters} кварталов. Это не календарный план реальных работ.`,
+  };
+  if (facts.criticalCount > 0) catalog.REVIEW_CRITICAL =
+    `Проверьте оставшиеся критические показатели: ${facts.critical.map(c => `${c.district} / ${c.indicator}: ${fmt(c.value)}`).join('; ')}.`;
+  const best = facts.bestSingleReplacement;
+  if (facts.replacementSearchPerformed && best) catalog.VERIFIED_SINGLE_REPLACEMENT =
+    `Проверенная замена: ${decisionLabel(best.removed)} → ${decisionLabel(best.added)}. Score ${fmt(best.score)}, стоимость ${best.totalCost}. Это лучший найденный вариант одной замены, не глобальный оптимум. После загрузки варианта пересчитайте его сервером.`;
+  return catalog;
+}
+
+function analysisSchema(catalog) {
+  return { ...schema, properties: { ...schema.properties,
+    recommendations: { type: 'array', items: { type: 'string', enum: Object.keys(catalog) } },
+  } };
+}
+
+class InvalidModelAnalysis extends Error {}
+
+function groundAnalysis(analysis, facts, catalog) {
+  const prose = [analysis.summary, ...analysis.strengths, ...analysis.risks];
+  // A number whitelist cannot distinguish "Score 100" from a legitimate budget
+  // of 100. Provider prose has no numeric channel: all displayed figures and
+  // actionable recommendations below are rendered from the official facts.
+  // This is deliberately not a proof of all qualitative natural-language claims.
+  const unsupportedCertainty = /(?:гарантир|подтвержд[её]нн.{0,25}прогноз|глобальн.{0,15}оптим)/iu;
+  if (prose.some(text => /\p{N}/u.test(text) || unsupportedCertainty.test(text))
+    || analysis.recommendations.some(code => !Object.hasOwn(catalog, code))) {
+    throw new InvalidModelAnalysis('Model output violated the evidence contract');
+  }
+  const recommendations = [...new Set(analysis.recommendations.length
+    ? analysis.recommendations : ['COMPARE_SCENARIOS'])].map(code => catalog[code]);
+  if (!facts.replacementSearchPerformed) recommendations.push(
+    'Поиск замены не выполнялся сервером. Предварительные варианты в отдельной панели проверяются при повторном серверном расчёте.');
+  return {
+    summary: `Учебный Score ${fmt(facts.baselineScore)} → ${fmt(facts.score)} (${facts.deltaScore >= 0 ? '+' : ''}${fmt(facts.deltaScore)}); стоимость ${facts.totalCost} из ${facts.budget}, остаток ${facts.remainingBudget}. ${analysis.summary}`,
+    strengths: analysis.strengths,
+    risks: [...analysis.risks, 'Данные и эффекты синтетические. Качественное объяснение модели может содержать неточности; это не подтверждённый прогноз для реального города.'],
+    recommendations,
+  };
+}
+
 function deterministic(facts, reason) {
   const bestDistricts = [...facts.districts].sort((a, b) =>
     (b.afterScore - b.beforeScore) - (a.afterScore - a.beforeScore)).slice(0, 3);
@@ -107,7 +152,7 @@ function parseAnalysis(response) {
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
     Object.keys(value).some((key) => !textFields.includes(key)) ||
     typeof value.summary !== 'string' || !value.summary.trim() || value.summary.length > 5000 ||
-    !textFields.slice(1).every((key) => Array.isArray(value[key]) && value[key].length > 0 &&
+    !textFields.slice(1).every((key) => Array.isArray(value[key]) && (key === 'recommendations' || value[key].length > 0) &&
       value[key].length <= 8 && value[key].every((entry) => typeof entry === 'string' && entry.trim() && entry.length < 4000))) {
     throw new Error('Invalid model analysis');
   }
@@ -116,10 +161,11 @@ function parseAnalysis(response) {
 
 export async function explainScenario(scenario, result, options = {}) {
   const facts = buildExplanationFacts(scenario, result, options);
+  const catalog = recommendationCatalog(facts);
   const apiKey = options.apiKey ?? globalThis.process?.env?.OPENAI_API_KEY;
   if (!apiKey?.trim()) return deterministic(facts, 'not_configured');
   const model = options.model ?? globalThis.process?.env?.OPENAI_MODEL ?? 'gpt-6-astra';
-  const cacheKey = JSON.stringify([model, facts.replacementSearchPerformed,
+  const cacheKey = JSON.stringify(['evidence-contract-v1', model, facts.replacementSearchPerformed,
     [...scenario.decisions].sort((a,b) => a.measureId.localeCompare(b.measureId))]);
   // Injectable transports never share live-response cache with production.
   const useCache = !options.fetchImpl && !options.apiKey;
@@ -132,16 +178,16 @@ export async function explainScenario(scenario, result, options = {}) {
       body: JSON.stringify({ model, store: false, max_output_tokens: 3000,
         ...(model === 'gpt-6-astra' ? { reasoning: { effort: 'low' } } : {}),
         input: [
-          { role: 'developer', content: 'Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. Объясни сильные стороны, риски, компромиссы и последствия. Не рассчитывай новые числа, не меняй бюджет, Score или формулу. Используй только готовые числа из JSON, округляя при показе до двух знаков. Не утверждай, что условные эффекты гарантированы в реальном городе. Объясни приоритет самого слабого района и штрафы строго ниже 40. Рекомендацию bestSingleReplacement, если она есть, назови проверенной заменой одного решения, никогда глобальным оптимумом. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По 2–4 коротких пункта в каждом списке.' },
+          { role: 'developer', content: `Ты аналитик учебного симулятора города. Ответь по-русски кратко. Вход содержит только синтетические данные и результаты доверенного калькулятора. В summary, strengths, risks объясни качественно сильные стороны, риски и компромиссы, без цифр, числовых значений, процентов и кодов мер/показателей. Не рассчитывай новые числа и не записывай числа словами: числовую сводку и точные значения добавит сервер. Называй меры и районы словами. Не используй утверждения о гарантии, подтверждённом прогнозе или глобальном оптимуме; сервер добавит оговорку о синтетике. Не предлагай добавление, удаление или замену мер в свободной прозе. Объясни приоритет самого слабого района и оставшиеся дефициты. recommendations — только выбранные коды из списка ${Object.keys(catalog).join(', ')}; это не свободный текст. Если подходящего совета нет, верни пустой массив. Код VERIFIED_SINGLE_REPLACEMENT допустим только если он есть в списке. Если replacementSearchPerformed=false, поиск замены не выполнялся; не утверждай, что улучшений нет или что замена проверена. Не предлагай шестое решение или несовместимые меры. По два–четыре коротких пункта strengths и risks.` },
           { role: 'user', content: JSON.stringify(facts) },
         ],
-        text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema } },
+        text: { format: { type: 'json_schema', name: 'city_scenario_analysis', strict: true, schema: analysisSchema(catalog) } },
       }),
     });
     if (!response.ok) {
       return deterministic(facts, response.status === 429 ? 'rate_limited' : 'provider_error');
     }
-    const analysis = parseAnalysis(await response.json());
+    const analysis = groundAnalysis(parseAnalysis(await response.json()), facts, catalog);
     const value = { mode: 'ai', available: true, model, ...analysis };
     if (useCache) {
       if (cache.size >= 100) cache.delete(cache.keys().next().value);
@@ -149,6 +195,7 @@ export async function explainScenario(scenario, result, options = {}) {
     }
     return structuredClone(value);
   } catch (error) {
-    return deterministic(facts, ['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'provider_error');
+    return deterministic(facts, error instanceof InvalidModelAnalysis ? 'invalid_model_analysis'
+      : ['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'provider_error');
   }
 }
