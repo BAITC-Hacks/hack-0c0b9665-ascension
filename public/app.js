@@ -1,3 +1,8 @@
+import './district-explorer.js';
+import './method-guide.js';
+import './workspace-nav.js';
+import { readDraft, initializeWorkspaceTools } from './workspace-tools.js';
+
 const $ = (id) => document.getElementById(id);
 const directions = {
   transport: { name: 'Транспорт' },
@@ -39,6 +44,7 @@ const demo = [
 const state = {
   dataset: null, baseline: null, decisions: [], totalCost: 0, filter: 'all', picks: {},
   result: null, busy: false, simulating: false, version: 0, mutationId: 0, simulationId: 0, explanationId: 0,
+  search: '', sort: 'catalog', affordable: false, history: [],
 };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const number = (value, digits = 2) => Number(value).toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -94,7 +100,12 @@ function renderFilters() {
 }
 
 function renderCatalog() {
-  const measures = state.dataset.measures.filter((measure) => state.filter === 'all' || measure.direction === state.filter);
+  const query = state.search.trim().toLocaleLowerCase('ru');
+  const measures = state.dataset.measures.filter((measure) => (state.filter === 'all' || measure.direction === state.filter)
+    && (!state.affordable || measure.cost <= state.dataset.budget - state.totalCost)
+    && (!query || [measure.id, measure.name, directions[measure.direction].name, ...Object.keys(measure.effects).flatMap(id => [id, indicatorName(id)])].join(' ').toLocaleLowerCase('ru').includes(query)));
+  if (state.sort !== 'catalog') measures.sort((a, b) => a[state.sort] - b[state.sort]);
+  $('catalog-count').textContent = `Показано ${measures.length} из ${state.dataset.measures.length} инициатив`;
   $('catalog').innerHTML = measures.map((measure) => {
     const selected = state.decisions.some((decision) => decision.measureId === measure.id);
     const full = state.decisions.length >= 5;
@@ -111,7 +122,7 @@ function renderCatalog() {
       <button class="add-button${selected ? ' is-added' : ''}" data-add="${measure.id}" aria-label="${selected ? 'Добавлено' : 'Добавить'}: ${escapeHtml(measure.name)}" aria-describedby="note-${measure.id}"${disabled ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : '+'}</span>${selected ? 'В сценарии' : 'Добавить в план'}</button>
       <p class="add-note" id="note-${measure.id}">${note}</p>
     </article>`;
-  }).join('');
+  }).join('') || '<p class="catalog-empty">Подходящих инициатив нет. Измените поиск или сбросьте фильтры.</p>';
 }
 
 function renderPlan() {
@@ -134,6 +145,9 @@ function renderPlan() {
   $('simulate-hint').textContent = state.busy ? 'Проверяем совместимость решений…' : state.simulating ? 'Проверяем влияние на все районы' : state.decisions.length < 5 ? `Выберите ещё ${5 - state.decisions.length} ${5 - state.decisions.length === 1 ? 'решение' : 5 - state.decisions.length < 5 ? 'решения' : 'решений'}` : 'Пять решений готовы к расчёту';
   $('demo-button').disabled = state.busy;
   $('reset-button').disabled = state.busy || state.decisions.length === 0;
+  $('undo-plan').disabled = state.busy || state.history.length === 0;
+  $('calculate-example').disabled = state.busy || state.simulating;
+  $('save-local-scenario').disabled = state.busy || state.decisions.length === 0;
 }
 
 function invalidateResult() {
@@ -147,9 +161,13 @@ function invalidateResult() {
   $('result-placeholder').hidden = false;
   $('result-state').textContent = 'Ожидает расчёта';
   renderDistricts(state.baseline, false);
+  deskSnapshot = null;
+  $('save-scenario').disabled = true;
+  $('save-scenario-status').textContent = 'Рассчитайте текущий план перед сохранением в кабинет.';
+  window.dispatchEvent(new CustomEvent('scenario:invalidated'));
 }
 
-async function applyDecisions(decisions, message) {
+async function applyDecisions(decisions, message, { remember = true } = {}) {
   if (state.busy) return false;
   const requestId = ++state.mutationId;
   state.busy = true;
@@ -162,10 +180,12 @@ async function applyDecisions(decisions, message) {
     if (!Array.isArray(validation.errors) || !Number.isFinite(validation.totalCost)) throw new Error('Сервер вернул некорректный результат проверки.');
     const blockingErrors = validation.errors.filter((error) => error.code !== 'DECISION_COUNT' || decisions.length >= 5);
     if (blockingErrors.length) { showErrors(blockingErrors); return false; }
+    if (remember) state.history = [...state.history, scenario()].slice(-20);
     state.decisions = decisions.map((decision) => ({ ...decision }));
     state.totalCost = validation.totalCost;
     for (const decision of decisions) if (decision.districtId) state.picks[decision.measureId] = decision.districtId;
     invalidateResult();
+    window.dispatchEvent(new CustomEvent('scenario:changed', { detail: { scenario: scenario() } }));
     announce(`${message} Выбрано ${decisions.length} из 5. Осталось ${state.dataset.budget - state.totalCost} условных единиц.`);
     return true;
   } catch (error) {
@@ -181,7 +201,7 @@ function renderDistricts(result, calculated) {
   $('district-summary').innerHTML = result.districts.map((district) => {
     const critical = state.dataset.indicators.filter(({ id }) => district.after[id] < 40).length;
     const share = state.dataset.districts.find(({ id }) => id === district.id).populationShare;
-    return `<article class="district-card"><div class="district-heading"><h3>${escapeHtml(district.name)}</h3><img class="district-people" src="/assets/illustrations/${districtArtwork[district.id]}" alt="" width="36" height="36" loading="lazy" decoding="async"></div><p class="district-population">${number(share * 100, 0)}% населения</p><span class="district-value">${number(district.afterScore)}</span>${calculated ? `<span class="district-change">${signed(district.afterScore - district.beforeScore)}</span>` : ''}<div class="district-mini-track" aria-hidden="true"><span style="width:${district.afterScore}%"></span></div><p class="district-critical${critical ? ' has-critical' : ''}">${critical ? `Критических показателей: ${critical}` : 'Без критических показателей'}</p></article>`;
+    return `<article class="district-card"><div class="district-heading"><h3>${escapeHtml(district.name)}</h3><img class="district-art" src="/assets/illustrations/${districtArtwork[district.id]}" alt="" width="48" height="48" loading="lazy" decoding="async"></div><p class="district-population">${number(share * 100, 0)}% населения</p><span class="district-value">${number(district.afterScore)}</span>${calculated ? `<span class="district-change">${signed(district.afterScore - district.beforeScore)}</span>` : ''}<div class="district-mini-track" aria-hidden="true"><span style="width:${district.afterScore}%"></span></div><p class="district-critical${critical ? ' has-critical' : ''}">${critical ? `Критических показателей: ${critical}` : 'Без критических показателей'}</p></article>`;
   }).join('');
   $('indicator-table').innerHTML = `<thead><tr><th scope="col">Показатель</th>${result.districts.map((district) => `<th scope="col">${escapeHtml(district.name)}</th>`).join('')}</tr></thead><tbody>${state.dataset.indicators.map((indicator) => `<tr><th scope="row"><span>${indicator.id}</span>${escapeHtml(indicator.name)}</th>${result.districts.map((district) => `<td${district.after[indicator.id] < 40 ? ' class="critical"' : ''} title="До: ${number(district.before[indicator.id])}${district.after[indicator.id] < 40 ? '. Критическое значение, ниже 40' : ''}">${number(district.after[indicator.id])}${calculated ? `<span class="cell-delta${district.delta[indicator.id] < 0 ? ' negative' : ''}">${signed(district.delta[indicator.id])}</span>` : ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
   $('table-note').textContent = calculated ? 'В каждой ячейке: итоговое значение и изменение относительно исходного. Наведите курсор для значения «до».' : 'Исходные значения официального синтетического набора.';
@@ -211,7 +231,9 @@ async function calculate() {
     if (!result.valid) { showErrors(result.errors || ['Не удалось рассчитать сценарий.']); return; }
     state.result = result;
     renderResult(result);
-    window.dispatchEvent(new CustomEvent('scenario:calculated', { detail: structuredClone({ scenario: input, result }) }));
+    window.dispatchEvent(new CustomEvent('scenario:calculated', { detail: structuredClone({ scenario: input, result, dataset: state.dataset, baseline: state.baseline }) }));
+    history.replaceState(null, '', `${location.pathname}${location.search}#results`);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
     $('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
     announce(`Сценарий рассчитан. Score ${number(result.score)}, изменение ${signed(result.deltaScore)}.`);
     void explain(input, version);
@@ -284,8 +306,26 @@ $('selected-list').addEventListener('change', (event) => {
 });
 $('demo-button').addEventListener('click', () => void applyDecisions(demo, 'Загружен официальный демо-сценарий.'));
 $('reset-button').addEventListener('click', async () => {
-  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; state.filter = 'all'; renderFilters(); renderCatalog(); }
+  if (await applyDecisions([], 'Создан новый сценарий.')) { state.picks = {}; clearCatalogFilters(); }
 });
+$('undo-plan').addEventListener('click', async () => {
+  const previous = state.history.at(-1);
+  if (previous && await applyDecisions(previous.decisions, 'Последнее изменение отменено.', { remember: false })) {
+    state.history.pop(); renderPlan();
+  }
+});
+$('calculate-example').addEventListener('click', async () => {
+  if (await applyDecisions(demo, 'Загружен официальный демо-сценарий.')) await calculate();
+});
+function clearCatalogFilters() {
+  state.search = ''; state.sort = 'catalog'; state.affordable = false; state.filter = 'all';
+  $('catalog-search').value = ''; $('catalog-sort').value = 'catalog'; $('catalog-affordable').checked = false;
+  renderFilters(); renderCatalog();
+}
+$('catalog-search').addEventListener('input', event => { state.search = event.target.value; if (state.dataset) renderCatalog(); });
+$('catalog-sort').addEventListener('change', event => { state.sort = event.target.value; if (state.dataset) renderCatalog(); });
+$('catalog-affordable').addEventListener('change', event => { state.affordable = event.target.checked; if (state.dataset) renderCatalog(); });
+$('catalog-clear').addEventListener('click', () => { if (state.dataset) clearCatalogFilters(); });
 $('simulate-button').addEventListener('click', () => void calculate());
 window.addEventListener('scenario:load', (event) => {
   const input = event.detail?.scenario;
@@ -295,6 +335,21 @@ window.addEventListener('scenario:load', (event) => {
     return;
   }
   void applyDecisions(input.decisions, 'Сценарий загружен. Рассчитайте его повторно.');
+});
+window.addEventListener('constructor:focus', event => {
+  if (!state.dataset || state.busy) return;
+  const measure = measureById(event.detail?.measureId);
+  if (!measure) return;
+  clearCatalogFilters();
+  state.filter = measure.direction;
+  if (measure.scope === 'district' && state.dataset.districts.some(d => d.id === event.detail.districtId)) state.picks[measure.id] = event.detail.districtId;
+  renderFilters(); renderCatalog();
+  location.hash = 'workspace';
+  const card = document.querySelector(`[data-measure="${measure.id}"]`);
+  card.classList.add('measure-highlight');
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.querySelector('button')?.focus({ preventScroll: true });
+  announce(`Выбрана инициатива «${measure.name}». Проверьте район и добавьте её в план.`);
 });
 
 async function initialize() {
@@ -311,8 +366,23 @@ async function initialize() {
     renderDistricts(baseline, false);
     $('loading').hidden = true;
     $('app').hidden = false;
+    initializeWorkspaceTools();
+    window.dispatchEvent(new CustomEvent('simulator:ready', { detail: structuredClone({ dataset, baseline }) }));
     announce('Данные загружены. Выберите пять решений или загрузите демо-сценарий.');
-    await loadDeskScenario();
+    if (deskParams.has('saved') || deskParams.has('complaint')) await loadDeskScenario();
+    else if (deskParams.has('plan')) {
+      try {
+        const shared = JSON.parse(deskParams.get('plan'));
+        if (!shared || !Array.isArray(shared.decisions) || shared.decisions.length > 5) throw new Error('В ссылке нет корректного сценария.');
+        if (await applyDecisions(shared.decisions, 'Сценарий из ссылки загружен.')) await calculate();
+      } catch { showErrors(['Не удалось прочитать сценарий из ссылки. Вы можете собрать новый план.']); }
+      history.replaceState(null, '', `${location.pathname}${location.hash}`);
+    } else {
+      const draft = readDraft();
+      if (draft?.decisions?.length) {
+        if (await applyDecisions(draft.decisions, 'Ваш черновик восстановлен.', { remember: false })) $('draft-status').textContent = 'Черновик восстановлен. Для актуального результата нажмите «Рассчитать сценарий».';
+      }
+    }
   } catch (error) {
     $('loading').hidden = true;
     $('fatal-error').hidden = false;

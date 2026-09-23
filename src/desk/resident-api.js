@@ -131,7 +131,8 @@ export function createResidentApi({ db, getComplaint, saveComplaint, transaction
     };
   }
   function activePublication(publication, item = get(publication.complaintId)) {
-    return publication.active && item.status === 'resolved' && feedbackFor(item.id).at(-1)?.outcome !== 'unresolved';
+    return publication.active && item.status === 'resolved' && publication.resolutionKey === resolutionEvent(item).key
+      && feedbackFor(item.id).at(-1)?.outcome !== 'unresolved';
   }
   function publicResult(publication, item) {
     const feedback = feedbackFor(item.id);
@@ -163,8 +164,10 @@ export function createResidentApi({ db, getComplaint, saveComplaint, transaction
       if (!Number.isSafeInteger(id) || id < 1) fail(404, 'Обращение не найдено.', 'NOT_FOUND');
       if (!action && req.method === 'GET') {
         const item = get(id), link = database().prepare('SELECT expires FROM resident_links WHERE complaint=?').get(id);
+        const publication = publicationFor(id);
         sendJson(res, 200, { version: item.version, hasLink: Boolean(link && link.expires > Date.now()), expiresAt: link ? new Date(link.expires).toISOString() : null,
-          feedback: feedbackFor(id).map(entry => ({ ...safeFeedback(entry), photo: entry.photo || null })), publication: publicationFor(id) });
+          feedback: feedbackFor(id).map(entry => ({ ...safeFeedback(entry), photo: entry.photo || null })),
+          publication: publication ? { ...publication, effectiveVisible: activePublication(publication, item) } : null });
         return true;
       }
       if (action === 'link' && req.method === 'POST') {
@@ -195,7 +198,7 @@ export function createResidentApi({ db, getComplaint, saveComplaint, transaction
           if (beforeAttachmentIds.length + afterAttachmentIds.length > 5 || beforeAttachmentIds.some(photo => afterAttachmentIds.includes(photo))) fail(422, 'Выберите до пяти разных фотографий до и после.');
           const publicationId = existing?.id ?? Number(database().prepare('INSERT INTO resident_publications(complaint,data) VALUES(?,?)').run(id, '{}').lastInsertRowid);
           const publication = { id: publicationId, complaintId: id, title, summary, beforeAttachmentIds, afterAttachmentIds, active: true,
-            publishedAt: new Date().toISOString(), completedAt: resolutionEvent(item).at, source: item.source };
+            publishedAt: new Date().toISOString(), completedAt: resolutionEvent(item).at, resolutionKey: resolutionEvent(item).key, source: item.source };
           database().prepare('UPDATE resident_publications SET data=? WHERE id=?').run(JSON.stringify(publication), publicationId);
           return publication;
         });
@@ -221,7 +224,7 @@ export function createResidentApi({ db, getComplaint, saveComplaint, transaction
         const body = await readJson(req, 3 * 1024 * 1024);
         fields(body, ['version', 'outcome', 'comment', 'requestId', 'photo']);
         if (!['confirmed', 'unresolved'].includes(body.outcome)) fail(422, 'Выберите результат проверки.');
-        const comment = string(body.comment ?? '', 2000, false), requestId = string(body.requestId, 100);
+        const comment = string(body.comment ?? '', 2000, body.outcome === 'unresolved'), requestId = string(body.requestId, 100);
         const photo = body.photo === undefined || body.photo === null ? null : imageFile(body.photo);
         const signature = digest(JSON.stringify({ version: body.version, outcome: body.outcome, comment, photo: photo ? { name: photo.name, mime: photo.mime, sha256: digest(photo.bytes) } : null }));
         const result = transact(() => {

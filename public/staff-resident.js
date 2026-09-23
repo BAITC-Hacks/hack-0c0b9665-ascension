@@ -18,6 +18,7 @@ export function mountResidentTools(container, complaint, user) {
   const base = `/api/desk/resident/complaints/${complaint.id}`;
   const manager = ['admin','akim'].includes(user?.role);
   let working = false;
+  let generatedLink = null;
   async function action(button, callback) {
     if (working) return;
     working = true;
@@ -25,14 +26,21 @@ export function mountResidentTools(container, complaint, user) {
     button.disabled = true; button.textContent = 'Подождите…'; status.textContent = '';
     try { await callback(); }
     catch (error) { status.textContent = /Timeout|Abort|fetch/i.test(error.message) ? 'Нет ответа от сервера. Данные формы сохранены — повторите действие.' : error.message; }
-    finally { working = false; button.disabled = false; button.textContent = label; }
+    finally { working = false; button.disabled = false; button.textContent = button.dataset.doneLabel || label; }
   }
   async function load() {
     content.textContent = 'Загружаем обратную связь…';
-    const info = await request(base);
+    let info;
+    try { info = await request(base); }
+    catch (error) {
+      content.textContent = '';
+      const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Повторить загрузку обратной связи';
+      retry.onclick = event => action(event.currentTarget, load); content.append(retry);
+      throw error;
+    }
     if (!section.isConnected) return;
     const publication = info.publication;
-    const published = publication?.active === true;
+    const published = publication?.effectiveVisible === true;
     const selected = (kind, id) => (publication?.[`${kind}AttachmentIds`] || []).includes(id);
     const photos = kind => complaint.attachments.map(photo => `<label class="publication-photo"><input type="checkbox" name="${kind}" value="${photo.id}"${selected(kind,photo.id) ? ' checked' : ''}><img src="/api/desk/attachments/${photo.id}" alt=""><span>${escape(photo.name)}</span></label>`).join('');
     content.innerHTML = `<p class="muted">Персональная ссылка открывает только это обращение, ответы и сроки. Она действует 90 дней. Передайте её самому жителю.</p>
@@ -41,21 +49,28 @@ export function mountResidentTools(container, complaint, user) {
       <div class="resident-link" hidden><label>Персональная ссылка<input readonly aria-label="Персональная ссылка"></label><div class="actions"><button type="button" data-copy>Копировать ссылку</button><a class="button" data-open target="_blank" rel="noopener noreferrer">Открыть страницу жителя</a></div><p class="muted">Сохраните ссылку сейчас. После закрытия карточки можно выпустить новую.</p></div>
       <h4>Обратная связь жителя</h4><div>${info.feedback.length ? info.feedback.map(feedback => `<article class="resident-feedback"><strong>${feedback.outcome === 'confirmed' ? 'Житель подтвердил решение' : 'Житель сообщил: проблема осталась'}</strong><p class="muted">${escape(formatDate(feedback.at))}</p><p class="detail-text">${escape(feedback.comment || 'Без комментария')}</p>${feedback.photo ? `<a href="/api/desk/attachments/${feedback.photo.id}" target="_blank" rel="noopener">Открыть фото жителя</a>` : ''}</article>`).join('') : '<p class="muted">Житель ещё не оценил результат.</p>'}</div>
       ${manager ? `<details class="publication"><summary>Публикация в «Что изменилось в городе»</summary><p class="muted">Публикуются только заполненные здесь текст и выбранные фотографии. Проверьте, что в них нет личных данных. Текст обращения и внутренние комментарии автоматически не переносятся.</p>
+      ${publication?.active && !published ? '<p>Предыдущий результат сейчас скрыт: обращение изменилось или поступило замечание жителя. После проверки обновите публикацию.</p>' : ''}
       ${complaint.status !== 'resolved' ? '<p>Публикация доступна после перевода обращения в статус «Решено».</p>' : ''}
       <form class="publication-form"><label>Публичный заголовок<input name="title" required maxlength="160" value="${escape(publication?.title || '')}" placeholder="Например: восстановили освещение в районе"></label><label>Описание выполненной работы<textarea name="summary" required maxlength="2000">${escape(publication?.summary || '')}</textarea></label>
       ${complaint.attachments.length ? `<fieldset><legend>Фотографии до</legend><div class="publication-photos">${photos('before')}</div></fieldset><fieldset><legend>Фотографии после</legend><div class="publication-photos">${photos('after')}</div></fieldset>` : '<p class="muted">Фотографий пока нет. Можно опубликовать результат без фото.</p>'}
       <button class="primary"${complaint.status !== 'resolved' ? ' disabled' : ''}>${published ? 'Обновить публикацию' : 'Опубликовать результат'}</button></form>
-      ${published ? '<button type="button" data-unpublish>Снять с публикации</button>' : ''}<p><a href="/results.html" target="_blank" rel="noopener">Посмотреть публичную страницу</a></p></details>` : '<p class="muted">Публичный результат может опубликовать аким или администратор.</p>'}`;
+      ${publication?.active ? '<button type="button" data-unpublish>Снять с публикации</button>' : ''}<p><a href="/results.html" target="_blank" rel="noopener">Посмотреть публичную страницу</a></p></details>` : '<p class="muted">Публичный результат может опубликовать аким или администратор.</p>'}`;
     content.querySelector('[data-link]').onclick = event => action(event.currentTarget, async () => {
       const data = await request(`${base}/link`, {version:complaint.version});
       if (!section.isConnected) return;
       const url = `${location.origin}/resident.html#${data.token}`;
+      generatedLink = url;
       const box = content.querySelector('.resident-link'); box.hidden = false;
       box.querySelector('input').value = url;
       box.querySelector('[data-open]').href = url;
-      content.querySelector('[data-link]').textContent = 'Заменить персональную ссылку';
+      content.querySelector('[data-link]').dataset.doneLabel = 'Заменить персональную ссылку';
       status.textContent = `Ссылка создана. Действует до ${formatDate(data.expiresAt)}. Предыдущая ссылка больше не действует.`;
     });
+    if (generatedLink) {
+      const box = content.querySelector('.resident-link'); box.hidden = false;
+      box.querySelector('input').value = generatedLink;
+      box.querySelector('[data-open]').href = generatedLink;
+    }
     content.querySelector('[data-copy]').onclick = event => action(event.currentTarget, async () => {
       const input = content.querySelector('.resident-link input');
       try { await navigator.clipboard.writeText(input.value); status.textContent = 'Ссылка скопирована.'; }
@@ -76,10 +91,5 @@ export function mountResidentTools(container, complaint, user) {
       await load(); status.textContent = 'Публикация скрыта. Обращение и фотографии сохранены в кабинете.';
     });
   }
-  void load().catch(error => {
-    content.textContent = '';
-    status.textContent = error.message;
-    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Повторить загрузку обратной связи';
-    retry.onclick = event => action(event.currentTarget,load); content.append(retry);
-  });
+  void load().catch(error => { status.textContent = error.message; });
 }

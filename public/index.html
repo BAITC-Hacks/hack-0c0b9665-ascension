@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/comparison.css">
   <link rel="stylesheet" href="/illustrations.css">
   <link rel="stylesheet" href="/budget-story.css"><link rel="stylesheet" href="/experience-nav.css">
+  <link rel="stylesheet" href="/workspace-tools.css">
+  <link rel="stylesheet" href="/district-explorer.css">
+  <link rel="stylesheet" href="/method-guide.css">
   <script type="module" src="/app.js"></script>
   <script type="module" src="/comparison.js"></script>
   <script type="module" src="/budget-story.js"></script>
@@ -28,10 +31,10 @@
       <a class="nav-item" href="/demo.html" title="Демонстрация за 90 секунд"><span aria-hidden="true">▷</span> Демонстрация за 90 секунд</a>
       <a class="nav-item" href="/resident.html" title="Моё обращение"><span aria-hidden="true">◎</span> Моё обращение</a>
       <a class="nav-item" href="/results.html" title="Что изменилось в городе"><span aria-hidden="true">✓</span> Что изменилось в городе</a>
-      <a class="nav-item active" href="#workspace"><span aria-hidden="true">▦</span> Конструктор решений</a>
-      <a class="nav-item" href="#city"><span aria-hidden="true">◫</span> Показатели районов</a>
-      <a class="nav-item" href="#results"><span aria-hidden="true">↗</span> Результат сценария</a>
-      <a class="nav-item" href="#method"><span aria-hidden="true">ⓘ</span> Как это работает</a>
+      <a class="nav-item active" href="#workspace" title="Конструктор решений" aria-current="location"><span aria-hidden="true">▦</span> Конструктор решений</a>
+      <a class="nav-item" href="#city" title="Показатели районов"><span aria-hidden="true">◫</span> Показатели районов</a>
+      <a class="nav-item" href="#results" title="Результат сценария"><span aria-hidden="true">↗</span> Результат сценария</a>
+      <a class="nav-item" href="#method" title="Как это работает"><span aria-hidden="true">ⓘ</span> Как это работает</a>
     </nav>
     <div class="sidebar-bottom">
       <div class="city-symbol" aria-hidden="true"><svg viewBox="0 0 176 114" fill="none"><path d="M4 110h168M18 110V65h22v45M25 65V49h8v16M51 110V39h24v71M58 39V27h10v12M88 110V66h23v44M126 110V50h33v60M133 50V35h19v15" stroke="currentColor" stroke-width="1.3"/><path d="M85 110 94 38M105 110 96 38M92 54h7M90 72h11" stroke="currentColor" stroke-width="2"/><circle cx="95" cy="27" r="11" fill="currentColor" opacity=".5"/><path d="M57 53h12m-12 12h12m-12 12h12m63-12h22m-22 12h22m-22 12h22" stroke="currentColor"/></svg></div>
@@ -60,8 +63,8 @@
         <section class="overview-grid" aria-label="Параметры сценария">
           <article class="overview-card"><div class="metric-label">Исходный Score <img class="metric-icon" src="/assets/illustrations/services.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number" id="baseline-score">—</div><div class="metric-description">Astana Quality of Life Score</div></article>
           <article class="overview-card"><div class="metric-label">Бюджет города <img class="metric-icon" src="/assets/illustrations/budget.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number"><span id="budget-total">—</span><small>у. е.</small></div><div class="metric-description">Единый старт для каждого сценария</div></article>
-          <article class="overview-card"><div class="metric-label">Осталось распределить <img class="metric-icon" src="/assets/illustrations/budget.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
-          <article class="overview-card"><div class="metric-label">Решений в сценарии <img class="metric-icon" src="/assets/illustrations/plan.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
+          <article class="overview-card"><div class="metric-label">Осталось распределить <img class="metric-icon" src="/assets/illustrations/budget-remaining.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number green"><span id="budget-left">—</span><small>у. е.</small></div><div class="budget-track"><span id="budget-bar"></span></div></article>
+          <article class="overview-card"><div class="metric-label">Решений в сценарии <img class="metric-icon" src="/assets/illustrations/decision-checklist.webp" alt="" width="56" height="56" decoding="async"></div><div class="metric-number"><span id="decision-count">0</span><small>/ 5</small></div><div id="decision-dots" class="decision-dots" aria-hidden="true"></div></article>
         </section>
 
         <section id="workspace" class="workspace" aria-label="Конструктор сценария">
@@ -69,6 +72,8 @@
             <div class="section-heading"><div><div class="eyebrow">01 / КОНСТРУКТОР</div><h2>Выберите инициативы</h2></div><span class="quiet-tag">14 мер · 5 направлений</span></div>
             <p class="section-description">Ровно 5 уникальных мер, не более 2 в одном направлении.</p>
             <div id="filters" class="filters" role="group" aria-label="Фильтр по направлению"></div>
+            <div class="catalog-tools"><label>Найти инициативу<input id="catalog-search" type="search" placeholder="Название, код или показатель" maxlength="100"></label><label>Порядок<select id="catalog-sort"><option value="catalog">По каталогу</option><option value="cost">Сначала дешевле</option><option value="lag">Сначала быстрые</option></select></label><label class="catalog-check"><input id="catalog-affordable" type="checkbox"> В пределах остатка</label><button type="button" class="retry-button" id="catalog-clear">Сбросить фильтры</button></div>
+            <p id="catalog-count" class="workspace-note" role="status"></p>
             <div id="error-box" class="error-box" role="alert" tabindex="-1" hidden></div>
             <div id="catalog" class="catalog-grid"></div>
           </div>
@@ -78,17 +83,20 @@
             <div class="plan-summary"><div><span>Стоимость решений</span><strong><span id="plan-total">0</span> <small>у. е.</small></strong></div><div><span>Остаток бюджета</span><strong class="green"><span id="plan-left">100</span> <small>у. е.</small></strong></div></div>
             <button id="simulate-button" class="button button-primary" disabled>Рассчитать сценарий <span aria-hidden="true">↗</span></button>
             <p id="simulate-hint" class="plan-hint">Выберите ещё 5 решений</p>
+            <p id="draft-status" class="workspace-note" role="status">Черновик сохраняется в этом браузере.</p><button id="undo-plan" type="button" class="retry-button" disabled>Отменить последнее изменение</button>
             <details class="rules"><summary>Ограничения и совместимость</summary><ul><li>Бюджет — не более 100 у. е.; ровно 100 допустимо.</li><li>Каждая мера используется один раз.</li><li>M1 и M3 несовместимы в любом районе.</li><li>M4 + M7 и M5 + M13 несовместимы в одном районе.</li><li>Для районной меры нужен один район. Городская действует во всех пяти.</li></ul></details>
           </aside>
         </section>
 
         <section id="results" class="results-section" aria-labelledby="result-heading">
           <div class="section-heading"><div><div class="eyebrow">02 / ВЛИЯНИЕ РЕШЕНИЙ</div><h2 id="result-heading">Результат сценария</h2></div><span id="result-state" class="quiet-tag">Ожидает расчёта</span></div>
-          <div id="result-placeholder" class="result-placeholder"><img class="result-placeholder-art" src="/assets/illustrations/people.webp" alt="" width="104" height="104" loading="lazy" decoding="async"><div><h3>У каждого решения есть последствия</h3><p>Соберите пять инициатив и рассчитайте их влияние на город.<br>Здесь появятся Score, изменения по районам и объяснение результата.</p></div></div>
+          <div id="result-placeholder" class="result-placeholder"><img class="result-placeholder-art" src="/assets/illustrations/people.webp" alt="" width="104" height="104" loading="lazy" decoding="async"><div><h3>У каждого решения есть последствия</h3><p>Соберите пять инициатив и рассчитайте их влияние на город.<br>Здесь появятся Score, изменения по районам и объяснение результата.</p><div class="workspace-actions"><a class="button button-outline" href="#workspace">Собрать свой сценарий</a><button id="calculate-example" class="button button-outline" type="button">Рассчитать пример</button></div></div></div>
           <div id="result-content" hidden></div>
+          <div id="result-actions" class="result-actions" hidden><button type="button" class="button button-outline" id="export-result">Скачать расчёт (JSON)</button><button type="button" class="button button-outline" id="export-indicators">Показатели (CSV)</button><button type="button" class="button button-outline" id="share-result">Ссылка на сценарий</button><button type="button" class="button button-outline" id="print-result">Печать отчёта</button><a class="button button-outline" href="#city">Разобрать по районам</a><p id="result-action-status" class="workspace-note" role="status"></p><label id="share-link-field" hidden>Скопируйте ссылку<input id="share-link" readonly></label></div>
         </section>
 
         <section id="comparison-panel"></section>
+        <section class="scenario-library table-panel" aria-labelledby="library-heading"><div><div class="eyebrow">ЛИЧНЫЕ СЦЕНАРИИ</div><h2 id="library-heading">Сохраните свои варианты</h2><p class="workspace-note">До 12 сценариев в этом браузере. Можно сохранить незаконченный план и вернуться к нему позже.</p></div><form id="local-scenario-form"><label>Название<input id="local-scenario-name" maxlength="80" required placeholder="Например: Безопасная Нура"></label><button class="button button-outline" id="save-local-scenario" disabled>Сохранить вариант</button></form><div id="local-scenarios"></div><p id="library-status" class="workspace-note" role="status"></p></section>
         <section id="saved-scenario-panel" class="table-panel" style="padding:24px;margin-top:24px"><h2>Сохранить сценарий команды</h2><p>Рассчитайте сценарий, затем сохраните его в кабинете. Потребуется вход в командную учётную запись.</p><form id="save-scenario-form"><label for="scenario-name">Название сценария</label> <input id="scenario-name" required maxlength="100" placeholder="Например: Приоритеты Нуры"><button id="save-scenario" class="button button-primary" disabled>Сохранить сценарий</button></form><p id="save-scenario-status" role="status"></p><a href="/desk.html">Открыть сохранённые сценарии и обращения</a></section>
 
         <section id="city" class="city-section" aria-labelledby="city-heading">

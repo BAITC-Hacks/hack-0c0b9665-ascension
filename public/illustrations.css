@@ -36,7 +36,7 @@
 .empty-plan { padding-top: 15px; }
 .empty-plan-art { display: block; width: 92px; height: 92px; object-fit: contain; margin: 0 auto 7px; flex-shrink: 0; }
 .district-heading { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
-.district-people { display: block; width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.district-art { display: block; width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
 .district-population { margin-top: 0; }
 .result-placeholder { padding: 24px 30px; background: linear-gradient(100deg, #f0f3eb 35%, #f0f3ebd9), url('/assets/illustrations/city-texture.webp') right center / cover; }
 .result-placeholder-art { width: 104px; height: 104px; flex-shrink: 0; object-fit: contain; }
@@ -62,6 +62,10 @@
   .metric-icon { width: 45px; height: 45px; right: 10px; top: 16px; }
   .direction-art { width: 46px; height: 46px; }
   .measure-category { gap: 4px; }
+}
+@media (min-width: 801px) and (max-width: 1050px) {
+  .district-heading { flex-direction: column-reverse; align-items: flex-start; gap: 6px; }
+  .district-population { margin-top: 5px; }
 }
 @media (max-width: 800px) {
   .hero { min-height: 326px; padding-top: 12px; }
@@ -103,4 +107,5 @@
   .hero-actions .text-button span { padding-left: 6px; }
   .metric-icon { width: 32px; height: 32px; }
   .metric-label { font-size: 9px; }
+  .district-art { width: 38px; height: 38px; }
 }
