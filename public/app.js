@@ -332,7 +332,7 @@ window.addEventListener('city:changed', (event) => {
 });
 document.querySelector('nav').addEventListener('click', (event) => {
   const link = event.target.closest('a');
-  if (!link) return;
+  if (!link || !link.hash || link.pathname !== location.pathname) return;
   if (!state.hasScenarioData && link.hash !== '#map-section') cityMap?.setCity('astana');
   document.querySelectorAll('.nav-item').forEach((item) => item.classList.toggle('active', item === link));
 });

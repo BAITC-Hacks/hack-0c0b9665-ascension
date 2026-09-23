@@ -4,6 +4,7 @@ import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBaseline, getDataset, simulate, validateScenario } from './core/simulator.js';
 import { explainScenario, isAIConfigured } from './ai/explain.js';
+import { createComplaintRoutes } from './complaints/http.js';
 
 const MAX_JSON_BYTES = 32 * 1024;
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
@@ -171,17 +172,19 @@ async function sendStatic(request, response, pathname, publicDir) {
 
 /** Create once per process to retain AI limits between requests, including in serverless adapters. */
 export function createRequestHandler({ explain = explainScenario, aiConfigured = isAIConfigured,
-  publicDir = DEFAULT_PUBLIC_DIR, aiLimits = {}, now = Date.now } = {}) {
+  publicDir = DEFAULT_PUBLIC_DIR, complaints = {}, aiLimits = {}, now = Date.now } = {}) {
   const staticRoot = resolve(publicDir);
+  const handleComplaints = createComplaintRoutes(complaints);
   const enterAI = createAIGuard(aiLimits, now);
   return async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
     response.setHeader('X-Frame-Options', 'DENY');
-    response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
     try {
       const pathname = getPath(request);
+      if (await handleComplaints(request, response, pathname, { readJson, sendJson })) return;
       const expectedMethod = API_METHODS.get(pathname);
       if (expectedMethod) {
         if (request.method !== expectedMethod) {
