@@ -51,20 +51,40 @@ function scenarioKey(scenario) {
     [measureId, districtId ?? null]).sort((a, b) => a[0].localeCompare(b[0])));
 }
 
-function validateResponse(data, expectedScenario) {
+const emptyConstraints = () => ({ lockedDecisions: [], protectedIndicator: null });
+const hasConstraints = value => value.lockedDecisions.length > 0 || value.protectedIndicator !== null;
+function constraintsKey(value) {
+  if (!record(value) || !Array.isArray(value.lockedDecisions)) return null;
+  return JSON.stringify([scenarioKey({ decisions: value.lockedDecisions }),
+    value.protectedIndicator?.indicatorId ?? null, value.protectedIndicator?.districtId ?? null]);
+}
+
+function validateResponse(data, expectedScenario, constraints) {
   if (!record(data) || data.valid !== true || data.scope !== 'single-decision-neighborhood'
     || typeof data.exhaustiveWithinScope !== 'boolean' || typeof data.truncated !== 'boolean'
     || !['explored', 'validCandidates', 'paretoCandidates', 'limit'].every((key) => nonnegativeInteger(data[key]))
     || !Array.isArray(data.options)) return false;
   const baseline = snapshot(data.baseline);
   if (!baseline || scenarioKey(baseline.scenario) !== scenarioKey(expectedScenario)) return false;
+  if (hasConstraints(constraints) && (data.constraintScope !== 'constrained'
+    || constraintsKey(data.constraints) !== constraintsKey(constraints))) return false;
   return data.options.every((option) => record(option) && typeof option.id === 'string'
     && snapshot(option) && record(option.delta)
     && metricDefinitions.every(([key]) => finite(option.delta[key]))
     && record(option.changed) && validDecision(option.changed.removed) && validDecision(option.changed.added)
     && record(option.objectives) && ['maximizeScore', 'maximizeWorst', 'minimizeCost']
       .every((key) => ['improved', 'unchanged', 'worse'].includes(option.objectives[key]))
-    && Array.isArray(option.selectedFor) && option.selectedFor.every((key) => Object.hasOwn(priorityLabels, key)));
+    && Array.isArray(option.selectedFor) && option.selectedFor.every((key) => Object.hasOwn(priorityLabels, key))
+    && constraints.lockedDecisions.every(lock => option.scenario.decisions.some(decision =>
+      decision.measureId === lock.measureId && decision.districtId === lock.districtId))
+    && (!constraints.protectedIndicator || baseline.result.districts.every(district => {
+      const protection = constraints.protectedIndicator;
+      if (protection.districtId && district.id !== protection.districtId) return true;
+      const candidate = option.result.districts.find(({ id }) => id === district.id);
+      return finite(candidate?.after?.[protection.indicatorId])
+        && finite(district.after?.[protection.indicatorId])
+        && candidate.after[protection.indicatorId] >= district.after[protection.indicatorId];
+    })));
 }
 
 function signed(value) {
@@ -111,7 +131,12 @@ export function mountPolicyOptionsPanel(container, {
   const baselineArea = element('div', 'policy-options-baseline');
   const summary = element('div', 'policy-options-summary');
   const cards = element('div', 'policy-options-cards');
-  root.append(heading, intro, verificationNote, status, baselineArea, summary, cards);
+  const constraintDetails = element('details', 'policy-options-constraints');
+  constraintDetails.append(element('summary', 'policy-options-constraints-title', 'Что обязательно сохранить'));
+  const constraintControls = element('div', 'policy-options-constraint-controls');
+  constraintDetails.append(constraintControls);
+  const constraintSummary = element('p', 'policy-options-constraint-summary');
+  root.append(heading, intro, verificationNote, constraintDetails, constraintSummary, status, baselineArea, summary, cards);
   container.append(root);
 
   let available = city?.hasScenarioData === true;
@@ -120,6 +145,7 @@ export function mountPolicyOptionsPanel(container, {
   let pending = null;
   let destroyed = false;
   let catalog = validCatalog(dataset);
+  let constraints = emptyConstraints();
 
   function setStatus(message, error = false) {
     status.textContent = message;
@@ -144,6 +170,8 @@ export function mountPolicyOptionsPanel(container, {
   function clear(message) {
     cancel();
     current = null;
+    constraints = emptyConstraints();
+    renderConstraintControls();
     baselineArea.replaceChildren();
     summary.replaceChildren();
     cards.replaceChildren();
@@ -184,18 +212,120 @@ export function mountPolicyOptionsPanel(container, {
     const measure = catalog?.measures?.find(({ id }) => id === decision.measureId);
     const district = catalog?.districts?.find(({ id }) => id === decision.districtId)
       ?? current?.result.districts.find(({ id }) => id === decision.districtId);
-    return `${decision.measureId} · ${measure?.name ?? 'Мера'} — ${decision.districtId
-      ? district?.name ?? decision.districtId : 'весь город'}`;
+    return `${measure?.name ?? `Мера (${decision.measureId}), название недоступно`} — ${decision.districtId
+      ? district?.name ?? `Район (${decision.districtId}), название недоступно` : 'весь город'}`;
+  }
+
+  function describeConstraints(value) {
+    const protection = value.protectedIndicator;
+    const indicator = catalog?.indicators?.find(({ id }) => id === protection?.indicatorId);
+    const district = catalog?.districts?.find(({ id }) => id === protection?.districtId);
+    return `Закреплено решений: ${value.lockedDecisions.length} из 5. ${protection
+      ? `Сохранять «${indicator?.name ?? 'Выбранный показатель'}» не ниже текущего рассчитанного плана: ${district?.name ?? 'во всех пяти районах'}.`
+      : 'Защита показателя от ухудшения не выбрана.'}`;
+  }
+
+  function constraintsChanged() {
+    cancel();
+    summary.replaceChildren();
+    cards.replaceChildren();
+    constraintSummary.textContent = describeConstraints(constraints);
+    setStatus('Ограничения изменены. Найдите альтернативы заново.');
+    updateButton();
+  }
+
+  function renderConstraintControls() {
+    constraintControls.replaceChildren();
+    constraintSummary.textContent = current ? describeConstraints(constraints) : '';
+    if (!available || !current) {
+      constraintControls.append(element('p', 'policy-options-constraint-help', 'Ограничения доступны после расчёта плана для города с данными модели.'));
+      return;
+    }
+    const locks = element('fieldset', 'policy-options-locks');
+    locks.append(element('legend', '', 'Не заменять меру и не переносить её в другой район'));
+    for (const decision of current.scenario.decisions) {
+      const label = element('label', 'policy-options-lock-label');
+      const checkbox = element('input', 'policy-options-lock');
+      checkbox.type = 'checkbox';
+      checkbox.checked = constraints.lockedDecisions.some(lock => scenarioKey({ decisions: [lock] }) === scenarioKey({ decisions: [decision] }));
+      checkbox.addEventListener('change', () => {
+        if (!available || !current || destroyed) return;
+        constraints.lockedDecisions = constraints.lockedDecisions.filter(lock => lock.measureId !== decision.measureId);
+        if (checkbox.checked) constraints.lockedDecisions.push({ ...decision });
+        constraintsChanged();
+      });
+      label.append(checkbox, element('span', '', decisionName(decision)));
+      locks.append(label);
+    }
+    constraintControls.append(locks);
+    if (!Array.isArray(catalog?.indicators)) {
+      constraintControls.append(element('p', 'policy-options-constraint-help', 'Каталог показателей недоступен. Защиту показателя можно выбрать после загрузки каталога.'));
+      return;
+    }
+    const priorityLabel = element('label', 'policy-options-priority-label', 'Сохранять значение показателя не ниже текущего плана');
+    const priority = element('select', 'policy-options-priority');
+    const addOption = (select, value, text) => {
+      const option = element('option', '', text);
+      option.value = value;
+      select.append(option);
+    };
+    addOption(priority, '', 'Без защиты показателя');
+    for (const indicator of catalog.indicators) addOption(priority, indicator.id, indicator.name);
+    priority.value = constraints.protectedIndicator?.indicatorId ?? '';
+    priorityLabel.append(priority);
+    const districtLabel = element('label', 'policy-options-priority-label', 'Территория защиты');
+    const district = element('select', 'policy-options-priority-district');
+    addOption(district, '', 'Все пять районов');
+    for (const item of catalog.districts) addOption(district, item.id, item.name);
+    district.value = constraints.protectedIndicator?.districtId ?? '';
+    district.disabled = !priority.value;
+    districtLabel.append(district);
+    const updateProtection = () => {
+      if (!available || !current || destroyed) return;
+      constraints.protectedIndicator = priority.value ? { indicatorId: priority.value,
+        ...(district.value ? { districtId: district.value } : {}) } : null;
+      district.disabled = !priority.value;
+      constraintsChanged();
+    };
+    priority.addEventListener('change', updateProtection);
+    district.addEventListener('change', updateProtection);
+    constraintControls.append(priorityLabel, districtLabel,
+      element('p', 'policy-options-constraint-help', 'Сравниваем значения модели после реализации мер на горизонте 8 кварталов. Это ограничение поиска, а не гарантия реального эффекта.'));
+  }
+
+  function renderWorsened(result, baseline) {
+    const rows = [];
+    for (const district of result.districts) {
+      const previous = baseline.districts.find(({ id }) => id === district.id);
+      if (!record(district.after) || !record(previous?.after)
+        || !Object.keys(previous.after).length || Object.keys(previous.after).some(id =>
+          !finite(previous.after[id]) || !finite(district.after[id]))) {
+        return element('p', 'policy-options-worsened', 'Данных для полного сравнения районных показателей недостаточно.');
+      }
+      for (const [id, value] of Object.entries(district.after ?? {})) {
+        const before = previous?.after?.[id];
+        if (!finite(before) || !finite(value) || value >= before) continue;
+        const name = catalog?.indicators?.find(indicator => indicator.id === id)?.name ?? `Показатель (${id})`;
+        rows.push(`${district.name}: ${name} — ${numberFormat.format(before)} → ${numberFormat.format(value)} (${signed(value - before)})`);
+      }
+    }
+    const details = element('details', 'policy-options-worsened');
+    details.append(element('summary', '', rows.length ? `Что ухудшается относительно вашего плана: ${rows.length}` : 'Ухудшений показателей относительно вашего плана нет'));
+    const list = element('ul', 'policy-options-worsened-list');
+    for (const row of rows) list.append(element('li', '', row));
+    details.append(list);
+    return details;
   }
 
   function renderResponse(data) {
     renderBaseline(data.baseline.result);
     summary.replaceChildren();
     cards.replaceChildren();
-    const coverage = data.exhaustiveWithinScope ? 'Все замены одного решения проверены.'
+    const coverage = data.exhaustiveWithinScope ? 'Все замены одного решения в рамках выбранных ограничений проверены.'
       : 'Проверена только часть замен одного решения.';
     summary.append(element('p', 'policy-options-coverage',
       `${coverage} Проверено: ${data.explored}. Допустимых: ${data.validCandidates}. Вариантов без доминирования: ${data.paretoCandidates}.`));
+    summary.append(element('p', 'policy-options-applied-constraints', describeConstraints(constraints)));
     if (!catalog) summary.append(element('p', 'policy-options-limit',
       'Названия мер недоступны. Меры обозначены кодами из каталога.'));
     if (!data.options.length) {
@@ -204,7 +334,7 @@ export function mountPolicyOptionsPanel(container, {
       return;
     }
     summary.append(element('p', 'policy-options-explanation',
-      'Это варианты Парето: среди проверенных замен и вашего плана нет другого варианта не хуже по всем трём целям и лучше хотя бы по одной. Выбирайте, какой компромисс подходит городу.'));
+      'Это варианты Парето в рамках выбранных ограничений: среди допустимых замен и вашего плана нет другого варианта не хуже по всем трём целям и лучше хотя бы по одной. За пределами ограничений могут быть другие варианты.'));
     if (data.truncated) summary.append(element('p', 'policy-options-limit',
       `Показано ${data.options.length} из ${data.paretoCandidates} вариантов. Список ограничен; это не все найденные компромиссы.`));
     for (const [index, option] of data.options.entries()) {
@@ -217,7 +347,8 @@ export function mountPolicyOptionsPanel(container, {
         element('p', 'policy-options-removed', decisionName(option.changed.removed)),
         element('p', 'policy-options-change-label', 'Выбрать'),
         element('p', 'policy-options-added', decisionName(option.changed.added)));
-      card.append(change, renderMetrics(option.result, option.delta, option.objectives));
+      card.append(change, renderMetrics(option.result, option.delta, option.objectives),
+        renderWorsened(option.result, data.baseline.result));
       const loadButton = element('button', 'policy-options-load', `Загрузить вариант ${index + 1}`);
       loadButton.type = 'button';
       const renderedSequence = sequence;
@@ -239,6 +370,7 @@ export function mountPolicyOptionsPanel(container, {
     cancel();
     const requestSequence = sequence;
     const scenario = structuredClone(current.scenario);
+    const requestedConstraints = structuredClone(constraints);
     const controller = new AbortController();
     let timedOut = false;
     pending = { controller, timer: null };
@@ -257,7 +389,8 @@ export function mountPolicyOptionsPanel(container, {
       const work = async () => {
         const response = await fetcher(endpoint, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scenario), signal: controller.signal,
+          body: JSON.stringify(hasConstraints(requestedConstraints)
+            ? { scenario, constraints: requestedConstraints } : scenario), signal: controller.signal,
         });
         if (!response.ok) {
           if (response.status === 404) throw new Error('Расчёт альтернатив пока не подключён. Ваш основной результат сохранён.');
@@ -266,7 +399,7 @@ export function mountPolicyOptionsPanel(container, {
           throw new Error(`Не удалось получить альтернативы (HTTP ${response.status}). Попробуйте ещё раз.`);
         }
         const data = await response.json();
-        if (!validateResponse(data, scenario)) throw new Error('Расчёт альтернатив вернул неполные или устаревшие данные. Пересчитайте план и повторите поиск.');
+        if (!validateResponse(data, scenario, requestedConstraints)) throw new Error('Расчёт альтернатив вернул неполные или устаревшие данные либо не подтвердил ограничения. Пересчитайте план и повторите поиск.');
         let names = catalog;
         if (!names) {
           try {
@@ -279,6 +412,7 @@ export function mountPolicyOptionsPanel(container, {
       const { data, names } = await Promise.race([work(), timeout]);
       if (destroyed || requestSequence !== sequence) return;
       catalog = names;
+      renderConstraintControls();
       renderResponse(data);
     } catch (error) {
       if (destroyed || requestSequence !== sequence) return;
@@ -301,6 +435,7 @@ export function mountPolicyOptionsPanel(container, {
     if (!available) return;
     current = snapshot(event.detail);
     if (!current) return;
+    renderConstraintControls();
     renderBaseline(current.result);
     setStatus('План рассчитан. Найдите альтернативы и сравните последствия одной замены.');
     updateButton();
