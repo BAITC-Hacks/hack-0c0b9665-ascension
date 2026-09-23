@@ -25,6 +25,10 @@
 .action-register-card-toggle { cursor: pointer; overflow-wrap: anywhere; }
 .action-register-card-preview { display: block; margin-top: 6px; color: #465e73; font-size: 13px; }
 .action-register-card-details[open] .action-register-card-toggle { margin-bottom: 14px; }
+.action-register-implementation { border-top: 1px solid #d3dee8; padding-top: 10px; margin-block: 12px; }
+.action-register-implementation-toggle { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.action-register-implementation[open] .action-register-implementation-toggle { margin-bottom: 10px; }
+.action-register-readiness { padding: 10px; border-radius: 6px; background: #fff4e6; color: #684612; font-size: 13px; }
 .action-register-field { display: flex; flex-direction: column; gap: 4px; margin-block: 10px; font-size: 13px; font-weight: 600; min-width: 0; }
 .action-register-field input, .action-register-field textarea, .action-register-field select { width: 100%; min-width: 0; max-width: 100%; border: 1px solid #9baebf; border-radius: 6px; padding: 9px; min-height: 42px; color: #14283b; background: white; font: 14px/1.4 system-ui, sans-serif; }
 .action-register-field textarea { resize: vertical; }
