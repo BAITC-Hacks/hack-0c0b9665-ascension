@@ -72,9 +72,82 @@ function mount() {
   status.setAttribute('aria-atomic', 'true');
   const slots = element('div', 'comparison-slots');
   const districtArea = element('div', 'comparison-districts');
-  root.append(title, intro, slots, districtArea, status);
+  const exportArea = element('div', 'comparison-export');
+  const exportButton = element('button', 'comparison-export-button', 'Скачать сравнение (JSON)');
+  exportButton.type = 'button';
+  const exportHint = element('p', 'comparison-export-hint');
+  exportHint.id = 'comparison-export-hint';
+  exportButton.setAttribute('aria-describedby', exportHint.id);
+  exportArea.append(exportButton, exportHint);
+  root.append(title, intro, slots, districtArea, exportArea, status);
   host.append(root);
   let saved = [];
+
+  // Only the public simulator contract belongs in the download. In particular,
+  // an unexpected event property must not export credentials or AI prose.
+  function exportResult(result) {
+    const numbers = ['totalCost', 'remainingBudget', 'score', 'weightedAverage',
+      'worstDistrictScore', 'criticalCount', 'baselineScore', 'deltaScore'];
+    const numericMap = (map) => Object.fromEntries(Object.entries(map ?? {})
+      .filter(([key, value]) => /^(T[12]|E[12]|S[12]|B[12]|C[12])$/.test(key) && finite(value)));
+    return {
+      valid: true,
+      errors: [],
+      ...Object.fromEntries(numbers.filter((field) => finite(result[field]))
+        .map((field) => [field, result[field]])),
+      districts: result.districts.map((district) => ({
+        id: district.id,
+        name: district.name,
+        before: numericMap(district.before),
+        after: numericMap(district.after),
+        delta: numericMap(district.delta),
+        beforeScore: district.beforeScore,
+        afterScore: district.afterScore,
+      })),
+      contributions: (Array.isArray(result.contributions) ? result.contributions : [])
+        .filter((item) => isRecord(item) && Array.isArray(item.districtIds))
+        .map((item) => ({
+          measureId: item.measureId,
+          districtIds: item.districtIds.filter((id) => typeof id === 'string'),
+          effects: numericMap(item.effects),
+          realizedFactor: item.realizedFactor,
+        })),
+      synergies: (Array.isArray(result.synergies) ? result.synergies : [])
+        .filter((item) => isRecord(item) && Array.isArray(item.pair))
+        .map((item) => ({
+          pair: [...item.pair],
+          districtId: item.districtId,
+          effects: numericMap(item.effects),
+        })),
+    };
+  }
+
+  exportButton.addEventListener('click', () => {
+    if (saved.length !== 2) return;
+    const slot = ({ scenario, result }) => ({
+      scenario: { decisions: scenario.decisions.map(({ measureId, districtId }) =>
+        districtId === undefined ? { measureId } : { measureId, districtId }) },
+      result: exportResult(result),
+    });
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      slots: { A: slot(saved[0]), B: slot(saved[1]) },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = element('a');
+    link.href = url;
+    link.download = 'akim-comparison.json';
+    root.append(link);
+    try {
+      link.click();
+      status.textContent = 'Сравнение A/B подготовлено к скачиванию.';
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  });
 
   function render() {
     slots.replaceChildren();
@@ -116,6 +189,11 @@ function mount() {
       slots.append(card);
     }
     renderDistricts();
+    exportButton.disabled = saved.length !== 2;
+    exportHint.textContent = saved.length === 0
+      ? 'Сначала рассчитайте два сценария.'
+      : saved.length === 1 ? 'Рассчитайте второй сценарий, чтобы скачать сравнение.'
+        : 'Скачаются два последних результата с исходной точностью чисел.';
   }
 
   function renderDistricts() {
