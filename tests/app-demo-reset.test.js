@@ -83,6 +83,7 @@ function mountApp() {
   app = context.app;
   return {
     app, element, events, requests, map,
+    on(type, listener) { window.addEventListener(type, listener); },
     fire(id, type = 'click', event = {}) {
       for (const listener of element(id).listeners.get(type) ?? []) listener(event);
     },
@@ -183,6 +184,17 @@ test('reset clears the current result and draft controls immediately without con
   assert.ok(harness.events.some(({ type }) => type === 'scenario:invalidated'));
   assert.equal(element('scenario-action-status').hidden, false);
   assert.ok(element('scenario-action-status').textContent);
+});
+
+test('reset leaves district controls rendered by the mounted explorer intact', () => {
+  const harness = mountApp();
+  harness.app.state.result = simulate({ decisions: harness.app.demo });
+  harness.on('scenario:invalidated', () => {
+    assert.equal(harness.app.state.result, null, 'panels must receive already-cleared state');
+    harness.element('district-summary').innerHTML = '<button data-explorer-district="nura">Нура</button>';
+  });
+  harness.fire('reset-button');
+  assert.match(harness.element('district-summary').innerHTML, /data-explorer-district="nura"/);
 });
 
 test('reset cancels pending validation and its late response cannot overwrite a newer demo run', async () => {

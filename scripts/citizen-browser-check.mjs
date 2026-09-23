@@ -156,9 +156,10 @@ try {
   assert.equal(await publicPage.locator('#demo-back').isDisabled(),true);
   assert.equal((await api('/api/desk/complaints')).total,beforeDemo,'Demo must not write complaints');
   await publicPage.goto(origin+'/');
-  await publicPage.getByRole('button',{name:'Загрузить демо',exact:true}).click();
+  await publicPage.getByRole('button',{name:'Запустить демо',exact:true}).click();
   await publicPage.waitForFunction(()=>document.querySelector('#decision-count')?.textContent==='5');
-  await publicPage.locator('#simulate-button').click();
+  await publicPage.locator('#result-actions:not([hidden])').waitFor();
+  await publicPage.waitForFunction(()=>!document.querySelector('#demo-button').disabled);
   await publicPage.locator('#budget-story-heading').waitFor();
   assert.match(await publicPage.locator('.budget-story').innerText(),/95 из 100/);
   await widthCheck(publicPage);
@@ -166,7 +167,7 @@ try {
   await publicPage.locator('[data-remove]').first().click();
   await publicPage.waitForFunction(()=>document.querySelector('#result-content').hidden);
   assert.equal(await publicPage.locator('.budget-story').count(),0);
-  await publicPage.getByRole('link',{name:'Демонстрация за 90 секунд',exact:true}).waitFor();
+  await publicPage.locator('.sidebar').getByRole('link',{name:'Демонстрация за 90 секунд',exact:true}).waitFor();
   assert.deepEqual(errors,[]);
   console.log('PASS: link creation/rotation, privacy, resident photo/negative/positive feedback, reopening, publication/photos/filter/removal, offline retry, mobile, demo flow, real budget explanation and invalidation.');
 } finally {

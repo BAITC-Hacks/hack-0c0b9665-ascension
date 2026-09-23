@@ -18,8 +18,13 @@ const browser = await chromium.launch({ headless: true, channel: process.env.PLA
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage(); page.setDefaultTimeout(12000);
 const errors = []; page.on('pageerror', error => errors.push(error.message));
+let simulationRequests = 0;
+page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/simulate') simulationRequests++; });
+const sectionLinks = ['#map-section', '#workspace', '#city', '#results', '#policy-options-panel', '#comparison-panel', '#scenario-library', '#method', '#decision-brief', '#action-register-panel', '#evidence-register-panel'];
+const pageLinks = ['/citizens.html', '/mayor.html', '/desk.html', '/akim.html', '/demo.html', '/resident.html', '/results.html'];
 const visible = selector => page.locator(`${selector}:not([hidden])`).waitFor();
 const count = value => page.waitForFunction(value => document.querySelector('#decision-count').textContent === String(value), value);
+const savedCard = () => page.locator('#scenario-library .library-item').filter({ has: page.getByRole('heading', { name: 'Нура <вариант>', exact: true }) });
 async function downloadText(selector) {
   const pending = page.waitForEvent('download'); await page.locator(selector).click();
   const file = await pending; return readFile(await file.path(), 'utf8');
@@ -27,23 +32,40 @@ async function downloadText(selector) {
 async function widthCheck() { assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Horizontal page overflow'); }
 try {
   await page.goto(origin + '/#city'); await visible('#app'); await page.locator('#explorer-district').waitFor();
-  assert.equal(await page.locator('.sidebar nav .nav-item').count(), 9);
+  const navigation = await page.locator('.sidebar nav .nav-item').evaluateAll(links => links.map(link => link.getAttribute('href')));
+  assert.deepEqual(navigation.sort(), [...sectionLinks, ...pageLinks].sort(), 'Every release section and page must have one sidebar entry');
+  for (const target of sectionLinks) assert.equal(await page.locator(target).count(), 1, `One section must exist for ${target}`);
   assert.equal(await page.locator('.sidebar a[href="#city"]').getAttribute('aria-current'), 'location');
-  for (const path of ['/desk.html', '/akim.html', '/demo.html', '/resident.html', '/results.html']) assert.equal((await context.request.get(origin + path)).status(), 200);
+  for (const path of ['/', ...pageLinks]) {
+    const response = await context.request.get(origin + path);
+    assert.equal(response.status(), 200, path);
+    assert.match(response.headers()['content-type'], /^text\/html\b/, path);
+    assert.match(await response.text(), /<title>[^<]+<\/title>/, `${path} must serve a titled page`);
+  }
+  assert.equal(await page.locator('#scenario-library .scenario-library-root').count(), 1, 'The scenario library must mount once');
+  assert.equal(await page.locator('#local-scenario-form').count(), 1, 'There must be one local save form');
   await page.locator('#catalog-search').fill('M12'); assert.equal(await page.locator('.measure-card').count(), 1);
   await page.locator('#catalog-search').fill('does-not-exist'); assert.equal(await page.locator('.measure-card').count(), 0);
   await page.locator('#catalog-clear').click(); assert.equal(await page.locator('.measure-card').count(), 14);
   await page.locator('#catalog-sort').selectOption('cost'); assert.equal(await page.locator('.measure-cost').first().innerText(), '10у. е.');
-  await page.locator('#demo-button').click(); await count(5);
+  const beforeDemo = simulationRequests;
+  await page.getByRole('button', { name: 'Запустить демо', exact: true }).click(); await count(5); await visible('#result-actions');
+  await page.waitForFunction(() => !document.getElementById('demo-button').disabled);
+  assert.equal(simulationRequests - beforeDemo, 1, 'One demo click must produce exactly one calculation');
+  assert.equal(await page.locator('.score-value').innerText(), '56,54');
+  assert.match(await page.locator('#scenario-action-status').innerText(), /Демо рассчитано/);
   await page.locator('#catalog-affordable').check(); assert.equal(await page.locator('.measure-card').count(), 0);
   await page.locator('#catalog-clear').click();
   await page.locator('[data-remove="M7"]').click(); await count(4);
   await page.locator('#undo-plan').click(); await count(5);
   await page.locator('#local-scenario-name').fill('Нура <вариант>'); await page.locator('#save-local-scenario').click();
-  assert.equal(await page.locator('.library-item').count(), 1);
+  assert.equal(await page.locator('#scenario-library .library-item').count(), 1);
+  assert.equal(await savedCard().count(), 1);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('akim-scenario-library-v1')));
   assert.equal(stored.schemaVersion, 1); assert.equal(stored.entries[0].modelId, 'official-astana-v1');
-  await page.reload(); await count(5); assert.equal(await page.locator('.library-item strong').innerText(), 'Нура <вариант>');
+  assert.equal(stored.entries[0].snapshot, null, 'The edited plan must not retain a stale calculated snapshot');
+  await page.reload(); await count(5); assert.equal(await savedCard().getByRole('heading').innerText(), 'Нура <вариант>');
+  assert.equal(await page.locator('#scenario-library .scenario-library-root').count(), 1);
   await page.locator('#simulate-button').click(); await visible('#result-actions');
   assert.equal(await page.locator('.score-value').innerText(), '56,54');
   assert.equal(await page.locator('#explorer-mode').inputValue(), 'comparison');
@@ -76,8 +98,16 @@ try {
   assert.equal(await page.locator('#result-actions').isHidden(), true);
   assert.equal(await page.locator('#save-scenario').isDisabled(), true, 'Stale server snapshot must not be saveable');
   assert.equal(await page.locator('#method-source').inputValue(), 'baseline');
+  await page.route('**/api/validate', route => route.abort());
   await page.locator('#reset-button').click(); await count(0);
-  await page.locator('[aria-label="Загрузить сценарий Нура <вариант>"]').click(); await count(5);
+  assert.equal(await page.locator('#error-box').isHidden(), true, 'Reset must work without server validation');
+  assert.equal(await page.locator('#result-actions').isHidden(), true);
+  assert.equal(await page.locator('#save-scenario').isDisabled(), true);
+  assert.equal(await savedCard().count(), 1, 'Reset must preserve the saved library');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('ascension.workspace.draft.v1')).decisions), [], 'Reset must clear the persisted draft');
+  await page.unroute('**/api/validate');
+  await savedCard().getByRole('button', { name: 'Загрузить в план', exact: true }).click(); await count(5);
+  assert.equal(await page.locator('#result-actions').isHidden(), true, 'A loaded plan requires a fresh calculation');
   await page.locator('#reset-button').click(); await count(0);
   await page.locator('[data-recommend-measure="M7"]').click();
   assert.equal(await page.locator('#district-M7').inputValue(), 'nura');
@@ -100,7 +130,7 @@ try {
   await page.evaluate(() => localStorage.setItem('ascension.workspace.draft.v1', '{broken'));
   await page.reload(); await visible('#app'); await count(0); assert.equal(await page.locator('#fatal-error').isHidden(), true);
   assert.deepEqual(errors, []);
-  console.log('PASS: all nine links, catalog filters/sort, undo, draft restore, shared scenario repository, exact calculation, JSON/CSV/share/print, district filters/recommendations, methodology, failed mutation recovery, stale-result invalidation and mobile layout.');
+  console.log('PASS: all 18 navigation links and 8 pages, one-click demo calculation, catalog filters/sort, undo, draft restore, single scenario library, exact calculation, JSON/CSV/share/print, district filters/recommendations, methodology, failed mutation recovery, offline reset preserving saved plans, stale-result invalidation and mobile layout.');
 } finally {
   await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(temp, { recursive: true, force: true });
 }

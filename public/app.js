@@ -175,7 +175,6 @@ function renderPlan() {
 
 function invalidateResult() {
   setActionStatus('');
-  window.dispatchEvent(new CustomEvent('scenario:invalidated'));
   state.version += 1;
   state.simulationId += 1;
   state.explanationId += 1;
@@ -191,6 +190,8 @@ function invalidateResult() {
   deskSnapshot = null;
   $('save-scenario').disabled = true;
   $('save-scenario-status').textContent = 'Рассчитайте текущий план перед сохранением в кабинет.';
+  // Let mounted panels restore their controls after the base result DOM is reset.
+  window.dispatchEvent(new CustomEvent('scenario:invalidated'));
 }
 
 async function applyDecisions(decisions, message, { remember = true } = {}) {
